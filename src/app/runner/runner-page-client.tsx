@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
+import { buildResultsEditUrl, normalizeResultYear } from '@/lib/results-correction-link';
 import { runnerNameMatches, surnameHash } from '@/lib/runner-name';
-import type { RaceInfo, RaceResult } from '@/types/datatable';
+import type { RaceInfo, RaceResult, ResultsFocusContext } from '@/types/datatable';
 
 interface RunnerPageClientProps {
   name?: string;
@@ -46,6 +47,12 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
+  const [focusedResultContext, setFocusedResultContext] = useState<ResultsFocusContext | null>(null);
+  const fallbackRaceId = results?.[0]?.raceId ?? null;
+  const fallbackYear = results?.[0] ? normalizeResultYear(results[0].year) : null;
+  const correctionRaceId = focusedResultContext?.raceId ?? fallbackRaceId;
+  const correctionYear = focusedResultContext?.year ?? fallbackYear;
+  const correctionLink = correctionRaceId && correctionYear ? buildResultsEditUrl(correctionRaceId, correctionYear) : null;
 
   useEffect(() => {
     setQuery(decodedName);
@@ -216,7 +223,41 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
             <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes.</p>
           </div>
         ) : results ? (
-          <RaceResultsDataTable data={results} races={races} showRaceTitle />
+          <div className="space-y-4">
+            <RaceResultsDataTable
+              data={results}
+              races={races}
+              showRaceTitle
+              enableRowFocus
+              onFocusContextChange={setFocusedResultContext}
+            />
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+              <p className="font-semibold">Spot an error in these results?</p>
+              {correctionLink ? (
+                <>
+                  <p className="mt-1">
+                    Submit a correction via{' '}
+                    <a
+                      href={correctionLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                    >
+                      the results editor
+                    </a>
+                    .
+                  </p>
+                  {focusedResultContext?.source === 'selected-row' && (
+                    <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                      Using selected row context: {focusedResultContext.raceId} ({focusedResultContext.year}).
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-1">Select a result row to generate an edit link for the correct race and year.</p>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="text-gray-600 dark:text-slate-300">No runner data available.</p>

@@ -161,7 +161,7 @@ export default function RaceResultsDataTable({
     });
 
     return result;
-  }, [data, filters, sortColumn, sortDirection, showYearFilter, races]);
+  }, [data, filters, sortColumn, sortDirection, showYearFilter, races, eras]);
 
   // Reset scroll position when filters/sort change
   useEffect(() => {
@@ -222,7 +222,7 @@ export default function RaceResultsDataTable({
       Object.keys(row.categoryPos).forEach((cat) => uniq.add(cat));
     });
     return Array.from(uniq).sort();
-  }, [data, filters.year, filters.name, filters.club, showYearFilter]);
+  }, [data, filters.year, filters.name, filters.club, showYearFilter, eras]);
 
   // Get unique years from data, sorted in ascending order
   const availableYears = useMemo(() => {
