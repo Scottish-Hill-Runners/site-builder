@@ -246,7 +246,10 @@ function validateRows(
         level: 'warning',
         message: 'Missing runner category',
       });
-    } else if (options.strictCategories && !ALLOWED_RUNNER_CATEGORIES.has(category)) {
+    } else if (
+      options.strictCategories &&
+      !ALLOWED_RUNNER_CATEGORIES.has(category)
+    ) {
       issues.push({
         file: filePath,
         row: rowNumber,

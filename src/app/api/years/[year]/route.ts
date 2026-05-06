@@ -27,6 +27,9 @@ export async function GET(
     }
 
     console.error('Failed to load year results for API route', year, error);
-    return NextResponse.json({ error: 'Failed to load year results' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to load year results' },
+      { status: 500 }
+    );
   }
 }

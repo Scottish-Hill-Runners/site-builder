@@ -24,13 +24,13 @@ export async function generateStaticParams() {
 export default async function InfoSlugPage({ params }: InfoSlugPageProps) {
   const { slug } = await params;
   const allItems = await getAllInfoItems();
-  
+
   // First try the exact path
   let displaySlug = slug.join('/');
   if (!allItems.find((item) => item.slug === displaySlug)) {
     // If not found, try with /index appended
     displaySlug = `${displaySlug}/index`;
   }
-  
+
   return <InfoPageContent slug={displaySlug} />;
 }

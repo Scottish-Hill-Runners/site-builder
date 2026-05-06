@@ -16,12 +16,16 @@ function extractTitle(markdown: string): string {
 }
 
 /** Recursively collect all .md files under `dir`, returning slug (relative path without .md) and filePath. */
-function collectFiles(dir: string, base = ''): { slug: string; filePath: string }[] {
+function collectFiles(
+  dir: string,
+  base = ''
+): { slug: string; filePath: string }[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(dir, entry.name);
     const rel = base ? `${base}/${entry.name}` : entry.name;
     if (entry.isDirectory()) return collectFiles(fullPath, rel);
-    if (entry.name.endsWith('.md')) return [{ slug: rel.replace(/\.md$/, ''), filePath: fullPath }];
+    if (entry.name.endsWith('.md'))
+      return [{ slug: rel.replace(/\.md$/, ''), filePath: fullPath }];
     return [];
   });
 }
@@ -56,7 +60,8 @@ function buildInfo() {
 
       return {
         slug,
-        title: ((data.title as string | undefined)?.trim()) || extractTitle(content),
+        title:
+          (data.title as string | undefined)?.trim() || extractTitle(content),
         content: content.replace(/\u00a0/g, ' '),
       };
     });

@@ -21,17 +21,27 @@ export default async function ClubSlugPage({ params }: ClubSlugPageProps) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-      <nav aria-label="Breadcrumb" className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+      >
         <ol role="list" className="flex flex-wrap gap-2">
           <li>
-            <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+            <Link href="/" className="text-blue-600 hover:text-blue-800">
+              Home
+            </Link>
           </li>
           <li aria-hidden="true">/</li>
           <li>
-            <Link href="/clubs" className="text-blue-600 hover:text-blue-800">Clubs</Link>
+            <Link href="/clubs" className="text-blue-600 hover:text-blue-800">
+              Clubs
+            </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
+          <li
+            className="font-semibold text-slate-900 dark:text-slate-100"
+            aria-current="page"
+          >
             {club?.name ?? slug}
           </li>
         </ol>
@@ -57,7 +67,9 @@ export default async function ClubSlugPage({ params }: ClubSlugPageProps) {
         )}
 
         {club === null || club.content.trim() === '' ? (
-          <p className="text-slate-600 dark:text-slate-300">No information available.</p>
+          <p className="text-slate-600 dark:text-slate-300">
+            No information available.
+          </p>
         ) : (
           <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>

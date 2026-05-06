@@ -23,7 +23,11 @@ const hashes: Record<string, string> = {};
 for (const filePath of files) {
   const absPath = path.join(publicDir, filePath);
   const buffer = fs.readFileSync(absPath);
-  const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 8);
+  const hash = crypto
+    .createHash('sha256')
+    .update(buffer)
+    .digest('hex')
+    .slice(0, 8);
   hashes[filePath] = hash;
 }
 

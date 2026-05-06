@@ -14,7 +14,10 @@ interface RacePageClientProps {
   } | null;
 }
 
-export default function RacePageClient({ raceId, raceImages }: RacePageClientProps) {
+export default function RacePageClient({
+  raceId,
+  raceImages,
+}: RacePageClientProps) {
   const [data, setData] = useState<RaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -31,7 +34,7 @@ export default function RacePageClient({ raceId, raceImages }: RacePageClientPro
       try {
         const result = await fetchJsonWithApiFallback<RaceData>(
           `/api/races/${encodeURIComponent(raceId)}`,
-          `/results/${encodeURIComponent(raceId)}.json.gz`,
+          `/results/${encodeURIComponent(raceId)}.json.gz`
         );
 
         if (!isCancelled) {
@@ -47,7 +50,9 @@ export default function RacePageClient({ raceId, raceImages }: RacePageClientPro
       } catch (error) {
         console.error('Failed to fetch race data on client:', error);
         if (!isCancelled) {
-          setErrorMessage('Failed to load race results. Please try again later.');
+          setErrorMessage(
+            'Failed to load race results. Please try again later.'
+          );
           setData(null);
         }
       } finally {
@@ -64,31 +69,48 @@ export default function RacePageClient({ raceId, raceImages }: RacePageClientPro
   }, [raceId]);
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8">
+    <main
+      id="main-content"
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
+    >
       <div className="max-w-6xl mx-auto">
-        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+        >
           <ol role="list" className="flex flex-wrap gap-2">
             <li>
-              <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-800">
+                Home
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
             <li>
-              <Link href="/races" className="text-blue-600 hover:text-blue-800">Races</Link>
+              <Link href="/races" className="text-blue-600 hover:text-blue-800">
+                Races
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
-              {isLoading ? 'Loading...' : data?.info.title ?? raceId}
+            <li
+              className="font-semibold text-slate-900 dark:text-slate-100"
+              aria-current="page"
+            >
+              {isLoading ? 'Loading...' : (data?.info.title ?? raceId)}
             </li>
           </ol>
         </nav>
 
         {isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">Loading race results...</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              Loading race results...
+            </p>
           </div>
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Race not found.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Race not found.
+            </p>
             <Link
               href="/races"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -99,7 +121,9 @@ export default function RacePageClient({ raceId, raceImages }: RacePageClientPro
         ) : errorMessage ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-2 font-semibold text-red-600">{errorMessage}</p>
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes or choose another race.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Try again in a few minutes or choose another race.
+            </p>
             <Link
               href="/races"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -109,7 +133,9 @@ export default function RacePageClient({ raceId, raceImages }: RacePageClientPro
           </div>
         ) : data ? (
           <>
-            <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">{data.info.title}</h1>
+            <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
+              {data.info.title}
+            </h1>
             <RaceDetailsTabs
               raceId={raceId}
               race={data.info}
@@ -124,7 +150,9 @@ export default function RacePageClient({ raceId, raceImages }: RacePageClientPro
           </>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">No race data available.</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              No race data available.
+            </p>
           </div>
         )}
       </div>

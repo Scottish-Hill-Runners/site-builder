@@ -17,7 +17,9 @@ interface ChampionshipPageClientProps {
   series: string;
 }
 
-export default function ChampionshipPageClient({ series }: ChampionshipPageClientProps) {
+export default function ChampionshipPageClient({
+  series,
+}: ChampionshipPageClientProps) {
   const [data, setData] = useState<ChampionshipData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -32,7 +34,9 @@ export default function ChampionshipPageClient({ series }: ChampionshipPageClien
       setIsNotFound(false);
 
       try {
-        const result = await fetchGzipJson<ChampionshipData[]>('/championships.json.gz');
+        const result = await fetchGzipJson<ChampionshipData[]>(
+          '/championships.json.gz'
+        );
 
         if (!isCancelled) {
           if (result.status === 'ok') {
@@ -51,7 +55,9 @@ export default function ChampionshipPageClient({ series }: ChampionshipPageClien
       } catch (error) {
         console.error('Failed to fetch championship data on client:', error);
         if (!isCancelled) {
-          setErrorMessage('Failed to load championship data. Please try again later.');
+          setErrorMessage(
+            'Failed to load championship data. Please try again later.'
+          );
         }
       } finally {
         if (!isCancelled) {
@@ -67,31 +73,51 @@ export default function ChampionshipPageClient({ series }: ChampionshipPageClien
   }, [series]);
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8">
+    <main
+      id="main-content"
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
+    >
       <div className="max-w-4xl mx-auto">
-        <nav aria-label="Breadcrumb" className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-6 text-sm text-slate-500 dark:text-slate-400"
+        >
           <ol role="list" className="flex flex-wrap gap-2">
             <li>
-              <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-800">
+                Home
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
             <li>
-              <Link href="/championships" className="text-blue-600 hover:text-blue-800">Championships</Link>
+              <Link
+                href="/championships"
+                className="text-blue-600 hover:text-blue-800"
+              >
+                Championships
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
-              {isLoading ? 'Loading...' : data?.title ?? series}
+            <li
+              className="font-semibold text-slate-900 dark:text-slate-100"
+              aria-current="page"
+            >
+              {isLoading ? 'Loading...' : (data?.title ?? series)}
             </li>
           </ol>
         </nav>
 
         {isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">Loading championship...</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              Loading championship...
+            </p>
           </div>
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Championship not found.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Championship not found.
+            </p>
             <Link
               href="/championships"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -102,7 +128,9 @@ export default function ChampionshipPageClient({ series }: ChampionshipPageClien
         ) : errorMessage ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-2 font-semibold text-red-600">{errorMessage}</p>
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes or choose another championship.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Try again in a few minutes or choose another championship.
+            </p>
             <Link
               href="/championships"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -112,7 +140,9 @@ export default function ChampionshipPageClient({ series }: ChampionshipPageClien
           </div>
         ) : data ? (
           <div className="rounded-lg bg-white p-8 shadow-md dark:bg-slate-900">
-            <h1 className="mb-2 text-4xl font-bold text-slate-900 dark:text-slate-100">{data.title}</h1>
+            <h1 className="mb-2 text-4xl font-bold text-slate-900 dark:text-slate-100">
+              {data.title}
+            </h1>
             <div className="mb-6 flex flex-wrap gap-2">
               {Object.keys(data.years)
                 .sort((a, b) => Number(b) - Number(a))
@@ -127,7 +157,9 @@ export default function ChampionshipPageClient({ series }: ChampionshipPageClien
                 ))}
             </div>
             <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.contents}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {data.contents}
+              </ReactMarkdown>
             </div>
           </div>
         ) : null}

@@ -84,10 +84,7 @@ function normaliseRunnerName(rawName: unknown): string | null {
         part
           .split('-')
           .map((hyphenated) =>
-            hyphenated
-              .split("'")
-              .map(titleCaseSegment)
-              .join("'")
+            hyphenated.split("'").map(titleCaseSegment).join("'")
           )
           .join('-')
       )
@@ -139,19 +136,15 @@ for (const club of clubs) {
 }
 
 function likelySex(category: string): string {
-  if (/W(OM[EA]N)?|F(EMALE)?|L(ADY)?|G(IRL)?/i.test(category))
-    return 'F';
-  if (/(A|NB?|NON[-\s]?BINARY)/i.test(category))
-    return 'NB';
+  if (/W(OM[EA]N)?|F(EMALE)?|L(ADY)?|G(IRL)?/i.test(category)) return 'F';
+  if (/(A|NB?|NON[-\s]?BINARY)/i.test(category)) return 'NB';
   return 'M';
 }
 
 function categoryAge(category: string): number | null {
   const match = category.match(/(\d+)/);
-  if (match)
-    return Number.parseInt(match[1], 10);
-  if (/(JNR|JUN(IOR)?|U(NDER)?)/i.test(category))
-    return 23;
+  if (match) return Number.parseInt(match[1], 10);
+  if (/(JNR|JUN(IOR)?|U(NDER)?)/i.test(category)) return 23;
   if (/(V(VET)?)/i.test(category))
     return /S(EN(IOR)?)?/i.test(category) ? 50 : 40;
   return null;
@@ -177,7 +170,8 @@ async function readRaceInstance(
         const age = categoryAge(category) ?? 30; // Assume 30+ if no age info in category, to give a category position.
         const catPos = {} as PosByCategory;
         if (age <= 23) {
-          catPos[sex + 23] = posByCategory[sex + 23] = (posByCategory?.[sex + 23] ?? 0) + 1;
+          catPos[sex + 23] = posByCategory[sex + 23] =
+            (posByCategory?.[sex + 23] ?? 0) + 1;
           catPos[sex] = posByCategory[sex] = (posByCategory?.[sex] ?? 0) + 1;
         } else {
           let catIncr = 10;
@@ -186,7 +180,7 @@ async function readRaceInstance(
             catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
             if (a == 60) catIncr = 5;
           }
-       }
+        }
 
         return catPos;
       };
@@ -194,7 +188,8 @@ async function readRaceInstance(
       progress(`Processing results from ${raceInstancePath}`);
       return jsonArray.flatMap((json) => {
         const name = normaliseRunnerName(
-          json.Name ?? `${json.Firstname ?? json.FirstName ?? ''} ${json.Surname ?? ''}`
+          json.Name ??
+            `${json.Firstname ?? json.FirstName ?? ''} ${json.Surname ?? ''}`
         );
         if (!name) return [];
 
@@ -203,22 +198,24 @@ async function readRaceInstance(
         )
           .trim()
           .toUpperCase();
-        return [{
-          raceId: raceId,
-          year: path.basename(raceInstancePath, '.csv'),
-          position: parseInt(
-            json.RunnerPosition ??
-              json.FinishPosition ??
-              json.Position ??
-              json.Pos
-          ),
-          name,
-          club:
-            clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club,
-          category: category == '' ? 'M' : category,
-          categoryPos: updateCategoryPos(category),
-          time: formatTime((json.FinishTime ?? json.Time) as string),
-        }];
+        return [
+          {
+            raceId: raceId,
+            year: path.basename(raceInstancePath, '.csv'),
+            position: parseInt(
+              json.RunnerPosition ??
+                json.FinishPosition ??
+                json.Position ??
+                json.Pos
+            ),
+            name,
+            club:
+              clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club,
+            category: category == '' ? 'M' : category,
+            categoryPos: updateCategoryPos(category),
+            time: formatTime((json.FinishTime ?? json.Time) as string),
+          },
+        ];
       });
     });
 }
@@ -238,10 +235,12 @@ async function readRaceResults(raceId: string): Promise<RaceResult[]> {
 
 async function readResults(): Promise<RaceResult[]> {
   return await Promise.all(
-    fs.readdirSync(contentPath('races'), { withFileTypes: true }).flatMap((raceId) => {
-      if (!raceId.isDirectory()) return Promise.resolve([] as RaceResult[]);
-      return readRaceResults(path.join(contentPath('races'), raceId.name));
-    })
+    fs
+      .readdirSync(contentPath('races'), { withFileTypes: true })
+      .flatMap((raceId) => {
+        if (!raceId.isDirectory()) return Promise.resolve([] as RaceResult[]);
+        return readRaceResults(path.join(contentPath('races'), raceId.name));
+      })
   ).then((result) => result.flat());
 }
 
@@ -317,7 +316,11 @@ function parseEras(raw: string | undefined): Era[] | undefined {
     }
     const rangeMatch = label.match(/^(\d{4})-(\d{4})$/);
     if (rangeMatch) {
-      eras.push({ label, from: parseInt(rangeMatch[1], 10), to: parseInt(rangeMatch[2], 10) });
+      eras.push({
+        label,
+        from: parseInt(rangeMatch[1], 10),
+        to: parseInt(rangeMatch[2], 10),
+      });
       continue;
     }
     progress(`Warning: unrecognised era "${label}" — skipping`);
@@ -362,9 +365,14 @@ function writeRaceData(allResults: RaceResult[]) {
     if (hasGpx) {
       const gpxSrc = path.join(raceDir, 'route.gpx');
       fs.copyFileSync(gpxSrc, `${outputDir}/${raceId}.gpx`);
-      const elevationData = buildElevationChartData(fs.readFileSync(gpxSrc, 'utf-8'));
+      const elevationData = buildElevationChartData(
+        fs.readFileSync(gpxSrc, 'utf-8')
+      );
       if (elevationData)
-        fs.writeFileSync(`${outputDir}/${raceId}-elevation.json`, JSON.stringify(elevationData));
+        fs.writeFileSync(
+          `${outputDir}/${raceId}-elevation.json`,
+          JSON.stringify(elevationData)
+        );
     }
     if (hasRaceMap)
       fs.copyFileSync(
@@ -434,9 +442,13 @@ function readChampionships(): ChampionshipData[] {
     // Extract year data from frontmatter
     for (const [key, value] of Object.entries(data)) {
       if (/^\d{4}$/.test(key) && typeof value === 'string') {
-        const raceIds = value === 'n/a' 
-          ? [] 
-          : value.split(';').map((id: string) => id.trim()).filter((id: string) => id);
+        const raceIds =
+          value === 'n/a'
+            ? []
+            : value
+                .split(';')
+                .map((id: string) => id.trim())
+                .filter((id: string) => id);
         years[key] = raceIds;
       }
     }
@@ -471,13 +483,21 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
     content: info,
     active: activeClubNames.has(name),
   }));
-  writeGz(path.join(process.cwd(), 'public'), 'clubs.json', JSON.stringify(output));
+  writeGz(
+    path.join(process.cwd(), 'public'),
+    'clubs.json',
+    JSON.stringify(output)
+  );
   progress('Wrote clubs.json.gz');
 }
 
 function writeChampionshipData(championships: ChampionshipData[]): void {
   progress(`Read ${championships.length} championships`);
-  writeGz(path.join(process.cwd(), 'public'), 'championships.json', JSON.stringify(championships));
+  writeGz(
+    path.join(process.cwd(), 'public'),
+    'championships.json',
+    JSON.stringify(championships)
+  );
   progress('Wrote championships.json.gz');
 }
 
@@ -499,13 +519,13 @@ function parseTimeToSeconds(time: string): number | null {
   if (parts.length === 2) {
     const minutes = Number.parseFloat(parts[0]);
     const seconds = Number.parseFloat(parts[1]);
-    return (minutes * 60) + seconds;
+    return minutes * 60 + seconds;
   }
 
   const hours = Number.parseFloat(parts[0]);
   const minutes = Number.parseFloat(parts[1]);
   const seconds = Number.parseFloat(parts[2]);
-  return (hours * 3600) + (minutes * 60) + seconds;
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 function pointsWithWinnerBonus(position: number): number {
@@ -529,7 +549,7 @@ function writeChampionshipResultsData(
       const championshipResults =
         championship.slug === 'Under23'
           ? results.filter(isUnder23Result)
-          : results.map(r => ({...r})); // clone to allow mutation if needed
+          : results.map((r) => ({ ...r })); // clone to allow mutation if needed
 
       // Compute points for this series + year
       const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
@@ -540,9 +560,9 @@ function writeChampionshipResultsData(
           }
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
           const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
-          
+
           if (!raceWinnerTimes.has(sex)) {
-            // Because results are generally ordered by position within the CSV, 
+            // Because results are generally ordered by position within the CSV,
             // the first runner we see for a given sex should be that sex's winner.
             const runnerTime = parseTimeToSeconds(row.time);
             if (runnerTime !== null && runnerTime > 0) {
@@ -556,12 +576,18 @@ function writeChampionshipResultsData(
         const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
         if (championship.slug === 'LongClassics') {
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId);
-          const winnerTime = raceWinnerTimes ? raceWinnerTimes.get(sex) : undefined;
+          const winnerTime = raceWinnerTimes
+            ? raceWinnerTimes.get(sex)
+            : undefined;
           const runnerTime = parseTimeToSeconds(row.time);
-          row.points = (!winnerTime || !runnerTime || runnerTime <= 0)
-            ? 0
-            : Math.round((winnerTime / runnerTime) * 1000);
-        } else if (championship.slug === 'SHR' || championship.slug === 'Under23') {
+          row.points =
+            !winnerTime || !runnerTime || runnerTime <= 0
+              ? 0
+              : Math.round((winnerTime / runnerTime) * 1000);
+        } else if (
+          championship.slug === 'SHR' ||
+          championship.slug === 'Under23'
+        ) {
           const categoryPosition = row.categoryPos[sex] ?? row.position;
           row.points = pointsWithWinnerBonus(categoryPosition);
         } else {
@@ -607,32 +633,36 @@ async function writeCalendarData(): Promise<void> {
       return true;
     })
     .map((row) => {
-    const raceId = String(row.Race ?? '').trim();
-    const raceIndexPath = contentPath('races', raceId, 'index.md');
-    if (!raceId || !fs.existsSync(raceIndexPath)) {
-      return {
+      const raceId = String(row.Race ?? '').trim();
+      const raceIndexPath = contentPath('races', raceId, 'index.md');
+      if (!raceId || !fs.existsSync(raceIndexPath)) {
+        return {
+          Date: String(row.Date ?? '').trim(),
+          raceName: raceId,
+        };
+      }
+
+      const { data } = matter.read(raceIndexPath);
+      const entry: CalendarEntry = {
         Date: String(row.Date ?? '').trim(),
-        raceName: raceId,
+        raceName: String(data.title ?? raceId),
+        raceId,
       };
-    }
 
-    const { data } = matter.read(raceIndexPath);
-    const entry: CalendarEntry = {
-      Date: String(row.Date ?? '').trim(),
-      raceName: String(data.title ?? raceId),
-      raceId,
-    };
+      const distance = parseFloat(String(data.distance ?? ''));
+      if (!Number.isNaN(distance)) entry.distance = distance;
 
-    const distance = parseFloat(String(data.distance ?? ''));
-    if (!Number.isNaN(distance)) entry.distance = distance;
+      const climb = parseFloat(String(data.climb ?? ''));
+      if (!Number.isNaN(climb)) entry.climb = climb;
 
-    const climb = parseFloat(String(data.climb ?? ''));
-    if (!Number.isNaN(climb)) entry.climb = climb;
+      return entry;
+    });
 
-    return entry;
-  });
-
-  writeGz(path.join(process.cwd(), 'public'), 'calendar.json', JSON.stringify(entries));
+  writeGz(
+    path.join(process.cwd(), 'public'),
+    'calendar.json',
+    JSON.stringify(entries)
+  );
   progress('Wrote calendar.json.gz');
 }
 

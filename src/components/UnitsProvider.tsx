@@ -18,7 +18,11 @@ export function useUnits(): UnitsContextValue {
   return useContext(UnitsContext);
 }
 
-export default function UnitsProvider({ children }: { children: React.ReactNode }) {
+export default function UnitsProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [imperial, setImperialState] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -30,7 +34,10 @@ export default function UnitsProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, imperial ? 'imperial' : 'metric');
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        imperial ? 'imperial' : 'metric'
+      );
     } catch {
       // localStorage unavailable — preference won't persist
     }

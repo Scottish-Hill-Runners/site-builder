@@ -16,8 +16,7 @@ export function getLatestResultYear(results: RaceResult[]): string | null {
 
   for (const row of results) {
     const year = normalizeResultYear(row.year);
-    if (year && (latestYear === null || year > latestYear))
-      latestYear = year;
+    if (year && (latestYear === null || year > latestYear)) latestYear = year;
   }
 
   return latestYear;

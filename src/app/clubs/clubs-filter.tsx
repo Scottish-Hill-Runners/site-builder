@@ -37,7 +37,11 @@ export default function ClubsFilter({ items }: ClubsFilterProps) {
             strokeWidth={2}
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+            />
           </svg>
         </div>
         <input
@@ -59,11 +63,16 @@ export default function ClubsFilter({ items }: ClubsFilterProps) {
       )}
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-slate-400">No clubs match your search.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          No clubs match your search.
+        </p>
       ) : (
         <ul className="space-y-2">
           {filtered.map((club) => (
-            <li key={club.slug} className={club.active === false ? 'opacity-50' : undefined}>
+            <li
+              key={club.slug}
+              className={club.active === false ? 'opacity-50' : undefined}
+            >
               <Link
                 href={`/clubs/${club.slug}`}
                 className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"

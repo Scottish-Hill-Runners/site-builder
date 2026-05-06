@@ -47,7 +47,10 @@ function resolveRepo(repo: string): string {
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
       const url = new URL(trimmed);
-      const parts = url.pathname.replace(/^\//, '').replace(/\.git$/, '').split('/');
+      const parts = url.pathname
+        .replace(/^\//, '')
+        .replace(/\.git$/, '')
+        .split('/');
       if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
     } catch {
       // fall through
@@ -58,7 +61,9 @@ function resolveRepo(repo: string): string {
 
 function getContentSha(root: string): string {
   try {
-    return execSync(`git -C "${root}" rev-parse HEAD`, { stdio: ['ignore', 'pipe', 'ignore'] })
+    return execSync(`git -C "${root}" rev-parse HEAD`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
       .toString()
       .trim();
   } catch {
@@ -71,8 +76,15 @@ function readYaml<T>(filePath: string): T | null {
   return parseYaml(fs.readFileSync(filePath, 'utf-8')) as T;
 }
 
-function resolveItem<T extends { path: string }>(item: T, baseUrl: string): T & { sourcePath: string; imageUrl: string } {
-  return { ...item, sourcePath: item.path, imageUrl: `${baseUrl}/${encodeRepoPath(item.path)}` };
+function resolveItem<T extends { path: string }>(
+  item: T,
+  baseUrl: string
+): T & { sourcePath: string; imageUrl: string } {
+  return {
+    ...item,
+    sourcePath: item.path,
+    imageUrl: `${baseUrl}/${encodeRepoPath(item.path)}`,
+  };
 }
 
 // ── Main build ─────────────────────────────────────────────────────────────
@@ -82,19 +94,33 @@ function buildImageCollections() {
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const root = contentRoot();
-  const repo = resolveRepo(process.env.CONTENT_REPO || 'Scottish-Hill-Runners/contents');
+  const repo = resolveRepo(
+    process.env.CONTENT_REPO || 'Scottish-Hill-Runners/contents'
+  );
   const sha = getContentSha(root);
   const baseUrl = `https://raw.githubusercontent.com/${repo}/${sha}`;
 
-  progress(`Building image collections from distributed manifests (CONTENT_ROOT=${root})...`);
+  progress(
+    `Building image collections from distributed manifests (CONTENT_ROOT=${root})...`
+  );
 
   // 1. Homepage images
-  const homepageSrc = readYaml<SourceHomepageFile>(contentPath('homepage', 'images.yaml'));
-  const homepageImages = (homepageSrc?.images ?? []).map((item) => resolveItem(item, baseUrl));
+  const homepageSrc = readYaml<SourceHomepageFile>(
+    contentPath('homepage', 'images.yaml')
+  );
+  const homepageImages = (homepageSrc?.images ?? []).map((item) =>
+    resolveItem(item, baseUrl)
+  );
 
   // 2. Per-race images — scan races/*/images.yaml
   const racesDir = contentPath('races');
-  const raceImagesBySlug: Record<string, { hero: ReturnType<typeof resolveItem>[]; gallery: ReturnType<typeof resolveItem>[] }> = {};
+  const raceImagesBySlug: Record<
+    string,
+    {
+      hero: ReturnType<typeof resolveItem>[];
+      gallery: ReturnType<typeof resolveItem>[];
+    }
+  > = {};
 
   if (fs.existsSync(racesDir)) {
     for (const entry of fs.readdirSync(racesDir, { withFileTypes: true })) {
@@ -103,19 +129,27 @@ function buildImageCollections() {
       const src = readYaml<SourceRaceImagesFile>(imagesFile);
       if (!src) continue;
       raceImagesBySlug[entry.name] = {
-        hero:    (src.hero    ?? []).map((item) => resolveItem(item, baseUrl)),
+        hero: (src.hero ?? []).map((item) => resolveItem(item, baseUrl)),
         gallery: (src.gallery ?? []).map((item) => resolveItem(item, baseUrl)),
       };
     }
   }
 
   // 3. Documents
-  const docsSrc = readYaml<SourceDocumentsFile>(contentPath('documents', 'manifest.yaml'));
-  const documents = (docsSrc?.documents ?? []).map((item) => resolveItem(item, baseUrl));
+  const docsSrc = readYaml<SourceDocumentsFile>(
+    contentPath('documents', 'manifest.yaml')
+  );
+  const documents = (docsSrc?.documents ?? []).map((item) =>
+    resolveItem(item, baseUrl)
+  );
 
   // 4. Committee portraits
-  const committeeSrc = readYaml<SourceCommitteeFile>(contentPath('committee', 'portraits.yaml'));
-  const committeePortraits = (committeeSrc?.portraits ?? []).map((item) => resolveItem(item, baseUrl));
+  const committeeSrc = readYaml<SourceCommitteeFile>(
+    contentPath('committee', 'portraits.yaml')
+  );
+  const committeePortraits = (committeeSrc?.portraits ?? []).map((item) =>
+    resolveItem(item, baseUrl)
+  );
 
   const payload = {
     version: 3,
@@ -130,9 +164,9 @@ function buildImageCollections() {
   writeGz(outputDir, 'image-collections.json', JSON.stringify(payload));
   progress(
     `✓ Built image collections: ${homepageImages.length} homepage, ` +
-    `${Object.keys(raceImagesBySlug).length} races, ` +
-    `${documents.length} documents, ` +
-    `${committeePortraits.length} portraits`,
+      `${Object.keys(raceImagesBySlug).length} races, ` +
+      `${documents.length} documents, ` +
+      `${committeePortraits.length} portraits`
   );
 }
 

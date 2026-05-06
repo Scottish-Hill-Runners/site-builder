@@ -22,10 +22,14 @@ function buildEpics() {
       return;
     }
 
-    progress(`Reading epics from ${epicDir} (CONTENT_ROOT=${contentRoot()})...`);
+    progress(
+      `Reading epics from ${epicDir} (CONTENT_ROOT=${contentRoot()})...`
+    );
 
     // Get all markdown files
-    const files = fs.readdirSync(epicDir).filter((file) => file.endsWith('.md'));
+    const files = fs
+      .readdirSync(epicDir)
+      .filter((file) => file.endsWith('.md'));
     progress(`Found ${files.length} epic files`);
 
     // Parse files

@@ -14,15 +14,25 @@ const RouteMap = dynamic(() => import('@/components/RouteMap'), {
   ),
 });
 
-const ElevationProfile = dynamic(() => import('@/components/ElevationProfile'), {
-  ssr: false,
-});
+const ElevationProfile = dynamic(
+  () => import('@/components/ElevationProfile'),
+  {
+    ssr: false,
+  }
+);
 import remarkGfm from 'remark-gfm';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
-import { buildResultsEditUrl, getLatestResultYear } from '@/lib/results-correction-link';
+import {
+  buildResultsEditUrl,
+  getLatestResultYear,
+} from '@/lib/results-correction-link';
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';
-import type { RaceInfo, RaceResult, ResultsFocusContext } from '@/types/datatable';
+import type {
+  RaceInfo,
+  RaceResult,
+  ResultsFocusContext,
+} from '@/types/datatable';
 
 interface RaceDetailsTabsProps {
   raceId: string;
@@ -41,33 +51,55 @@ type TabKey = 'results' | 'info' | 'gpx' | 'gallery';
 function filenameToAltText(sourcePath: string): string {
   const fileName = sourcePath.split('/').pop() ?? sourcePath;
   const baseName = fileName.replace(/\.[^.]+$/, '');
-  return baseName
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return baseName.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 const TAB_STORAGE_KEY = 'raceDetails.activeTab';
 
-export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRaceMap, results, resultsError, heroImage, galleryImages }: RaceDetailsTabsProps) {
+export default function RaceDetailsTabs({
+  raceId,
+  race,
+  contents,
+  hasGpx,
+  hasRaceMap,
+  results,
+  resultsError,
+  heroImage,
+  galleryImages,
+}: RaceDetailsTabsProps) {
   const { imperial } = useUnits();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     try {
-        const saved = window.localStorage.getItem(TAB_STORAGE_KEY);
-        if (saved === 'results' || saved === 'info' || saved === 'gpx' || saved === 'gallery') return saved as TabKey;
-      } catch {}
-      return 'info';
+      const saved = window.localStorage.getItem(TAB_STORAGE_KEY);
+      if (
+        saved === 'results' ||
+        saved === 'info' ||
+        saved === 'gpx' ||
+        saved === 'gallery'
+      )
+        return saved as TabKey;
+    } catch {}
+    return 'info';
   });
   useEffect(() => {
-    try { window.localStorage.setItem(TAB_STORAGE_KEY, activeTab); } catch {}
+    try {
+      window.localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    } catch {}
   }, [activeTab]);
-  const [focusedResultContext, setFocusedResultContext] = useState<ResultsFocusContext | null>(null);
+  const [focusedResultContext, setFocusedResultContext] =
+    useState<ResultsFocusContext | null>(null);
   const hasRouteAssets = hasGpx || hasRaceMap;
   const hasGallery = galleryImages.length > 0;
-  const pageDefaultYear = useMemo(() => getLatestResultYear(results), [results]);
+  const pageDefaultYear = useMemo(
+    () => getLatestResultYear(results),
+    [results]
+  );
   const correctionRaceId = focusedResultContext?.raceId ?? raceId;
   const correctionYear = focusedResultContext?.year ?? pageDefaultYear;
-  const correctionLink = correctionRaceId && correctionYear ? buildResultsEditUrl(correctionRaceId, correctionYear) : null;
+  const correctionLink =
+    correctionRaceId && correctionYear
+      ? buildResultsEditUrl(correctionRaceId, correctionYear)
+      : null;
   const tabs: Array<{ key: TabKey; label: string }> = [
     { key: 'info', label: 'Race info' },
     { key: 'results', label: 'Results' },
@@ -83,7 +115,11 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
 
   return (
     <section className="mb-6 rounded-lg border border-gray-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900">
-      <div role="tablist" aria-label="Race details tabs" className="flex flex-wrap gap-2 border-b border-gray-200 p-3 dark:border-slate-800">
+      <div
+        role="tablist"
+        aria-label="Race details tabs"
+        className="flex flex-wrap gap-2 border-b border-gray-200 p-3 dark:border-slate-800"
+      >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -96,7 +132,9 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
               id={`race-tab-${tab.key}`}
               onClick={() => setActiveTab(tab.key)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                isActive ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               {tab.label}
@@ -107,11 +145,19 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
 
       <div className="p-4 sm:p-6">
         {activeTab === 'results' && (
-          <div role="tabpanel" id="race-tab-panel-results" aria-labelledby="race-tab-results">
+          <div
+            role="tabpanel"
+            id="race-tab-panel-results"
+            aria-labelledby="race-tab-results"
+          >
             {resultsError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-900 dark:bg-red-950/40">
-                <p className="mb-2 font-semibold text-red-700">{resultsError}</p>
-                <p className="text-sm text-red-600">Try again in a few minutes or choose another race.</p>
+                <p className="mb-2 font-semibold text-red-700">
+                  {resultsError}
+                </p>
+                <p className="text-sm text-red-600">
+                  Try again in a few minutes or choose another race.
+                </p>
               </div>
             ) : results.length > 0 ? (
               <div className="space-y-4">
@@ -122,7 +168,9 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
                   onFocusContextChange={setFocusedResultContext}
                 />
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                  <p className="font-semibold">Spot an error in these results?</p>
+                  <p className="font-semibold">
+                    Spot an error in these results?
+                  </p>
                   <p className="mt-1">
                     {correctionLink ? (
                       <>
@@ -141,15 +189,20 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
                       'Select a result row to generate an edit link for the correct race and year.'
                     )}
                   </p>
-                  {focusedResultContext?.source === 'selected-row' && correctionLink && (
-                    <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                      Using selected row context: {focusedResultContext.raceId} ({focusedResultContext.year}).
-                    </p>
-                  )}
+                  {focusedResultContext?.source === 'selected-row' &&
+                    correctionLink && (
+                      <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                        Using selected row context:{' '}
+                        {focusedResultContext.raceId} (
+                        {focusedResultContext.year}).
+                      </p>
+                    )}
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-600 dark:text-slate-300">No results available for {race.title}.</p>
+              <p className="text-sm text-gray-600 dark:text-slate-300">
+                No results available for {race.title}.
+              </p>
             )}
           </div>
         )}
@@ -178,24 +231,61 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
             )}
 
             <div className="grid grid-cols-1 gap-2 text-sm text-gray-700 dark:text-slate-300 sm:grid-cols-2">
-              <p><span className="font-semibold text-gray-900 dark:text-slate-100">Venue:</span> {race.venue}</p>
-              <p><span className="font-semibold text-gray-900 dark:text-slate-100">Distance:</span> {formatDistance(race.distance, imperial)}</p>
+              <p>
+                <span className="font-semibold text-gray-900 dark:text-slate-100">
+                  Venue:
+                </span>{' '}
+                {race.venue}
+              </p>
+              <p>
+                <span className="font-semibold text-gray-900 dark:text-slate-100">
+                  Distance:
+                </span>{' '}
+                {formatDistance(race.distance, imperial)}
+              </p>
               {typeof race.climb === 'number' && (
-                <p><span className="font-semibold text-gray-900 dark:text-slate-100">Climb:</span> {formatClimb(race.climb, imperial)}</p>
+                <p>
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
+                    Climb:
+                  </span>{' '}
+                  {formatClimb(race.climb, imperial)}
+                </p>
               )}
               {race.maleRecord && (
-                <p><span className="font-semibold text-gray-900 dark:text-slate-100">Male record:</span> {race.maleRecord}</p>
+                <p>
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
+                    Male record:
+                  </span>{' '}
+                  {race.maleRecord}
+                </p>
               )}
               {race.femaleRecord && (
-                <p><span className="font-semibold text-gray-900 dark:text-slate-100">Female record:</span> {race.femaleRecord}</p>
+                <p>
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
+                    Female record:
+                  </span>{' '}
+                  {race.femaleRecord}
+                </p>
               )}
               {race.nonBinaryRecord && (
-                <p><span className="font-semibold text-gray-900 dark:text-slate-100">Non-binary record:</span> {race.nonBinaryRecord}</p>
+                <p>
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
+                    Non-binary record:
+                  </span>{' '}
+                  {race.nonBinaryRecord}
+                </p>
               )}
               {race.web && (
                 <p className="sm:col-span-2">
-                  <span className="font-semibold text-gray-900 dark:text-slate-100">Website:</span>{' '}
-                  <a href={race.web} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
+                    Website:
+                  </span>{' '}
+                  <a
+                    href={race.web}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
                     {race.web}
                   </a>
                 </p>
@@ -205,10 +295,14 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
             <div>
               {contents.trim() ? (
                 <div className="prose prose-slate max-w-none prose-headings:text-gray-900 dark:prose-invert dark:prose-headings:text-slate-100">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{contents}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {contents}
+                  </ReactMarkdown>
                 </div>
               ) : (
-                <p className="text-sm text-gray-600 dark:text-slate-300">No additional content available for this race.</p>
+                <p className="text-sm text-gray-600 dark:text-slate-300">
+                  No additional content available for this race.
+                </p>
               )}
             </div>
 
@@ -231,8 +325,15 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
         )}
 
         {activeTab === 'gallery' && hasGallery && (
-          <div role="tabpanel" id="race-tab-panel-gallery" aria-labelledby="race-tab-gallery" className="space-y-3">
-            <p className="text-sm text-gray-700 dark:text-slate-300">Photos from {race.title}.</p>
+          <div
+            role="tabpanel"
+            id="race-tab-panel-gallery"
+            aria-labelledby="race-tab-gallery"
+            className="space-y-3"
+          >
+            <p className="text-sm text-gray-700 dark:text-slate-300">
+              Photos from {race.title}.
+            </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {galleryImages.map((image, index) => (
                 <figure
@@ -257,7 +358,12 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
         )}
 
         {activeTab === 'gpx' && hasRouteAssets && (
-          <div role="tabpanel" id="race-tab-panel-gpx" aria-labelledby="race-tab-gpx" className="space-y-4">
+          <div
+            role="tabpanel"
+            id="race-tab-panel-gpx"
+            aria-labelledby="race-tab-gpx"
+            className="space-y-4"
+          >
             {hasGpx && (
               <>
                 <RouteMap raceId={raceId} raceName={race.title} />
@@ -266,7 +372,9 @@ export default function RaceDetailsTabs({ raceId, race, contents, hasGpx, hasRac
             )}
             {hasRaceMap && (
               <div className="space-y-2">
-                <p className="text-sm text-gray-700 dark:text-slate-300">Race map preview:</p>
+                <p className="text-sm text-gray-700 dark:text-slate-300">
+                  Race map preview:
+                </p>
                 <Image
                   src={`/results/${encodeURIComponent(raceId)}-map.webp`}
                   alt={`${race.title} race map`}

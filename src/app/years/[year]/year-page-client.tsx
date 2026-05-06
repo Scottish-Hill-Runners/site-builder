@@ -3,8 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
-import { fetchJsonWithApiFallback, fetchGzipJson } from '@/lib/client-results-fetch';
-import { buildResultsEditUrl, normalizeResultYear } from '@/lib/results-correction-link';
+import {
+  fetchJsonWithApiFallback,
+  fetchGzipJson,
+} from '@/lib/client-results-fetch';
+import {
+  buildResultsEditUrl,
+  normalizeResultYear,
+} from '@/lib/results-correction-link';
 import type { RaceInfo, RaceResult } from '@/types/datatable';
 import type { ResultsFocusContext } from '@/types/datatable';
 
@@ -18,12 +24,16 @@ export default function YearPageClient({ year }: YearPageClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
-  const [focusedResultContext, setFocusedResultContext] = useState<ResultsFocusContext | null>(null);
+  const [focusedResultContext, setFocusedResultContext] =
+    useState<ResultsFocusContext | null>(null);
   const fallbackRaceId = results?.[0]?.raceId ?? null;
   const fallbackYear = normalizeResultYear(year);
   const correctionRaceId = focusedResultContext?.raceId ?? fallbackRaceId;
   const correctionYear = focusedResultContext?.year ?? fallbackYear;
-  const correctionLink = correctionRaceId && correctionYear ? buildResultsEditUrl(correctionRaceId, correctionYear) : null;
+  const correctionLink =
+    correctionRaceId && correctionYear
+      ? buildResultsEditUrl(correctionRaceId, correctionYear)
+      : null;
 
   useEffect(() => {
     let isCancelled = false;
@@ -37,9 +47,11 @@ export default function YearPageClient({ year }: YearPageClientProps) {
         const [result, racesResponse] = await Promise.all([
           fetchJsonWithApiFallback<RaceResult[]>(
             `/api/years/${encodeURIComponent(year)}`,
-            `/results/${encodeURIComponent(year)}.json.gz`,
+            `/results/${encodeURIComponent(year)}.json.gz`
           ),
-          fetchGzipJson<{ [raceId: string]: RaceInfo }>('/results/races.json.gz'),
+          fetchGzipJson<{ [raceId: string]: RaceInfo }>(
+            '/results/races.json.gz'
+          ),
         ]);
         if (!isCancelled) {
           if (result.status === 'ok') {
@@ -55,7 +67,9 @@ export default function YearPageClient({ year }: YearPageClientProps) {
       } catch (error) {
         console.error('Failed to fetch year data on client:', error);
         if (!isCancelled) {
-          setErrorMessage('Failed to load year results. Please try again later.');
+          setErrorMessage(
+            'Failed to load year results. Please try again later.'
+          );
           setResults(null);
         }
       } finally {
@@ -72,29 +86,46 @@ export default function YearPageClient({ year }: YearPageClientProps) {
   }, [year]);
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8">
+    <main
+      id="main-content"
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-6xl">
-        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+        >
           <ol role="list" className="flex flex-wrap gap-2">
             <li>
-              <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-800">
+                Home
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
+            <li
+              className="font-semibold text-slate-900 dark:text-slate-100"
+              aria-current="page"
+            >
               {year} Results
             </li>
           </ol>
         </nav>
 
-        <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">{year} Results</h1>
+        <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
+          {year} Results
+        </h1>
 
         {isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">Loading year results...</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              Loading year results...
+            </p>
           </div>
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">No results found for {year}.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              No results found for {year}.
+            </p>
             <Link
               href="/races"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -105,7 +136,9 @@ export default function YearPageClient({ year }: YearPageClientProps) {
         ) : errorMessage ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-2 font-semibold text-red-600">{errorMessage}</p>
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Try again in a few minutes.
+            </p>
           </div>
         ) : results ? (
           <div className="space-y-4">
@@ -135,18 +168,24 @@ export default function YearPageClient({ year }: YearPageClientProps) {
                   </p>
                   {focusedResultContext?.source === 'selected-row' && (
                     <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                      Using selected row context: {focusedResultContext.raceId} ({focusedResultContext.year}).
+                      Using selected row context: {focusedResultContext.raceId}{' '}
+                      ({focusedResultContext.year}).
                     </p>
                   )}
                 </>
               ) : (
-                <p className="mt-1">Select a result row to generate an edit link for the correct race and year.</p>
+                <p className="mt-1">
+                  Select a result row to generate an edit link for the correct
+                  race and year.
+                </p>
               )}
             </div>
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">No year data available.</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              No year data available.
+            </p>
           </div>
         )}
       </div>

@@ -8,8 +8,9 @@ let inflight: Promise<Record<string, string>> | null = null;
 async function fetchManifest(): Promise<Record<string, string>> {
   try {
     const response = await fetch(MANIFEST_URL, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`asset-manifest fetch failed: ${response.status}`);
-    const data = await response.json() as { files: Record<string, string> };
+    if (!response.ok)
+      throw new Error(`asset-manifest fetch failed: ${response.status}`);
+    const data = (await response.json()) as { files: Record<string, string> };
     manifest = data.files;
     loadedAt = Date.now();
     return manifest;

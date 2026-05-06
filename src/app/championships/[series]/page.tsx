@@ -9,7 +9,11 @@ export async function generateStaticParams() {
   ];
 }
 
-export default async function ChampionshipPage({ params }: { params: Promise<{ series: string }> }) {
+export default async function ChampionshipPage({
+  params,
+}: {
+  params: Promise<{ series: string }>;
+}) {
   const { series } = await params;
 
   return <ChampionshipPageClient series={series} />;

@@ -52,14 +52,22 @@ function buildPaths(
   profile: ElevationPoint[],
   totalDist: number,
   minEle: number,
-  maxEle: number,
-): { area: string; line: string; startX: number; startY: number; endX: number; endY: number } {
+  maxEle: number
+): {
+  area: string;
+  line: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+} {
   const eleRange = maxEle - minEle || 1;
   const toX = (d: number) => PAD.left + (d / totalDist) * PLOT_W;
-  const toY = (e: number) => PAD.top + PLOT_H - ((e - minEle) / eleRange) * PLOT_H;
+  const toY = (e: number) =>
+    PAD.top + PLOT_H - ((e - minEle) / eleRange) * PLOT_H;
 
-  const xs = profile.map(p => toX(p.d));
-  const ys = profile.map(p => toY(p.ele));
+  const xs = profile.map((p) => toX(p.d));
+  const ys = profile.map((p) => toY(p.ele));
 
   const tension = 0.5;
   let linePath = `M ${fmt(xs[0])},${fmt(ys[0])}`;
@@ -75,8 +83,7 @@ function buildPaths(
     linePath += ` C ${fmt(cp1x)},${fmt(cp1y)} ${fmt(cp2x)},${fmt(cp2y)} ${fmt(p2[0])},${fmt(p2[1])}`;
   }
 
-  const areaPath =
-    `${linePath} L ${fmt(xs[xs.length - 1])},${fmt(BASELINE)} L ${fmt(xs[0])},${fmt(BASELINE)} Z`;
+  const areaPath = `${linePath} L ${fmt(xs[xs.length - 1])},${fmt(BASELINE)} L ${fmt(xs[0])},${fmt(BASELINE)} Z`;
 
   return {
     area: areaPath,
@@ -118,7 +125,9 @@ export interface ElevationChartData {
 // ---------------------------------------------------------------------------
 // Pure entry point — called by build-race-results.ts for each race with a GPX
 // ---------------------------------------------------------------------------
-export function buildElevationChartData(gpxXml: string): ElevationChartData | null {
+export function buildElevationChartData(
+  gpxXml: string
+): ElevationChartData | null {
   const coords = parseGpxCoords(gpxXml);
   if (coords.length === 0) return null;
 

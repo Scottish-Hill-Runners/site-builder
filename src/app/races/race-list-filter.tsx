@@ -17,13 +17,11 @@ export default function RaceListFilter({ races }: RaceListFilterProps) {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return races;
-    return races.filter(
-      (r) => {
-        const title = (r.title ?? '').toLowerCase();
-        const venue = (r.venue ?? '').toLowerCase();
-        return title.includes(needle) || venue.includes(needle);
-      },
-    );
+    return races.filter((r) => {
+      const title = (r.title ?? '').toLowerCase();
+      const venue = (r.venue ?? '').toLowerCase();
+      return title.includes(needle) || venue.includes(needle);
+    });
   }, [races, query]);
 
   return (
@@ -43,7 +41,9 @@ export default function RaceListFilter({ races }: RaceListFilterProps) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-500 dark:text-slate-400">No races match your search.</p>
+        <p className="py-6 text-center text-sm text-gray-500 dark:text-slate-400">
+          No races match your search.
+        </p>
       ) : (
         <ul className="space-y-2">
           {filtered.map((race) => (
@@ -52,8 +52,13 @@ export default function RaceListFilter({ races }: RaceListFilterProps) {
                 href={`/races/${encodeURIComponent(race.raceId)}`}
                 className="block rounded-lg border border-gray-200 bg-white px-4 py-3 text-blue-600 hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
               >
-                <div className="font-semibold dark:text-slate-100">{race.title ?? race.raceId}</div>
-                <div className="text-sm text-gray-600 dark:text-slate-300">{race.venue ?? 'Unknown venue'} • {formatDistance(race.distance, imperial)}</div>
+                <div className="font-semibold dark:text-slate-100">
+                  {race.title ?? race.raceId}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-slate-300">
+                  {race.venue ?? 'Unknown venue'} •{' '}
+                  {formatDistance(race.distance, imperial)}
+                </div>
               </Link>
             </li>
           ))}

@@ -26,7 +26,9 @@ export default function NewsList({ items }: NewsListProps) {
   return (
     <div className="w-full space-y-3">
       {items.length === 0 ? (
-        <p className="py-8 text-center text-gray-500 dark:text-slate-400">No news items available</p>
+        <p className="py-8 text-center text-gray-500 dark:text-slate-400">
+          No news items available
+        </p>
       ) : (
         items.map((item) => (
           <article
@@ -67,7 +69,9 @@ export default function NewsList({ items }: NewsListProps) {
             {expandedId === item.slug && (
               <div className="border-t border-gray-100 bg-gray-50 px-4 pb-4 dark:border-slate-800 dark:bg-slate-800/60">
                 <div className="prose prose-sm mt-4 max-w-none text-gray-700 dark:prose-invert dark:text-slate-200">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {item.content}
+                  </ReactMarkdown>
                 </div>
               </div>
             )}

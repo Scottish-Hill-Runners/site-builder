@@ -69,10 +69,17 @@ const emptyPayload: ImageCollectionsPayload = {
 };
 
 async function readPayload(): Promise<ImageCollectionsPayload> {
-  const filePath = path.join(process.cwd(), 'public', 'image-collections.json.gz');
+  const filePath = path.join(
+    process.cwd(),
+    'public',
+    'image-collections.json.gz'
+  );
   const compressed = await fs.readFile(filePath);
-  const payload = JSON.parse(gunzipSync(compressed).toString('utf8')) as ImageCollectionsPayload;
-  if (!payload || typeof payload !== 'object') throw new Error('image-collections.json.gz format is invalid');
+  const payload = JSON.parse(
+    gunzipSync(compressed).toString('utf8')
+  ) as ImageCollectionsPayload;
+  if (!payload || typeof payload !== 'object')
+    throw new Error('image-collections.json.gz format is invalid');
   return payload;
 }
 
@@ -93,12 +100,16 @@ export async function getHomepageImages(): Promise<HomepageImageItem[]> {
   return (await getPayload()).homepageImages ?? [];
 }
 
-export async function getRaceImagesBySlug(slug: string): Promise<RaceImagesBySlugEntry | null> {
+export async function getRaceImagesBySlug(
+  slug: string
+): Promise<RaceImagesBySlugEntry | null> {
   const { raceImagesBySlug } = await getPayload();
   if (!raceImagesBySlug) return null;
   if (raceImagesBySlug[slug]) return raceImagesBySlug[slug];
   const lower = slug.toLowerCase();
-  const key = Object.keys(raceImagesBySlug).find((k) => k.toLowerCase() === lower);
+  const key = Object.keys(raceImagesBySlug).find(
+    (k) => k.toLowerCase() === lower
+  );
   return key ? raceImagesBySlug[key] : null;
 }
 

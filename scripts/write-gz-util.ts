@@ -3,11 +3,14 @@ import path from 'path';
 import zlib from 'zlib';
 
 export function progress(message: string): void {
-  if ('VERBOSE' in process.env)
-    process.stdout.write(`\x1b[K${message}\r`);
+  if ('VERBOSE' in process.env) process.stdout.write(`\x1b[K${message}\r`);
 }
 
-export function writeGz(outputDir: string, fileName: string, data: string): void {
+export function writeGz(
+  outputDir: string,
+  fileName: string,
+  data: string
+): void {
   const outputFile = path.join(outputDir, `${fileName}.gz`);
   fs.writeFileSync(outputFile, zlib.gzipSync(Buffer.from(data, 'utf8')));
 

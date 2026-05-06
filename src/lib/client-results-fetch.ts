@@ -14,14 +14,16 @@ async function parseGzipJsonResponse<T>(response: Response): Promise<T> {
     throw new Error('Response body is empty');
   }
 
-  const decompressedStream = response.body.pipeThrough(new DecompressionStream('gzip'));
+  const decompressedStream = response.body.pipeThrough(
+    new DecompressionStream('gzip')
+  );
   const text = await new Response(decompressedStream).text();
   return JSON.parse(text) as T;
 }
 
 export async function fetchJsonWithApiFallback<T>(
   apiUrl: string,
-  gzipFallbackUrl: string,
+  gzipFallbackUrl: string
 ): Promise<FetchJsonResult<T>> {
   try {
     // Prefer the versioned .json.gz file so long-term immutable caching applies.
@@ -29,11 +31,17 @@ export async function fetchJsonWithApiFallback<T>(
     const gzipResponse = await fetch(resolvedGzipUrl, { cache: 'force-cache' });
 
     if (gzipResponse.ok) {
-      return { status: 'ok', data: await parseGzipJsonResponse<T>(gzipResponse) };
+      return {
+        status: 'ok',
+        data: await parseGzipJsonResponse<T>(gzipResponse),
+      };
     }
 
     if (gzipResponse.status !== 404) {
-      return { status: 'error', error: new Error(`Request failed with status ${gzipResponse.status}`) };
+      return {
+        status: 'error',
+        error: new Error(`Request failed with status ${gzipResponse.status}`),
+      };
     }
 
     // .json.gz not found — fall back to the API route.
@@ -47,7 +55,10 @@ export async function fetchJsonWithApiFallback<T>(
       return { status: 'not-found' };
     }
 
-    return { status: 'error', error: new Error(`API request failed with status ${apiResponse.status}`) };
+    return {
+      status: 'error',
+      error: new Error(`API request failed with status ${apiResponse.status}`),
+    };
   } catch (error) {
     return {
       status: 'error',
@@ -56,7 +67,9 @@ export async function fetchJsonWithApiFallback<T>(
   }
 }
 
-export async function fetchGzipJson<T>(gzipUrl: string): Promise<FetchJsonResult<T>> {
+export async function fetchGzipJson<T>(
+  gzipUrl: string
+): Promise<FetchJsonResult<T>> {
   try {
     const resolvedUrl = await resolvePublicUrl(gzipUrl);
     const response = await fetch(resolvedUrl, { cache: 'force-cache' });
@@ -66,7 +79,10 @@ export async function fetchGzipJson<T>(gzipUrl: string): Promise<FetchJsonResult
     }
 
     if (!response.ok) {
-      return { status: 'error', error: new Error(`Request failed with status ${response.status}`) };
+      return {
+        status: 'error',
+        error: new Error(`Request failed with status ${response.status}`),
+      };
     }
 
     return { status: 'ok', data: await parseGzipJsonResponse<T>(response) };

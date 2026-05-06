@@ -36,7 +36,13 @@ export default function NewsFilter({ items }: NewsFilterProps) {
     return items.filter((item) => {
       const t = new Date(item.date).getTime();
       if (t < fromMs || t > toMs) return false;
-      if (needle && !item.title.toLowerCase().includes(needle) && !item.excerpt.toLowerCase().includes(needle) && !item.content.toLowerCase().includes(needle)) return false;
+      if (
+        needle &&
+        !item.title.toLowerCase().includes(needle) &&
+        !item.excerpt.toLowerCase().includes(needle) &&
+        !item.content.toLowerCase().includes(needle)
+      )
+        return false;
       return true;
     });
   }, [items, from, to, query]);
@@ -51,7 +57,10 @@ export default function NewsFilter({ items }: NewsFilterProps) {
     <div className="w-full space-y-6">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <label htmlFor="news-search" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+          <label
+            htmlFor="news-search"
+            className="text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Search
           </label>
           <input
@@ -67,7 +76,10 @@ export default function NewsFilter({ items }: NewsFilterProps) {
         <fieldset className="flex flex-wrap items-end gap-4">
           <legend className="sr-only">Date range</legend>
           <div className="flex flex-col gap-1">
-            <label htmlFor="news-from" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label
+              htmlFor="news-from"
+              className="text-sm font-medium text-gray-700 dark:text-slate-300"
+            >
               From
             </label>
             <input
@@ -80,7 +92,10 @@ export default function NewsFilter({ items }: NewsFilterProps) {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="news-to" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label
+              htmlFor="news-to"
+              className="text-sm font-medium text-gray-700 dark:text-slate-300"
+            >
               To
             </label>
             <input

@@ -37,7 +37,9 @@ export async function getAllNewsItems(): Promise<NewsItem[]> {
   }
 }
 
-export async function getRecentNewsItems(limit: number = 10): Promise<NewsItem[]> {
+export async function getRecentNewsItems(
+  limit: number = 10
+): Promise<NewsItem[]> {
   try {
     if (cachedNewsItems !== null) {
       return cachedNewsItems.slice(0, limit);

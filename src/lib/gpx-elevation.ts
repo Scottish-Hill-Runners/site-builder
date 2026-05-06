@@ -2,13 +2,13 @@ import type { GeoJSON, Feature, Geometry } from 'geojson';
 
 /** A single point on the elevation profile: cumulative distance (km) + elevation (m). */
 export interface ElevationPoint {
-  d: number;   // cumulative distance in km
+  d: number; // cumulative distance in km
   ele: number; // elevation in metres
 }
 
 export interface ElevationStats {
-  gain: number;   // total ascent in metres
-  loss: number;   // total descent in metres (positive value)
+  gain: number; // total ascent in metres
+  loss: number; // total descent in metres (positive value)
   minEle: number; // lowest elevation in metres
   maxEle: number; // highest elevation in metres
 }
@@ -28,7 +28,8 @@ function haversineKm(a: [number, number], b: [number, number]): number {
     sinLat * sinLat +
     Math.cos((a[1] * Math.PI) / 180) *
       Math.cos((b[1] * Math.PI) / 180) *
-      sinLng * sinLng;
+      sinLng *
+      sinLng;
   return R * 2 * Math.asin(Math.sqrt(h));
 }
 
@@ -70,7 +71,9 @@ function collectCoords(geom: Geometry, out: [number, number, number][]): void {
  * Returns an array of [lng, lat, ele] tuples (ele in metres).
  * Returns an empty array when no elevation data is present.
  */
-export function extractTrackCoords(geojson: GeoJSON): [number, number, number][] {
+export function extractTrackCoords(
+  geojson: GeoJSON
+): [number, number, number][] {
   const out: [number, number, number][] = [];
   if (geojson.type === 'FeatureCollection') {
     for (const f of geojson.features) {
@@ -90,7 +93,7 @@ export function extractTrackCoords(geojson: GeoJSON): [number, number, number][]
  */
 export function buildElevationProfile(
   coords: [number, number, number][],
-  maxPoints = 500,
+  maxPoints = 500
 ): ElevationPoint[] {
   if (coords.length === 0) return [];
 
@@ -98,7 +101,10 @@ export function buildElevationProfile(
   const raw: ElevationPoint[] = [{ d: 0, ele: coords[0][2] }];
   let cumDist = 0;
   for (let i = 1; i < coords.length; i++) {
-    cumDist += haversineKm([coords[i - 1][0], coords[i - 1][1]], [coords[i][0], coords[i][1]]);
+    cumDist += haversineKm(
+      [coords[i - 1][0], coords[i - 1][1]],
+      [coords[i][0], coords[i][1]]
+    );
     raw.push({ d: cumDist, ele: coords[i][2] });
   }
 

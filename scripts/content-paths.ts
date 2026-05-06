@@ -4,8 +4,7 @@ const rootDir = process.cwd();
 const defaultContentRoot = path.join(rootDir, 'content');
 
 function normalizeContentRoot(envValue?: string): string {
-  if (!envValue || envValue.trim() === '')
-    return defaultContentRoot;
+  if (!envValue || envValue.trim() === '') return defaultContentRoot;
   return path.isAbsolute(envValue)
     ? path.normalize(envValue)
     : path.resolve(rootDir, envValue);

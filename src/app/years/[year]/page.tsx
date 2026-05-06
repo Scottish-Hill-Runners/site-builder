@@ -6,7 +6,11 @@ export async function generateStaticParams() {
   return years.map((year) => ({ year }));
 }
 
-export default async function YearPage({ params }: { params: Promise<{ year: string }> }) {
+export default async function YearPage({
+  params,
+}: {
+  params: Promise<{ year: string }>;
+}) {
   const { year } = await params;
   return <YearPageClient year={year} />;
 }

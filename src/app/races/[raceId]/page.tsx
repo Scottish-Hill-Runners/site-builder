@@ -4,14 +4,17 @@ import { loadAllRaces } from '@/lib/results-data';
 import type { AllRaceData } from '@/types/datatable';
 
 export async function generateStaticParams() {
-  const allRaces = await loadAllRaces().catch(() => ({} as AllRaceData));
+  const allRaces = await loadAllRaces().catch(() => ({}) as AllRaceData);
   return Object.keys(allRaces).map((raceId) => ({ raceId }));
 }
 
-export default async function RacePage({ params }: { params: Promise<{ raceId: string }> }) {
+export default async function RacePage({
+  params,
+}: {
+  params: Promise<{ raceId: string }>;
+}) {
   const { raceId } = await params;
   const raceImages = await getRaceImagesBySlug(raceId);
 
   return <RacePageClient raceId={raceId} raceImages={raceImages} />;
 }
-

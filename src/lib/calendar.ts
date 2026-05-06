@@ -39,8 +39,12 @@ function parseRaceDate(value: string): Date | null {
   return raceDate;
 }
 
-export async function getUpcomingCalendarEntries(daysAhead: number): Promise<CalendarEntry[]> {
-  const maxDays = Number.isFinite(daysAhead) ? Math.max(0, Math.floor(daysAhead)) : 0;
+export async function getUpcomingCalendarEntries(
+  daysAhead: number
+): Promise<CalendarEntry[]> {
+  const maxDays = Number.isFinite(daysAhead)
+    ? Math.max(0, Math.floor(daysAhead))
+    : 0;
 
   try {
     if (cachedCalendarEntries === null) {

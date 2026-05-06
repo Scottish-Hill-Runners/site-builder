@@ -4,7 +4,9 @@ import { loadAllRaces, loadRaceResults } from '@/lib/results-data';
 export const dynamic = 'force-static';
 
 export async function generateStaticParams() {
-  const allRaces = await loadAllRaces().catch(() => ({} as Record<string, unknown>));
+  const allRaces = await loadAllRaces().catch(
+    () => ({}) as Record<string, unknown>
+  );
   return Object.keys(allRaces).map((raceId) => ({ raceId }));
 }
 
@@ -28,6 +30,9 @@ export async function GET(
     }
 
     console.error('Failed to load race data for API route', raceId, error);
-    return NextResponse.json({ error: 'Failed to load race data' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to load race data' },
+      { status: 500 }
+    );
   }
 }

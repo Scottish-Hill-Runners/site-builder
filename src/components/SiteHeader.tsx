@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -22,7 +22,8 @@ export default function SiteHeader() {
               </linearGradient>
             </defs>
             <text
-              x="16" y="46"
+              x="16"
+              y="46"
               fontFamily="'Arial Narrow', sans-serif"
               fontWeight="700"
               fontStyle="italic"
@@ -30,8 +31,17 @@ export default function SiteHeader() {
               textLength="468"
               lengthAdjust="spacingAndGlyphs"
               style={{ fill: 'var(--logo-text)' }}
-            >Scottish Hill Runners</text>
-            <rect x="36" y="50" width="426" height="6" rx="1" fill="url(#shr-logo-g)" />
+            >
+              Scottish Hill Runners
+            </text>
+            <rect
+              x="36"
+              y="50"
+              width="426"
+              height="6"
+              rx="1"
+              fill="url(#shr-logo-g)"
+            />
           </svg>
         </Link>
         <div className="flex items-center gap-2">

@@ -37,7 +37,11 @@ export default function EpicsFilter({ items }: EpicsFilterProps) {
             strokeWidth={2}
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+            />
           </svg>
         </div>
         <input
@@ -59,7 +63,9 @@ export default function EpicsFilter({ items }: EpicsFilterProps) {
       )}
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-slate-400">No epics match your search.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          No epics match your search.
+        </p>
       ) : (
         <ul className="space-y-2">
           {filtered.map((item) => (

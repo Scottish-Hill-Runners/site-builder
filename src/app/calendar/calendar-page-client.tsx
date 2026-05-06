@@ -177,12 +177,17 @@ export default function CalendarPageClient() {
       return;
     }
 
-    if (selectedMonthKey && monthGroups.some((group) => group.key === selectedMonthKey)) {
+    if (
+      selectedMonthKey &&
+      monthGroups.some((group) => group.key === selectedMonthKey)
+    ) {
       return;
     }
 
     const currentMonthKey = getMonthKey(startOfToday());
-    const currentMonth = monthGroups.find((group) => group.key === currentMonthKey);
+    const currentMonth = monthGroups.find(
+      (group) => group.key === currentMonthKey
+    );
     const nextUpcoming = monthGroups.find((group) => group.hasUpcomingRace);
     const defaultMonth = currentMonth ?? nextUpcoming ?? monthGroups[0];
     setSelectedMonthKey(defaultMonth.key);
@@ -219,7 +224,9 @@ export default function CalendarPageClient() {
       } catch (error) {
         console.error('Failed to fetch calendar data on client:', error);
         if (!isCancelled) {
-          setErrorMessage('Failed to load calendar data. Please try again later.');
+          setErrorMessage(
+            'Failed to load calendar data. Please try again later.'
+          );
           setEntries(null);
         }
       } finally {
@@ -236,39 +243,63 @@ export default function CalendarPageClient() {
   }, []);
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8">
+    <main
+      id="main-content"
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-6xl">
-        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+        >
           <ol role="list" className="flex flex-wrap gap-2">
             <li>
-              <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-800">
+                Home
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
+            <li
+              className="font-semibold text-slate-900 dark:text-slate-100"
+              aria-current="page"
+            >
               Calendar
             </li>
           </ol>
         </nav>
 
-        <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">Race Calendar</h1>
+        <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
+          Race Calendar
+        </h1>
 
         {isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">Loading calendar...</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              Loading calendar...
+            </p>
           </div>
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Calendar data not found.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Calendar data not found.
+            </p>
           </div>
         ) : errorMessage ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-2 font-semibold text-red-600">{errorMessage}</p>
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Try again in a few minutes.
+            </p>
           </div>
         ) : entries && entries.length > 0 ? (
           <div className="space-y-8">
-            <section aria-label="Calendar months" className="rounded-lg bg-white p-4 shadow-md dark:bg-slate-900 sm:p-6">
-              <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">Browse By Month</h2>
+            <section
+              aria-label="Calendar months"
+              className="rounded-lg bg-white p-4 shadow-md dark:bg-slate-900 sm:p-6"
+            >
+              <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Browse By Month
+              </h2>
 
               {/* Mobile/tablet: single month selector with prev/next navigation */}
               <div className="mb-6 lg:hidden">
@@ -277,31 +308,52 @@ export default function CalendarPageClient() {
                     <button
                       type="button"
                       onClick={() => {
-                        const currentIndex = monthGroups.findIndex((g) => g.key === selectedMonthKey);
+                        const currentIndex = monthGroups.findIndex(
+                          (g) => g.key === selectedMonthKey
+                        );
                         if (currentIndex > 0) {
-                          setSelectedMonthKey(monthGroups[currentIndex - 1].key);
+                          setSelectedMonthKey(
+                            monthGroups[currentIndex - 1].key
+                          );
                         }
                       }}
                       aria-label="Previous month"
-                      disabled={monthGroups.findIndex((g) => g.key === selectedMonthKey) === 0}
+                      disabled={
+                        monthGroups.findIndex(
+                          (g) => g.key === selectedMonthKey
+                        ) === 0
+                      }
                       className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-slate-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       ← Prev
                     </button>
                     <div className="flex-1 rounded-lg border border-slate-200 bg-gradient-to-r from-blue-50 to-blue-50 px-4 py-3 text-center dark:border-slate-700 dark:from-blue-950/40 dark:to-blue-950/40">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">{selectedMonth.label}</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400">{selectedMonth.entries.length} races</div>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">
+                        {selectedMonth.label}
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        {selectedMonth.entries.length} races
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        const currentIndex = monthGroups.findIndex((g) => g.key === selectedMonthKey);
+                        const currentIndex = monthGroups.findIndex(
+                          (g) => g.key === selectedMonthKey
+                        );
                         if (currentIndex < monthGroups.length - 1) {
-                          setSelectedMonthKey(monthGroups[currentIndex + 1].key);
+                          setSelectedMonthKey(
+                            monthGroups[currentIndex + 1].key
+                          );
                         }
                       }}
                       aria-label="Next month"
-                      disabled={monthGroups.findIndex((g) => g.key === selectedMonthKey) === monthGroups.length - 1}
+                      disabled={
+                        monthGroups.findIndex(
+                          (g) => g.key === selectedMonthKey
+                        ) ===
+                        monthGroups.length - 1
+                      }
                       className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-slate-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       Next →
@@ -333,8 +385,12 @@ export default function CalendarPageClient() {
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <div className="font-semibold text-slate-900 dark:text-slate-100">{group.label}</div>
-                          <div className="text-xs font-medium text-slate-600 dark:text-slate-300">{group.entries.length} races</div>
+                          <div className="font-semibold text-slate-900 dark:text-slate-100">
+                            {group.label}
+                          </div>
+                          <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                            {group.entries.length} races
+                          </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {group.raceDays.slice(0, 10).map((day) => (
@@ -381,7 +437,9 @@ export default function CalendarPageClient() {
                     const pastRace = isPastRace(entry.Date);
                     const entryYear = entry.Date.slice(0, 4);
                     const champSeries = entry.raceId
-                      ? (championshipLookup.get(`${entryYear}/${entry.raceId}`) ?? [])
+                      ? (championshipLookup.get(
+                          `${entryYear}/${entry.raceId}`
+                        ) ?? [])
                       : [];
 
                     return (
@@ -396,10 +454,15 @@ export default function CalendarPageClient() {
                       >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">{formatRaceDate(entry.Date)}</div>
+                            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {formatRaceDate(entry.Date)}
+                            </div>
                             <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
                               {entry.raceId ? (
-                                <Link href={`/races/${encodeURIComponent(entry.raceId)}`} className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                                <Link
+                                  href={`/races/${encodeURIComponent(entry.raceId)}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                                >
                                   {entry.raceName}
                                 </Link>
                               ) : (
@@ -422,8 +485,16 @@ export default function CalendarPageClient() {
                             )}
                           </div>
                           <div className="text-right text-sm text-slate-700 dark:text-slate-300">
-                            <div>{entry.distance !== undefined ? formatDistance(entry.distance, imperial) : 'Distance: —'}</div>
-                            <div>{entry.climb !== undefined ? `${formatClimb(entry.climb, imperial)} climb` : 'Climb: —'}</div>
+                            <div>
+                              {entry.distance !== undefined
+                                ? formatDistance(entry.distance, imperial)
+                                : 'Distance: —'}
+                            </div>
+                            <div>
+                              {entry.climb !== undefined
+                                ? `${formatClimb(entry.climb, imperial)} climb`
+                                : 'Climb: —'}
+                            </div>
                           </div>
                         </div>
                       </article>
@@ -431,13 +502,17 @@ export default function CalendarPageClient() {
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-slate-600 dark:text-slate-300">No races available for the selected month.</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  No races available for the selected month.
+                </p>
               )}
             </section>
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">No calendar entries available.</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              No calendar entries available.
+            </p>
           </div>
         )}
       </div>

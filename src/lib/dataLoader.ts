@@ -6,19 +6,26 @@ import { resolvePublicUrl } from './asset-manifest';
  * @param filePath - Path to the compressed JSON file (relative to public folder)
  * @returns Parsed data array
  */
-export async function fetchCompressedJsonData(filePath: string): Promise<RaceData[]> {
+export async function fetchCompressedJsonData(
+  filePath: string
+): Promise<RaceData[]> {
   try {
     const resolvedPath = await resolvePublicUrl(filePath);
-    const url = new URL(resolvedPath, typeof window === 'undefined' ? `http://localhost:3000` : window.location.origin);
+    const url = new URL(
+      resolvedPath,
+      typeof window === 'undefined'
+        ? `http://localhost:3000`
+        : window.location.origin
+    );
     const response = await fetch(url.toString());
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch data: ${response.statusText}`);
     }
 
     // Get the content as an ArrayBuffer
     const buffer = await response.arrayBuffer();
-    
+
     // Decompress using DecompressionStream (gzip)
     const decompressedStream = new ReadableStream({
       start(controller) {
@@ -45,7 +52,9 @@ export async function fetchCompressedJsonData(filePath: string): Promise<RaceDat
       },
     });
 
-    const decompressedBuffer = await new Response(decompressedStream).arrayBuffer();
+    const decompressedBuffer = await new Response(
+      decompressedStream
+    ).arrayBuffer();
     const decompressedText = new TextDecoder().decode(decompressedBuffer);
     const data = JSON.parse(decompressedText) as RaceData[];
 
@@ -64,14 +73,19 @@ export async function fetchCompressedJsonData(filePath: string): Promise<RaceDat
 export async function fetchJsonData(filePath: string): Promise<RaceData[]> {
   try {
     const resolvedPath = await resolvePublicUrl(filePath);
-    const url = new URL(resolvedPath, typeof window === 'undefined' ? `http://localhost:3000` : window.location.origin);
+    const url = new URL(
+      resolvedPath,
+      typeof window === 'undefined'
+        ? `http://localhost:3000`
+        : window.location.origin
+    );
     const response = await fetch(url.toString());
 
     if (!response.ok) {
       throw new Error(`Failed to fetch data: ${response.statusText}`);
     }
 
-    const data = await response.json() as RaceData[];
+    const data = (await response.json()) as RaceData[];
     return data;
   } catch (error) {
     console.error('Error loading JSON data:', error);

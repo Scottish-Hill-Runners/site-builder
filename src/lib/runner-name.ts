@@ -26,7 +26,10 @@ function splitRunnerName(name: string): { first: string; surname: string } {
   return { first, surname };
 }
 
-function firstNameApproximateMatch(queryFirst: string, candidateFirst: string): boolean {
+function firstNameApproximateMatch(
+  queryFirst: string,
+  candidateFirst: string
+): boolean {
   const q = normalizeNameToken(queryFirst);
   const c = normalizeNameToken(candidateFirst);
 
@@ -46,7 +49,10 @@ function firstNameApproximateMatch(queryFirst: string, candidateFirst: string): 
   return false;
 }
 
-export function runnerNameMatches(searchName: string, candidateName: string): boolean {
+export function runnerNameMatches(
+  searchName: string,
+  candidateName: string
+): boolean {
   const search = splitRunnerName(searchName);
   const candidate = splitRunnerName(candidateName);
 
@@ -54,7 +60,9 @@ export function runnerNameMatches(searchName: string, candidateName: string): bo
     return false;
   }
 
-  const surnameMatches = normalizeNameToken(search.surname) === normalizeNameToken(candidate.surname);
+  const surnameMatches =
+    normalizeNameToken(search.surname) ===
+    normalizeNameToken(candidate.surname);
   if (!surnameMatches) {
     return false;
   }

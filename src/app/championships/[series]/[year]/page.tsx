@@ -9,10 +9,17 @@ type ChampionshipData = {
 };
 
 export async function generateStaticParams() {
-  const championshipsPath = path.join(process.cwd(), 'public', 'championships.json.gz');
-  if (!fs.existsSync(championshipsPath)) return [] as { series: string; year: string }[];
+  const championshipsPath = path.join(
+    process.cwd(),
+    'public',
+    'championships.json.gz'
+  );
+  if (!fs.existsSync(championshipsPath))
+    return [] as { series: string; year: string }[];
 
-  const raw = zlib.gunzipSync(fs.readFileSync(championshipsPath)).toString('utf8');
+  const raw = zlib
+    .gunzipSync(fs.readFileSync(championshipsPath))
+    .toString('utf8');
   const championships = JSON.parse(raw) as ChampionshipData[];
 
   return championships.flatMap((championship) =>

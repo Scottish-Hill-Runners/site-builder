@@ -1,14 +1,27 @@
 'use client';
 
-import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import {
+  FormEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import type { RunnerNameEntry } from '@/lib/results-data';
-import { buildResultsEditUrl, normalizeResultYear } from '@/lib/results-correction-link';
+import {
+  buildResultsEditUrl,
+  normalizeResultYear,
+} from '@/lib/results-correction-link';
 import { runnerNameMatches, surnameHash } from '@/lib/runner-name';
-import type { RaceInfo, RaceResult, ResultsFocusContext } from '@/types/datatable';
+import type {
+  RaceInfo,
+  RaceResult,
+  ResultsFocusContext,
+} from '@/types/datatable';
 
 interface RunnerPageClientProps {
   name?: string;
@@ -24,7 +37,10 @@ function normalizeSearchValue(value: string): string {
     .trim();
 }
 
-export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageClientProps) {
+export default function RunnerPageClient({
+  name,
+  runnerNames = [],
+}: RunnerPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const encodedName = name ?? searchParams.get('name') ?? '';
@@ -48,12 +64,18 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
-  const [focusedResultContext, setFocusedResultContext] = useState<ResultsFocusContext | null>(null);
+  const [focusedResultContext, setFocusedResultContext] =
+    useState<ResultsFocusContext | null>(null);
   const fallbackRaceId = results?.[0]?.raceId ?? null;
-  const fallbackYear = results?.[0] ? normalizeResultYear(results[0].year) : null;
+  const fallbackYear = results?.[0]
+    ? normalizeResultYear(results[0].year)
+    : null;
   const correctionRaceId = focusedResultContext?.raceId ?? fallbackRaceId;
   const correctionYear = focusedResultContext?.year ?? fallbackYear;
-  const correctionLink = correctionRaceId && correctionYear ? buildResultsEditUrl(correctionRaceId, correctionYear) : null;
+  const correctionLink =
+    correctionRaceId && correctionYear
+      ? buildResultsEditUrl(correctionRaceId, correctionYear)
+      : null;
 
   useEffect(() => {
     setQuery(decodedName);
@@ -68,7 +90,9 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
     }
 
     return runnerNames
-      .filter((runner) => normalizeSearchValue(runner.name).includes(normalizedQuery))
+      .filter((runner) =>
+        normalizeSearchValue(runner.name).includes(normalizedQuery)
+      )
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 8);
   }, [deferredQuery, runnerNames]);
@@ -119,12 +143,18 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
         setIsNotFound(true);
         setResults(null);
       } else if (response.status === 'error') {
-        console.error('Failed to fetch runner batch on client:', response.error);
-        setErrorMessage('Failed to load runner results. Please try again later.');
+        console.error(
+          'Failed to fetch runner batch on client:',
+          response.error
+        );
+        setErrorMessage(
+          'Failed to load runner results. Please try again later.'
+        );
         setResults(null);
       } else {
-        const filtered = response.data
-          .filter((row) => runnerNameMatches(decodedName, row.name));
+        const filtered = response.data.filter((row) =>
+          runnerNameMatches(decodedName, row.name)
+        );
         if (filtered.length === 0) {
           setIsNotFound(true);
           setResults(null);
@@ -144,15 +174,26 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
   }, [decodedName, surname]);
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8">
+    <main
+      id="main-content"
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-6xl">
-        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+        >
           <ol role="list" className="flex flex-wrap gap-2">
             <li>
-              <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-800">
+                Home
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
+            <li
+              className="font-semibold text-slate-900 dark:text-slate-100"
+              aria-current="page"
+            >
               {decodedName ? decodedName : 'Runner'}
             </li>
           </ol>
@@ -163,7 +204,10 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
         </h1>
 
         <section className="mb-8 rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-none">
-          <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleSubmit}>
+          <form
+            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            onSubmit={handleSubmit}
+          >
             <label className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               Runner name
               <input
@@ -205,15 +249,21 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
 
         {!decodedName ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Search above to find a runner and load their results.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Search above to find a runner and load their results.
+            </p>
           </div>
         ) : isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">Loading runner results...</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              Loading runner results...
+            </p>
           </div>
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">No matching results found for {decodedName}.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              No matching results found for {decodedName}.
+            </p>
             <Link
               href="/years/2024"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -224,7 +274,9 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
         ) : errorMessage ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-2 font-semibold text-red-600">{errorMessage}</p>
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Try again in a few minutes.
+            </p>
           </div>
         ) : results ? (
           <div className="space-y-4">
@@ -253,18 +305,24 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
                   </p>
                   {focusedResultContext?.source === 'selected-row' && (
                     <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                      Using selected row context: {focusedResultContext.raceId} ({focusedResultContext.year}).
+                      Using selected row context: {focusedResultContext.raceId}{' '}
+                      ({focusedResultContext.year}).
                     </p>
                   )}
                 </>
               ) : (
-                <p className="mt-1">Select a result row to generate an edit link for the correct race and year.</p>
+                <p className="mt-1">
+                  Select a result row to generate an edit link for the correct
+                  race and year.
+                </p>
               )}
             </div>
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">No runner data available.</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              No runner data available.
+            </p>
           </div>
         )}
       </div>

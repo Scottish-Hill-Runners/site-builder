@@ -16,10 +16,7 @@ function shuffled<T>(arr: T[]): T[] {
 function filenameToAltText(sourcePath: string): string {
   const fileName = sourcePath.split('/').pop() ?? sourcePath;
   const baseName = fileName.replace(/\.[^.]+$/, '');
-  return baseName
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return baseName.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export default async function Home() {
@@ -59,37 +56,93 @@ export default async function Home() {
 
           <section className="w-full mt-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Link href="/races" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Races</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Explore hill races</p>
+              <Link
+                href="/races"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Races
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Explore hill races
+                </p>
               </Link>
-              <Link href="/championships" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Championships</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Championship series</p>
+              <Link
+                href="/championships"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Championships
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Championship series
+                </p>
               </Link>
-              <Link href="/calendar" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Calendar</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Upcoming race calendar</p>
+              <Link
+                href="/calendar"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Calendar
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Upcoming race calendar
+                </p>
               </Link>
-              <Link href="/runner" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Runners</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Runner</p>
+              <Link
+                href="/runner"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Runners
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Runner
+                </p>
               </Link>
-              <Link href="/info" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Info</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Membership and guidance</p>
+              <Link
+                href="/info"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Info
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Membership and guidance
+                </p>
               </Link>
-              <Link href="/epics" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Epics</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Long distance challenges</p>
+              <Link
+                href="/epics"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Epics
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Long distance challenges
+                </p>
               </Link>
-              <Link href="/info/safety" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Safety</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Safety rules and guidelines</p>
+              <Link
+                href="/info/safety"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Safety
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Safety rules and guidelines
+                </p>
               </Link>
-              <Link href="/clubs" className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors">
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Clubs</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">Member clubs</p>
+              <Link
+                href="/clubs"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Clubs
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Member clubs
+                </p>
               </Link>
             </div>
           </section>
@@ -100,7 +153,10 @@ export default async function Home() {
             </h2>
             <NewsList items={newsItems} />
             <div className="mt-6 text-right">
-              <Link href="/news" className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
+              <Link
+                href="/news"
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+              >
                 Old news →
               </Link>
             </div>
