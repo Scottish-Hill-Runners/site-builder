@@ -57,25 +57,14 @@ export default async function Home() {
           <section className="w-full mt-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <Link
-                href="/races"
+                href="/info"
                 className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
               >
                 <h3 className="font-semibold text-gray-900 dark:text-slate-50">
-                  Races
+                  Info
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Explore hill races
-                </p>
-              </Link>
-              <Link
-                href="/championships"
-                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
-                  Championships
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Championship series
+                  Membership and guidance
                 </p>
               </Link>
               <Link
@@ -90,6 +79,17 @@ export default async function Home() {
                 </p>
               </Link>
               <Link
+                href="/championships"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
+                  Championships
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Championship series
+                </p>
+              </Link>
+              <Link
                 href="/runner"
                 className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
               >
@@ -101,14 +101,14 @@ export default async function Home() {
                 </p>
               </Link>
               <Link
-                href="/info"
+                href="/races"
                 className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
               >
                 <h3 className="font-semibold text-gray-900 dark:text-slate-50">
-                  Info
+                  Races
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Membership and guidance
+                  Explore hill races
                 </p>
               </Link>
               <Link
@@ -120,17 +120,6 @@ export default async function Home() {
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
                   Long distance challenges
-                </p>
-              </Link>
-              <Link
-                href="/info/safety"
-                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
-              >
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">
-                  Safety
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Safety rules and guidelines
                 </p>
               </Link>
               <Link
