@@ -329,8 +329,18 @@ function writeRaceData(allResults: RaceResult[]) {
   const byRaceId = groupBy(allResults, (r) => r.raceId);
   const encoder = new TextEncoder();
   const raceInfo: { [raceId: string]: RaceInfo } = {};
-  byRaceId.forEach((results, raceId) => {
-    const raceDir = path.join(contentPath('races'), raceId);
+  const racesDir = contentPath('races');
+  const allRaceDirs = fs
+    .readdirSync(racesDir, { withFileTypes: true })
+    .filter(
+      (d) =>
+        d.isDirectory() &&
+        fs.existsSync(path.join(racesDir, d.name, 'index.md'))
+    )
+    .map((d) => d.name);
+  for (const raceId of allRaceDirs) {
+    const results = byRaceId.get(raceId) ?? [];
+    const raceDir = path.join(racesDir, raceId);
     const { data, content } = matter.read(path.join(raceDir, 'index.md'));
     const info = {
       title: data.title,
@@ -372,7 +382,7 @@ function writeRaceData(allResults: RaceResult[]) {
         hasRaceMap: hasRaceMap,
       })
     );
-  });
+  }
   writeGz(outputDir, 'races.json', JSON.stringify(raceInfo));
 }
 
