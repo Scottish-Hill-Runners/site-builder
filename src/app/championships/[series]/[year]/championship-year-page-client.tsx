@@ -893,6 +893,7 @@ export default function ChampionshipYearPageClient({
             ) : (
               <RaceResultsDataTable
                 data={results}
+                races={raceMetadata}
                 showRaceColumn
                 showYearFilter={false}
                 initialNameFilter={selectedRunnerName}
