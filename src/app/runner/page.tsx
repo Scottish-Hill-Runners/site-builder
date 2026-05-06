@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
 import RunnerPageClient from '@/app/runner/runner-page-client';
-import { loadRunnerNames } from '@/lib/results-data';
+import { loadRunnerNames, type RunnerNameEntry } from '@/lib/results-data';
 
 export default async function RunnerPage() {
-  const runnerNames = await loadRunnerNames().catch(() => [] as string[]);
+  const runnerNames = await loadRunnerNames().catch(() => [] as RunnerNameEntry[]);
 
   return (
     <Suspense fallback={null}>

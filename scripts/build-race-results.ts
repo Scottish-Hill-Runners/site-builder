@@ -69,6 +69,49 @@ function formatTime(time: string): string {
   return 'n/a'; // Compares less than any hh:mm:ss time.
 }
 
+function normaliseRunnerName(rawName: unknown): string | null {
+  if (typeof rawName !== 'string') return null;
+
+  const titleCaseSegment = (segment: string): string => {
+    if (!segment) return segment;
+    return segment[0].toUpperCase() + segment.slice(1).toLowerCase();
+  };
+
+  const titleCaseName = (value: string): string =>
+    value
+      .split(' ')
+      .map((part) =>
+        part
+          .split('-')
+          .map((hyphenated) =>
+            hyphenated
+              .split("'")
+              .map(titleCaseSegment)
+              .join("'")
+          )
+          .join('-')
+      )
+      .join(' ');
+
+  let name = rawName
+    .normalize('NFKC')
+    .replace(/[‘’`´]/g, "'")
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!name || /^\(?unknown\)?$/i.test(name)) return null;
+  if (/^[\s\-?,.:;'"()]+$/.test(name)) return null;
+
+  name = name.replace(/^[\s\-?,.:;'"()]+/, '').trim();
+  if (!name || /^\(?unknown\)?$/i.test(name)) return null;
+  if (!/\p{L}/u.test(name)) return null;
+
+  name = titleCaseName(name);
+
+  return name;
+}
+
 function readClubs(dir: string): ClubInfo[] {
   const clubs = [] as ClubInfo[];
   for (const club of fs.readdirSync(dir, { withFileTypes: true }))
@@ -149,13 +192,18 @@ async function readRaceInstance(
       };
 
       progress(`Processing results from ${raceInstancePath}`);
-      return jsonArray.map((json) => {
+      return jsonArray.flatMap((json) => {
+        const name = normaliseRunnerName(
+          json.Name ?? `${json.Firstname ?? ''} ${json.Surname ?? ''}`
+        );
+        if (!name) return [];
+
         const category = (
           (json.RunnerCategory ?? json.Category ?? json.Cat ?? '') as string
         )
           .trim()
           .toUpperCase();
-        return {
+        return [{
           raceId: raceId,
           year: path.basename(raceInstancePath, '.csv'),
           position: parseInt(
@@ -164,15 +212,13 @@ async function readRaceInstance(
               json.Position ??
               json.Pos
           ),
-          name: (
-            json.Name ?? `${json.Firstname ?? ''} ${json.Surname ?? ''}`
-          ).trim(),
+          name,
           club:
             clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club,
           category: category == '' ? 'M' : category,
           categoryPos: updateCategoryPos(category),
           time: formatTime((json.FinishTime ?? json.Time) as string),
-        };
+        }];
       });
     });
 }
@@ -331,12 +377,18 @@ function writeRaceData(allResults: RaceResult[]) {
 }
 
 function writeRunnerData(allResults: RaceResult[]) {
-  const uniqueRunners = new Set<string>();
-  allResults.forEach((r) => uniqueRunners.add(r.name));
+  const runnerCounts = new Map<string, number>();
+  allResults.forEach((r) => {
+    runnerCounts.set(r.name, (runnerCounts.get(r.name) ?? 0) + 1);
+  });
   writeGz(
     outputDir,
     'runners.json',
-    JSON.stringify(Array.from(uniqueRunners).sort((a, b) => a.localeCompare(b)))
+    JSON.stringify(
+      Array.from(runnerCounts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    )
   );
   const byRunnerHash = groupBy(allResults, (r) => surnameHash(r.name) % 100);
   byRunnerHash.forEach((results, hash) => {

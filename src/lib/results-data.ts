@@ -3,6 +3,11 @@ import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import type { AllRaceData, RaceData, RaceResult } from '@/types/datatable';
 
+export type RunnerNameEntry = {
+  name: string;
+  count: number;
+};
+
 function resultsPath(fileName: string): string {
   return path.join(process.cwd(), 'public', 'results', fileName);
 }
@@ -54,6 +59,6 @@ export async function loadRunnerBatch(batch: number): Promise<RaceResult[]> {
   return readJsonGzip<RaceResult[]>(`R-${batch}.json.gz`);
 }
 
-export async function loadRunnerNames(): Promise<string[]> {
-  return await readJsonGzip<string[]>('runners.json.gz');
+export async function loadRunnerNames(): Promise<RunnerNameEntry[]> {
+  return await readJsonGzip<RunnerNameEntry[]>('runners.json.gz');
 }

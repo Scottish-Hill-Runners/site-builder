@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
+import type { RunnerNameEntry } from '@/lib/results-data';
 import { buildResultsEditUrl, normalizeResultYear } from '@/lib/results-correction-link';
 import { runnerNameMatches, surnameHash } from '@/lib/runner-name';
 import type { RaceInfo, RaceResult, ResultsFocusContext } from '@/types/datatable';
 
 interface RunnerPageClientProps {
   name?: string;
-  runnerNames?: string[];
+  runnerNames?: RunnerNameEntry[];
 }
 
 function normalizeSearchValue(value: string): string {
@@ -61,11 +62,14 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
   const suggestions = useMemo(() => {
     const normalizedQuery = normalizeSearchValue(deferredQuery);
     if (!normalizedQuery) {
-      return runnerNames.slice(0, 8);
+      return [...runnerNames]
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .slice(0, 8);
     }
 
     return runnerNames
-      .filter((runnerName) => normalizeSearchValue(runnerName).includes(normalizedQuery))
+      .filter((runner) => normalizeSearchValue(runner.name).includes(normalizedQuery))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 8);
   }, [deferredQuery, runnerNames]);
 
@@ -184,14 +188,14 @@ export default function RunnerPageClient({ name, runnerNames = [] }: RunnerPageC
                 {query.trim() ? 'Matches' : 'Popular picks'}
               </p>
               <div className="flex flex-wrap gap-2">
-                {suggestions.map((runnerName) => (
+                {suggestions.map((runner) => (
                   <button
-                    key={runnerName}
+                    key={runner.name}
                     type="button"
-                    onClick={() => goToRunner(runnerName)}
+                    onClick={() => goToRunner(runner.name)}
                     className="rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:border-blue-500 hover:text-blue-700 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-300"
                   >
-                    {runnerName}
+                    {runner.name}
                   </button>
                 ))}
               </div>
