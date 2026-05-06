@@ -194,7 +194,7 @@ async function readRaceInstance(
       progress(`Processing results from ${raceInstancePath}`);
       return jsonArray.flatMap((json) => {
         const name = normaliseRunnerName(
-          json.Name ?? `${json.Firstname ?? ''} ${json.Surname ?? ''}`
+          json.Name ?? `${json.Firstname ?? json.FirstName ?? ''} ${json.Surname ?? ''}`
         );
         if (!name) return [];
 
@@ -481,6 +481,40 @@ function writeChampionshipData(championships: ChampionshipData[]): void {
   progress('Wrote championships.json.gz');
 }
 
+function parseTimeToSeconds(time: string): number | null {
+  const trimmed = time.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parts = trimmed.split(':');
+  if (parts.length < 2 || parts.length > 3) {
+    return null;
+  }
+
+  if (!parts.every((part) => /^\d+(?:\.\d+)?$/.test(part))) {
+    return null;
+  }
+
+  if (parts.length === 2) {
+    const minutes = Number.parseFloat(parts[0]);
+    const seconds = Number.parseFloat(parts[1]);
+    return (minutes * 60) + seconds;
+  }
+
+  const hours = Number.parseFloat(parts[0]);
+  const minutes = Number.parseFloat(parts[1]);
+  const seconds = Number.parseFloat(parts[2]);
+  return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+function pointsWithWinnerBonus(position: number): number {
+  if (position < 1 || position > 40) return 0;
+  const base = 41 - position;
+  const winnerBonus = position === 1 ? 1 : 0;
+  return base + winnerBonus;
+}
+
 function writeChampionshipResultsData(
   allResults: RaceResult[],
   championships: ChampionshipData[]
@@ -495,7 +529,45 @@ function writeChampionshipResultsData(
       const championshipResults =
         championship.slug === 'Under23'
           ? results.filter(isUnder23Result)
-          : results;
+          : results.map(r => ({...r})); // clone to allow mutation if needed
+
+      // Compute points for this series + year
+      const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
+      if (championship.slug === 'LongClassics') {
+        for (const row of championshipResults) {
+          if (!winnerTimesByRaceAndSex.has(row.raceId)) {
+            winnerTimesByRaceAndSex.set(row.raceId, new Map());
+          }
+          const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
+          const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
+          
+          if (!raceWinnerTimes.has(sex)) {
+            // Because results are generally ordered by position within the CSV, 
+            // the first runner we see for a given sex should be that sex's winner.
+            const runnerTime = parseTimeToSeconds(row.time);
+            if (runnerTime !== null && runnerTime > 0) {
+              raceWinnerTimes.set(sex, runnerTime);
+            }
+          }
+        }
+      }
+
+      for (const row of championshipResults) {
+        const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
+        if (championship.slug === 'LongClassics') {
+          const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId);
+          const winnerTime = raceWinnerTimes ? raceWinnerTimes.get(sex) : undefined;
+          const runnerTime = parseTimeToSeconds(row.time);
+          row.points = (!winnerTime || !runnerTime || runnerTime <= 0)
+            ? 0
+            : Math.round((winnerTime / runnerTime) * 1000);
+        } else if (championship.slug === 'SHR' || championship.slug === 'Under23') {
+          const categoryPosition = row.categoryPos[sex] ?? row.position;
+          row.points = pointsWithWinnerBonus(categoryPosition);
+        } else {
+          row.points = row.position;
+        }
+      }
 
       writeGz(
         outputDir,

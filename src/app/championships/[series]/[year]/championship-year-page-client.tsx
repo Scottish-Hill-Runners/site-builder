@@ -34,24 +34,6 @@ type StandingRow = {
   isQualified?: boolean;
 };
 
-function parseRunnerName(name: string): { surname: string; initial: string; displayName: string } {
-  const trimmed = name.trim();
-  if (trimmed === '') {
-    return { surname: 'Unknown', initial: '?', displayName: 'Unknown' };
-  }
-
-  const parts = trimmed.split(/\s+/);
-  const surname = parts[parts.length - 1] || trimmed;
-  const initialSource = parts[0] || trimmed;
-  const initial = initialSource.charAt(0).toUpperCase() || '?';
-
-  return {
-    surname,
-    initial,
-    displayName: trimmed,
-  };
-}
-
 function parseCategoryAge(category: string): number | null {
   const match = category.match(/(\d+)/);
   if (!match) {
@@ -83,82 +65,11 @@ function getDistanceBucket(distance?: number): DistanceBucket {
   return 'medium';
 }
 
-function parseTimeToSeconds(time: string): number | null {
-  const trimmed = time.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  const parts = trimmed.split(':');
-  if (parts.length < 2 || parts.length > 3) {
-    return null;
-  }
-
-  if (!parts.every((part) => /^\d+(?:\.\d+)?$/.test(part))) {
-    return null;
-  }
-
-  if (parts.length === 2) {
-    const minutes = Number.parseFloat(parts[0]);
-    const seconds = Number.parseFloat(parts[1]);
-    return (minutes * 60) + seconds;
-  }
-
-  const hours = Number.parseFloat(parts[0]);
-  const minutes = Number.parseFloat(parts[1]);
-  const seconds = Number.parseFloat(parts[2]);
-  return (hours * 3600) + (minutes * 60) + seconds;
-}
-
-function getWinnerTimesByRace(rows: RaceResult[]): Map<string, number> {
-  const winnerTimesByRace = new Map<string, number>();
-
-  rows.forEach((row) => {
-    if (row.position !== 1 || winnerTimesByRace.has(row.raceId)) {
-      return;
-    }
-
-    const winnerTime = parseTimeToSeconds(row.time);
-    if (winnerTime !== null && winnerTime > 0) {
-      winnerTimesByRace.set(row.raceId, winnerTime);
-    }
-  });
-
-  return winnerTimesByRace;
-}
-
-function pointsWithWinnerBonus(position: number): number {
-  if (position < 1 || position > 40) {
-    return 0;
-  }
-
-  const base = 41 - position;
-  const winnerBonus = position === 1 ? 1 : 0;
-  return base + winnerBonus;
-}
-
-function calculateRacePoints(series: string, row: RaceResult, winnerTimesByRace: Map<string, number>): number {
-  if (series === 'LongClassics') {
-    const winnerTime = winnerTimesByRace.get(row.raceId);
-    const runnerTime = parseTimeToSeconds(row.time);
-
-    if (!winnerTime || !runnerTime || runnerTime <= 0) {
-      return 0;
-    }
-
-    return (winnerTime / runnerTime) * 1000;
-  }
-
-  if (series === 'SHR' || series === 'Under23') {
-    const categoryPosition = row.categoryPos[row.category] ?? row.position;
-    return pointsWithWinnerBonus(categoryPosition);
-  }
-
-  // TODO: Replace with event-specific points methods once each championship defines its scoring rules.
-  return row.position;
-}
-
-function meetsMinimumRequirements(series: string, categories: string[], events: RunnerEvent[]): boolean {
+function meetsMinimumRequirements(
+  series: string,
+  categories: string[],
+  events: RunnerEvent[]
+): boolean {
   if (series === 'BogAndBurn') {
     return events.length >= 6;
   }
@@ -184,7 +95,11 @@ function meetsMinimumRequirements(series: string, categories: string[], events: 
   return true;
 }
 
-function totalRunnerPoints(series: string, categories: string[], events: RunnerEvent[]): number {
+function totalRunnerPoints(
+  series: string,
+  categories: string[],
+  events: RunnerEvent[]
+): number {
   if (series === 'Under23') {
     return [...events]
       .sort((a, b) => b.points - a.points)
@@ -200,8 +115,11 @@ function totalRunnerPoints(series: string, categories: string[], events: RunnerE
       .reduce((sum, event) => sum + event.points, 0);
   }
 
-  if (series !== 'SHR') {
-    return events.reduce((sum, event) => sum + event.points, 0);
+  if (series === 'LongClassics') {
+    return events
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 5)
+      .reduce((sum, event) => sum + event.points, 0);
   }
 
   if (isSixtyOrOlder(categories)) {
@@ -250,7 +168,10 @@ function totalRunnerPoints(series: string, categories: string[], events: RunnerE
     selected.add(bestRemainingIndex);
   }
 
-  return Array.from(selected).reduce((sum, index) => sum + events[index].points, 0);
+  return Array.from(selected).reduce(
+    (sum, index) => sum + events[index].points,
+    0
+  );
 }
 
 function buildRunnerResultsMap(
@@ -262,7 +183,10 @@ function buildRunnerResultsMap(
   const normalizedSearchName = runnerName.toLowerCase();
   const normalizedSearchClub = runnerClub.toLowerCase();
   rows.forEach((row) => {
-    if (row.name.toLowerCase() === normalizedSearchName && row.club.toLowerCase() === normalizedSearchClub) {
+    if (
+      row.name.toLowerCase() === normalizedSearchName &&
+      row.club.toLowerCase() === normalizedSearchClub
+    ) {
       map.set(row.raceId, row);
     }
   });
@@ -274,8 +198,16 @@ function countHeadToHeadWins(
   runnerB: StandingRow,
   allResults: RaceResult[]
 ): number {
-  const resultsMapA = buildRunnerResultsMap(allResults, runnerA.name, runnerA.club);
-  const resultsMapB = buildRunnerResultsMap(allResults, runnerB.name, runnerB.club);
+  const resultsMapA = buildRunnerResultsMap(
+    allResults,
+    runnerA.name,
+    runnerA.club
+  );
+  const resultsMapB = buildRunnerResultsMap(
+    allResults,
+    runnerB.name,
+    runnerB.club
+  );
 
   let aWins = 0;
   let totalShared = 0;
@@ -283,18 +215,10 @@ function countHeadToHeadWins(
   // Find shared races
   resultsMapA.forEach((resultA, raceId) => {
     const resultB = resultsMapB.get(raceId);
-    if (!resultB) {
-      return;
-    }
-
-    totalShared++;
-    
-    // Use category position for comparison within the same category
-    const categoryA = resultA.categoryPos[resultA.category] ?? resultA.position;
-    const categoryB = resultB.categoryPos[resultB.category] ?? resultB.position;
-    
-    if (categoryA < categoryB) {
-      aWins++;
+    if (resultB) {
+      totalShared++;
+      if (resultA.position < resultB.position)
+        aWins++;
     }
   });
 
@@ -307,16 +231,21 @@ function formatPoints(points: number): string {
   return String(Math.round(points));
 }
 
-function buildStandings(series: string, rows: RaceResult[], raceMetadata: RaceMetadata): StandingRow[] {
-  const grouped = new Map<string, StandingRow & { runnerEvents: RunnerEvent[] }>();
-  const winnerTimesByRace = getWinnerTimesByRace(rows);
+function buildStandings(
+  series: string,
+  rows: RaceResult[],
+  raceMetadata: RaceMetadata
+): StandingRow[] {
+  const grouped = new Map<
+    string,
+    StandingRow & { runnerEvents: RunnerEvent[] }
+  >();
 
   rows.forEach((row) => {
-    const parsed = parseRunnerName(row.name);
-    const normalizedName = row.name.trim();
+    const normalizedName = row.name.trim() || 'Unknown';
     const normalizedClub = row.club.trim();
     const groupKey = `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
-    const racePoints = calculateRacePoints(series, row, winnerTimesByRace);
+    const racePoints = row.points ?? 0;
     const bucket = getDistanceBucket(raceMetadata[row.raceId]?.distance);
     const existing = grouped.get(groupKey);
 
@@ -324,14 +253,18 @@ function buildStandings(series: string, rows: RaceResult[], raceMetadata: RaceMe
       if (!existing.categories.includes(row.category)) {
         existing.categories.push(row.category);
       }
-      existing.runnerEvents.push({ raceId: row.raceId, points: racePoints, bucket });
+      existing.runnerEvents.push({
+        raceId: row.raceId,
+        points: racePoints,
+        bucket,
+      });
       existing.events.push({ raceId: row.raceId, points: racePoints });
       return;
     }
 
     grouped.set(groupKey, {
       key: groupKey,
-      name: parsed.displayName,
+      name: normalizedName,
       club: normalizedClub,
       categories: [row.category],
       points: 0,
@@ -341,7 +274,9 @@ function buildStandings(series: string, rows: RaceResult[], raceMetadata: RaceMe
   });
 
   const finalized = Array.from(grouped.values()).map((runner) => {
-    const sortedEvents = [...runner.events].sort((a, b) => a.raceId.localeCompare(b.raceId));
+    const sortedEvents = [...runner.events].sort((a, b) =>
+      a.raceId.localeCompare(b.raceId)
+    );
     return {
       key: runner.key,
       name: runner.name,
@@ -350,12 +285,17 @@ function buildStandings(series: string, rows: RaceResult[], raceMetadata: RaceMe
       points: totalRunnerPoints(series, runner.categories, runner.runnerEvents),
       events: sortedEvents,
       runnerEvents: runner.runnerEvents,
-      isQualified: meetsMinimumRequirements(series, runner.categories, runner.runnerEvents),
+      isQualified: meetsMinimumRequirements(
+        series,
+        runner.categories,
+        runner.runnerEvents
+      ),
     };
   });
 
   return finalized.sort((a, b) => {
-    const pointsDiff = series === 'BogAndBurn' ? a.points - b.points : b.points - a.points;
+    const pointsDiff =
+      series === 'BogAndBurn' ? a.points - b.points : b.points - a.points;
     if (pointsDiff !== 0) {
       return pointsDiff;
     }
@@ -389,7 +329,9 @@ export default function ChampionshipYearPageClient({
     return 'standings';
   });
   useEffect(() => {
-    try { window.localStorage.setItem(CHAMP_TAB_STORAGE_KEY, activeTab); } catch {}
+    try {
+      window.localStorage.setItem(CHAMP_TAB_STORAGE_KEY, activeTab);
+    } catch {}
   }, [activeTab]);
 
   const [selectedRunnerName, setSelectedRunnerName] = useState('');
@@ -398,7 +340,9 @@ export default function ChampionshipYearPageClient({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
-  const [clubNameToSlug, setClubNameToSlug] = useState<Record<string, string>>({});
+  const [clubNameToSlug, setClubNameToSlug] = useState<Record<string, string>>(
+    {}
+  );
 
   useEffect(() => {
     fetchGzipJson<Array<{ name: string; slug: string }>>('/clubs.json.gz')
@@ -412,7 +356,10 @@ export default function ChampionshipYearPageClient({
       .catch(() => {});
   }, []);
 
-  const allStandings = useMemo(() => buildStandings(series, results ?? [], raceMetadata), [results, raceMetadata, series]);
+  const allStandings = useMemo(
+    () => buildStandings(series, results ?? [], raceMetadata),
+    [results, raceMetadata, series]
+  );
 
   const availableCategoryPos = useMemo(() => {
     const categories = new Set<string>();
@@ -437,38 +384,37 @@ export default function ChampionshipYearPageClient({
       return allStandings;
     }
 
-    const filteredRows = results.filter((row) => selectedCategoryPos in row.categoryPos);
-    const winnerTimesByRace = getWinnerTimesByRace(results);
-    const grouped = new Map<string, StandingRow & { runnerEvents: RunnerEvent[] }>();
+    const filteredRows = results.filter(
+      (row) => selectedCategoryPos in row.categoryPos
+    );
+    const grouped = new Map<
+      string,
+      StandingRow & { runnerEvents: RunnerEvent[] }
+    >();
 
     filteredRows.forEach((row) => {
-      const parsed = parseRunnerName(row.name);
-      const normalizedName = row.name.trim();
+      const normalizedName = row.name.trim() || 'Unknown';
       const normalizedClub = row.club.trim();
       const groupKey = `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
-      const categoryPosition = row.categoryPos[selectedCategoryPos] ?? row.position;
-      let racePoints = calculateRacePoints(series, row, winnerTimesByRace);
 
-      if (series === 'SHR' || series === 'Under23') {
-        racePoints = pointsWithWinnerBonus(categoryPosition);
-      }
-
-      if (series !== 'LongClassics' && series !== 'SHR' && series !== 'Under23') {
-        racePoints = categoryPosition;
-      }
+      const racePoints = row.points ?? 0;
 
       const bucket = getDistanceBucket(raceMetadata[row.raceId]?.distance);
       const existing = grouped.get(groupKey);
 
       if (existing) {
-        existing.runnerEvents.push({ raceId: row.raceId, points: racePoints, bucket });
+        existing.runnerEvents.push({
+          raceId: row.raceId,
+          points: racePoints,
+          bucket,
+        });
         existing.events.push({ raceId: row.raceId, points: racePoints });
         return;
       }
 
       grouped.set(groupKey, {
         key: groupKey,
-        name: parsed.displayName,
+        name: normalizedName,
         club: normalizedClub,
         categories: [selectedCategoryPos],
         points: 0,
@@ -479,21 +425,32 @@ export default function ChampionshipYearPageClient({
     });
 
     const finalized = Array.from(grouped.values()).map((runner) => {
-      const sortedEvents = [...runner.events].sort((a, b) => a.raceId.localeCompare(b.raceId));
+      const sortedEvents = [...runner.events].sort((a, b) =>
+        a.raceId.localeCompare(b.raceId)
+      );
       return {
         key: runner.key,
         name: runner.name,
         club: runner.club,
         categories: runner.categories,
-        points: totalRunnerPoints(series, runner.categories, runner.runnerEvents),
+        points: totalRunnerPoints(
+          series,
+          runner.categories,
+          runner.runnerEvents
+        ),
         events: sortedEvents,
         runnerEvents: runner.runnerEvents,
-        isQualified: meetsMinimumRequirements(series, runner.categories, runner.runnerEvents),
+        isQualified: meetsMinimumRequirements(
+          series,
+          runner.categories,
+          runner.runnerEvents
+        ),
       };
     });
 
     return finalized.sort((a, b) => {
-      const pointsDiff = series === 'BogAndBurn' ? a.points - b.points : b.points - a.points;
+      const pointsDiff =
+        series === 'BogAndBurn' ? a.points - b.points : b.points - a.points;
       if (pointsDiff !== 0) {
         return pointsDiff;
       }
@@ -566,9 +523,14 @@ export default function ChampionshipYearPageClient({
           }
         }
       } catch (error) {
-        console.error('Failed to fetch championship year data on client:', error);
+        console.error(
+          'Failed to fetch championship year data on client:',
+          error
+        );
         if (!isCancelled) {
-          setErrorMessage('Failed to load championship results. Please try again later.');
+          setErrorMessage(
+            'Failed to load championship results. Please try again later.'
+          );
           setResults(null);
         }
       } finally {
@@ -585,37 +547,64 @@ export default function ChampionshipYearPageClient({
   }, [series, year]);
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8">
+    <main
+      id="main-content"
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-6xl">
-        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 text-sm text-slate-500 dark:text-slate-400"
+        >
           <ol role="list" className="flex flex-wrap gap-2">
             <li>
-              <Link href="/" className="text-blue-600 hover:text-blue-800">Home</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-800">
+                Home
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
             <li>
-              <Link href="/championships" className="text-blue-600 hover:text-blue-800">Championships</Link>
+              <Link
+                href="/championships"
+                className="text-blue-600 hover:text-blue-800"
+              >
+                Championships
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
             <li>
-              <Link href={`/championships/${encodeURIComponent(series)}`} className="text-blue-600 hover:text-blue-800">{series}</Link>
+              <Link
+                href={`/championships/${encodeURIComponent(series)}`}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                {series}
+              </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-semibold text-slate-900 dark:text-slate-100" aria-current="page">
+            <li
+              className="font-semibold text-slate-900 dark:text-slate-100"
+              aria-current="page"
+            >
               {year}
             </li>
           </ol>
         </nav>
 
-        <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">{series} {year}</h1>
+        <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
+          {series} {year}
+        </h1>
 
         {isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">Loading championship results...</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              Loading championship results...
+            </p>
           </div>
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="mb-4 text-gray-600 dark:text-slate-300">No championship results found for {series} {year}.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              No championship results found for {series} {year}.
+            </p>
             <Link
               href={`/championships/${encodeURIComponent(series)}`}
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -626,19 +615,27 @@ export default function ChampionshipYearPageClient({
         ) : errorMessage ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-2 font-semibold text-red-600">{errorMessage}</p>
-            <p className="mb-4 text-gray-600 dark:text-slate-300">Try again in a few minutes.</p>
+            <p className="mb-4 text-gray-600 dark:text-slate-300">
+              Try again in a few minutes.
+            </p>
           </div>
         ) : results ? (
           <div className="space-y-4">
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900" role="tablist" aria-label="Championship view selector">
+            <div
+              className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              role="tablist"
+              aria-label="Championship view selector"
+            >
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'standings'}
                 onClick={() => setActiveTab('standings')}
-                className={activeTab === 'standings'
-                  ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
-                  : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}
+                className={
+                  activeTab === 'standings'
+                    ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
+                    : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                }
               >
                 Standings
               </button>
@@ -647,9 +644,11 @@ export default function ChampionshipYearPageClient({
                 role="tab"
                 aria-selected={activeTab === 'results'}
                 onClick={() => setActiveTab('results')}
-                className={activeTab === 'results'
-                  ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
-                  : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}
+                className={
+                  activeTab === 'results'
+                    ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
+                    : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                }
               >
                 Results
               </button>
@@ -659,7 +658,10 @@ export default function ChampionshipYearPageClient({
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <label htmlFor="categorypos-select" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <label
+                      htmlFor="categorypos-select"
+                      className="text-sm font-semibold text-slate-700 dark:text-slate-200"
+                    >
                       Category:
                     </label>
                     <select
@@ -678,7 +680,10 @@ export default function ChampionshipYearPageClient({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <label htmlFor="club-select" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <label
+                      htmlFor="club-select"
+                      className="text-sm font-semibold text-slate-700 dark:text-slate-200"
+                    >
                       Club:
                     </label>
                     <select
@@ -698,45 +703,78 @@ export default function ChampionshipYearPageClient({
                 </div>
                 {qualifiedStandings.length > 0 && (
                   <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Qualified Runners</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      Qualified Runners
+                    </h3>
                     <div className="overflow-x-auto rounded-lg bg-white shadow-md dark:bg-slate-900">
                       <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                         <thead className="bg-slate-100 dark:bg-slate-800">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Club</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Category</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Points</th>
-                            <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 sm:table-cell dark:text-slate-300">Events</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Club
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Category
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Points
+                            </th>
+                            <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 sm:table-cell dark:text-slate-300">
+                              Events
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                           {qualifiedStandings.map((runner) => (
-                          <tr
-                            key={runner.key}
-                            tabIndex={0}
-                            onClick={() => handleRunnerClick(runner.name)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                handleRunnerClick(runner.name);
-                              }
-                            }}
-                            className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
-                          >
-                            <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{runner.name}</td>
-                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                              {runner.club && clubNameToSlug[runner.club] ? (
-                                <Link href={`/clubs/${encodeURIComponent(clubNameToSlug[runner.club])}`} className="text-blue-600 hover:underline dark:text-blue-400">{runner.club}</Link>
-                              ) : runner.club}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{runner.categories.join(', ')}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">{formatPoints(runner.points)}</td>
-                            <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                              {runner.events.map((event) => `${event.raceId}: ${formatPoints(event.points)}`).join(', ')}
-                            </td>
-                          </tr>
-                        ))}
+                            <tr
+                              key={runner.key}
+                              tabIndex={0}
+                              onClick={() => handleRunnerClick(runner.name)}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === 'Enter' ||
+                                  event.key === ' '
+                                ) {
+                                  event.preventDefault();
+                                  handleRunnerClick(runner.name);
+                                }
+                              }}
+                              className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
+                            >
+                              <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {runner.name}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                {runner.club && clubNameToSlug[runner.club] ? (
+                                  <Link
+                                    href={`/clubs/${encodeURIComponent(clubNameToSlug[runner.club])}`}
+                                    className="text-blue-600 hover:underline dark:text-blue-400"
+                                  >
+                                    {runner.club}
+                                  </Link>
+                                ) : (
+                                  runner.club
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                {runner.categories.join(', ')}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {formatPoints(runner.points)}
+                              </td>
+                              <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
+                                {runner.events
+                                  .map(
+                                    (event) =>
+                                      `${event.raceId}: ${formatPoints(event.points)}`
+                                  )
+                                  .join(', ')}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -745,10 +783,13 @@ export default function ChampionshipYearPageClient({
 
                 {unqualifiedStandings.length > 0 && (
                   <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Unqualified Runners</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      Unqualified Runners
+                    </h3>
                     {series === 'SHR' && (
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Runners below minimum requirement (4 races, at least one in each distance category for under-60)
+                        Runners below minimum requirement (4 races, at least one
+                        in each distance category for under-60)
                       </p>
                     )}
                     {series === 'LongClassics' && (
@@ -765,51 +806,85 @@ export default function ChampionshipYearPageClient({
                       <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                         <thead className="bg-slate-100 dark:bg-slate-800">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Club</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Category</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Points</th>
-                            <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 sm:table-cell dark:text-slate-300">Events</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Club
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Category
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Points
+                            </th>
+                            <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 sm:table-cell dark:text-slate-300">
+                              Events
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                           {unqualifiedStandings.map((runner) => (
-                          <tr
-                            key={runner.key}
-                            tabIndex={0}
-                            onClick={() => handleRunnerClick(runner.name)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                handleRunnerClick(runner.name);
-                              }
-                            }}
-                            className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
-                          >
-                            <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{runner.name}</td>
-                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                              {runner.club && clubNameToSlug[runner.club] ? (
-                                <Link href={`/clubs/${encodeURIComponent(clubNameToSlug[runner.club])}`} className="text-blue-600 hover:underline dark:text-blue-400">{runner.club}</Link>
-                              ) : runner.club}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{runner.categories.join(', ')}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">{formatPoints(runner.points)}</td>
-                            <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                              {runner.events.map((event) => `${event.raceId}: ${formatPoints(event.points)}`).join(', ')}
-                            </td>
-                          </tr>
-                        ))}
+                            <tr
+                              key={runner.key}
+                              tabIndex={0}
+                              onClick={() => handleRunnerClick(runner.name)}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === 'Enter' ||
+                                  event.key === ' '
+                                ) {
+                                  event.preventDefault();
+                                  handleRunnerClick(runner.name);
+                                }
+                              }}
+                              className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
+                            >
+                              <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {runner.name}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                {runner.club && clubNameToSlug[runner.club] ? (
+                                  <Link
+                                    href={`/clubs/${encodeURIComponent(clubNameToSlug[runner.club])}`}
+                                    className="text-blue-600 hover:underline dark:text-blue-400"
+                                  >
+                                    {runner.club}
+                                  </Link>
+                                ) : (
+                                  runner.club
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                                {runner.categories.join(', ')}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {formatPoints(runner.points)}
+                              </td>
+                              <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
+                                {runner.events
+                                  .map(
+                                    (event) =>
+                                      `${event.raceId}: ${formatPoints(event.points)}`
+                                  )
+                                  .join(', ')}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
                 )}
 
-                {qualifiedStandings.length === 0 && unqualifiedStandings.length === 0 && (
-                  <div className="rounded-lg bg-slate-50 p-6 text-center dark:bg-slate-800">
-                    <p className="text-slate-600 dark:text-slate-400">No standings data available for this selection.</p>
-                  </div>
-                )}
+                {qualifiedStandings.length === 0 &&
+                  unqualifiedStandings.length === 0 && (
+                    <div className="rounded-lg bg-slate-50 p-6 text-center dark:bg-slate-800">
+                      <p className="text-slate-600 dark:text-slate-400">
+                        No standings data available for this selection.
+                      </p>
+                    </div>
+                  )}
               </div>
             ) : (
               <RaceResultsDataTable
@@ -817,12 +892,15 @@ export default function ChampionshipYearPageClient({
                 showRaceColumn
                 showYearFilter={false}
                 initialNameFilter={selectedRunnerName}
+                showPointsColumn
               />
             )}
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
-            <p className="text-gray-600 dark:text-slate-300">No championship data available.</p>
+            <p className="text-gray-600 dark:text-slate-300">
+              No championship data available.
+            </p>
           </div>
         )}
       </div>

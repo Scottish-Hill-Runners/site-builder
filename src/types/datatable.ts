@@ -7,6 +7,7 @@ export interface RaceResult {
   category: string;
   categoryPos: { [cat: string]: number };
   time: string;
+  points?: number;
 }
 
 export interface ResultsFocusContext {
