@@ -565,7 +565,7 @@ function writeChampionshipResultsData(
           const categoryPosition = row.categoryPos[sex] ?? row.position;
           row.points = pointsWithWinnerBonus(categoryPosition);
         } else {
-          row.points = row.position;
+          row.points = row.categoryPos[sex] ?? row.position;
         }
       }
 

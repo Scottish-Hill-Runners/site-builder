@@ -745,7 +745,9 @@ export default function ChampionshipYearPageClient({
                               className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
                             >
                               <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                {runner.name}
+                                <Link href={`/runner?name=${encodeURIComponent(runner.name)}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                                  {runner.name}
+                                </Link>
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
                                 {runner.club && clubNameToSlug[runner.club] ? (
