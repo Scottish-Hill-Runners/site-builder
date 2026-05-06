@@ -81,12 +81,32 @@ export default function RunnerPageClient({
     setQuery(decodedName);
   }, [decodedName]);
 
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const suggestions = useMemo(() => {
     const normalizedQuery = normalizeSearchValue(deferredQuery);
+    
     if (!normalizedQuery) {
+      // 1. Return deterministic names during SSR to prevent hydration errors
+      if (!isMounted) {
+        return [...runnerNames]
+          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+          .slice(0, 8);
+      }
+
+      // 2. Return randomized names once standard client rendering takes over
       return [...runnerNames]
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-        .slice(0, 8);
+        .map((runner) => ({
+          runner,
+          weightKey: Math.pow(Math.random(), 1 / runner.count) 
+        }))
+        .sort((a, b) => b.weightKey - a.weightKey)
+        .slice(0, 8)
+        .map((x) => x.runner);
     }
 
     return runnerNames
@@ -95,7 +115,7 @@ export default function RunnerPageClient({
       )
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 8);
-  }, [deferredQuery, runnerNames]);
+  }, [deferredQuery, runnerNames, isMounted]);
 
   function goToRunner(nameToOpen: string) {
     const trimmed = nameToOpen.trim();
