@@ -11,6 +11,7 @@ interface ChampionshipData {
   title: string;
   contents: string;
   years: { [year: string]: string[] };
+  yearHasData?: { [year: string]: boolean };
 }
 
 interface ChampionshipPageClientProps {
@@ -145,6 +146,7 @@ export default function ChampionshipPageClient({
             </h1>
             <div className="mb-6 flex flex-wrap gap-2">
               {Object.keys(data.years)
+                .filter((year) => data.yearHasData?.[year] ?? true)
                 .sort((a, b) => Number(b) - Number(a))
                 .map((year) => (
                   <Link

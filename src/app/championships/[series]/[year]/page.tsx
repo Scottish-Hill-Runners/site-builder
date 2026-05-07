@@ -6,6 +6,7 @@ import zlib from 'zlib';
 type ChampionshipData = {
   slug: string;
   years: { [year: string]: string[] };
+  yearHasData?: { [year: string]: boolean };
 };
 
 export async function generateStaticParams() {
@@ -23,10 +24,12 @@ export async function generateStaticParams() {
   const championships = JSON.parse(raw) as ChampionshipData[];
 
   return championships.flatMap((championship) =>
-    Object.keys(championship.years).map((year) => ({
-      series: championship.slug,
-      year,
-    }))
+    Object.keys(championship.years)
+      .filter((year) => championship.yearHasData?.[year] ?? true)
+      .map((year) => ({
+        series: championship.slug,
+        year,
+      }))
   );
 }
 

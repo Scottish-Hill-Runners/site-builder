@@ -30,6 +30,7 @@ type ChampionshipData = {
   title: string;
   contents: string;
   years: { [year: string]: string[] };
+  yearHasData?: { [year: string]: boolean };
 };
 
 type CalendarEntry = {
@@ -540,6 +541,8 @@ function writeChampionshipResultsData(
   championships: ChampionshipData[]
 ): void {
   for (const championship of championships) {
+    championship.yearHasData = {};
+
     for (const [year, raceIds] of Object.entries(championship.years)) {
       const raceSet = new Set(raceIds);
       const results = allResults.filter(
@@ -550,6 +553,9 @@ function writeChampionshipResultsData(
         championship.slug === 'Under23'
           ? results.filter(isUnder23Result)
           : results.map((r) => ({ ...r })); // clone to allow mutation if needed
+
+      championship.yearHasData[year] =
+        raceIds.length > 0 || championshipResults.length > 0;
 
       // Compute points for this series + year
       const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
@@ -675,8 +681,8 @@ async function main() {
   writeRaceData(allResults);
   writeRunnerData(allResults);
   summariseCategories(allResults);
-  writeChampionshipData(championships);
   writeChampionshipResultsData(allResults, championships);
+  writeChampionshipData(championships);
   await writeCalendarData();
 
   progress('Done\n');
