@@ -87,35 +87,40 @@ export default function RunnerPageClient({
     setIsMounted(true);
   }, []);
 
-  const suggestions = useMemo(() => {
-    const normalizedQuery = normalizeSearchValue(deferredQuery);
-    
-    if (!normalizedQuery) {
-      // 1. Return deterministic names during SSR to prevent hydration errors
-      if (!isMounted) {
-        return [...runnerNames]
-          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-          .slice(0, 8);
-      }
+  const runnerNamesByCount = useMemo(
+    () =>
+      [...runnerNames].sort(
+        (a, b) => b.count - a.count || a.name.localeCompare(b.name)
+      ),
+    [runnerNames]
+  );
 
-      // 2. Return randomized names once standard client rendering takes over
-      return [...runnerNames]
-        .map((runner) => ({
-          runner,
-          weightKey: Math.pow(Math.random(), 1 / runner.count) 
-        }))
-        .sort((a, b) => b.weightKey - a.weightKey)
-        .slice(0, 8)
-        .map((x) => x.runner);
+  const suggestions = useMemo(() => {
+    function weightedComparator(a: RunnerNameEntry, b: RunnerNameEntry): number {
+      return (
+        // eslint-disable-next-line react-hooks/purity
+        Math.pow(Math.random(), 1 / b.count) - Math.pow(Math.random(), 1 / a.count)
+      );
     }
 
-    return runnerNames
-      .filter((runner) =>
-        normalizeSearchValue(runner.name).includes(normalizedQuery)
-      )
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    const normalizedQuery = normalizeSearchValue(deferredQuery);   
+    if (normalizedQuery)
+      return runnerNamesByCount
+        .filter((runner) =>
+          normalizeSearchValue(runner.name).includes(normalizedQuery)
+        )
+        .slice(0, 8);
+
+    // Return deterministic names during SSR to prevent hydration errors
+    if (!isMounted)
+      return runnerNamesByCount.slice(0, 8);
+
+    // Return randomized names once standard client rendering takes over
+    return runnerNamesByCount
+      .slice(0, 2000)
+      .sort(weightedComparator)
       .slice(0, 8);
-  }, [deferredQuery, runnerNames, isMounted]);
+  }, [deferredQuery, runnerNamesByCount, isMounted]);
 
   function goToRunner(nameToOpen: string) {
     const trimmed = nameToOpen.trim();
