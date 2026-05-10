@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { loadAllRaces } from '@/lib/results-data';
+import { loadAllRaces, loadCalendar } from '@/lib/results-data';
 import RaceListFilter from '@/app/races/race-list-filter';
 import type { RaceInfo } from '@/types/datatable';
 
@@ -16,6 +16,11 @@ export default async function RaceListPage() {
       console.error('Failed to load races list:', error);
       return [] as Array<RaceInfo & { raceId: string }>;
     });
+
+  const calendar = await loadCalendar().catch((error: unknown) => {
+    console.error('Failed to load calendar:', error);
+    return [];
+  });
 
   return (
     <main
@@ -49,7 +54,7 @@ export default async function RaceListPage() {
             </p>
           </div>
         ) : (
-          <RaceListFilter races={races} />
+          <RaceListFilter races={races} calendar={calendar} />
         )}
       </div>
     </main>

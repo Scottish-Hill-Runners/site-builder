@@ -22,6 +22,22 @@ export async function loadAllRaces(): Promise<AllRaceData> {
   return await readJsonGzip<AllRaceData>('races.json.gz');
 }
 
+export type CalendarEntry = {
+  Date: string;
+  raceName: string;
+  raceId?: string;
+  distance?: number;
+  climb?: number;
+  latitude?: number;
+  longitude?: number;
+};
+
+export async function loadCalendar(): Promise<CalendarEntry[]> {
+  const buffer = await fs.readFile(path.join(process.cwd(), 'public', 'calendar.json.gz'));
+  const decompressed = gunzipSync(buffer).toString('utf8');
+  return JSON.parse(decompressed) as CalendarEntry[];
+}
+
 export async function loadRaceResults(raceId: string): Promise<RaceData> {
   const safeRaceId = raceId.replace(/[^a-zA-Z0-9_-]/g, '');
   if (!safeRaceId) {

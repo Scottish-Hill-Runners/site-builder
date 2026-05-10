@@ -39,6 +39,8 @@ type CalendarEntry = {
   raceId?: string;
   distance?: number;
   climb?: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 function formatTime(time: string): string {
@@ -678,6 +680,9 @@ async function writeCalendarData(): Promise<void> {
 
       const climb = parseFloat(String(data.climb ?? ''));
       if (!Number.isNaN(climb)) entry.climb = climb;
+
+      if (data.latitude !== undefined) entry.latitude = parseFloat(data.latitude);
+      if (data.longitude !== undefined) entry.longitude = parseFloat(data.longitude);
 
       return entry;
     });
