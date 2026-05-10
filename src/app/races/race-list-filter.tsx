@@ -18,9 +18,27 @@ interface RaceListFilterProps {
   calendar: CalendarEntry[];
 }
 
+const VIEW_STORAGE_KEY = 'shr-race-list-view';
+
 export default function RaceListFilter({ races, calendar }: RaceListFilterProps) {
   const { imperial } = useUnits();
-  const [view, setView] = useState<'list' | 'map'>('list');
+  
+  const [view, setView] = useState<'list' | 'map'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    try {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved === 'list' || saved === 'map') return saved;
+    } catch {}
+    return 'list';
+  });
+
+  const handleSetView = (newView: 'list' | 'map') => {
+    setView(newView);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, newView);
+    } catch {}
+  };
+
   const [query, setQuery] = useState('');
   const [distanceFilter, setDistanceFilter] = useState('');
   const [climbFilter, setClimbFilter] = useState('');
@@ -65,7 +83,7 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
     <div className="space-y-4">
       <div className="flex justify-end gap-2 border-b border-gray-200 dark:border-slate-800 pb-2">
         <button
-          onClick={() => setView('list')}
+          onClick={() => handleSetView('list')}
           className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
             view === 'list'
               ? 'bg-white text-blue-600 border-b-2 border-blue-600 dark:bg-slate-900 dark:text-blue-400'
@@ -75,7 +93,7 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
           All races
         </button>
         <button
-          onClick={() => setView('map')}
+          onClick={() => handleSetView('map')}
           className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
             view === 'map'
               ? 'bg-white text-blue-600 border-b-2 border-blue-600 dark:bg-slate-900 dark:text-blue-400'
