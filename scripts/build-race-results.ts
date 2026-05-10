@@ -560,9 +560,26 @@ function writeChampionshipResultsData(
       // Compute points for this series + year
       const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
       if (championship.slug === 'LongClassics') {
+        const extractRecord = (rec: unknown) => {
+          if (typeof rec !== 'string') return null;
+          const match = rec.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+          return match ? parseTimeToSeconds(match[1]) : null;
+        };
+
         for (const row of championshipResults) {
           if (!winnerTimesByRaceAndSex.has(row.raceId)) {
-            winnerTimesByRaceAndSex.set(row.raceId, new Map());
+            const raceWinnerTimes = new Map<string, number>();
+            winnerTimesByRaceAndSex.set(row.raceId, raceWinnerTimes);
+
+            // Try to set records from frontmatter first
+            const raceIndexPath = contentPath('races', row.raceId, 'index.md');
+            if (fs.existsSync(raceIndexPath)) {
+              const { data } = matter.read(raceIndexPath);
+              const mRec = extractRecord(data.maleRecord ?? data.record);
+              if (mRec) raceWinnerTimes.set('M', mRec);
+              const fRec = extractRecord(data.femaleRecord);
+              if (fRec) raceWinnerTimes.set('F', fRec);
+            }
           }
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
           const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
@@ -570,6 +587,7 @@ function writeChampionshipResultsData(
           if (!raceWinnerTimes.has(sex)) {
             // Because results are generally ordered by position within the CSV,
             // the first runner we see for a given sex should be that sex's winner.
+            // This is used as a fallback if no record exists in the frontmatter.
             const runnerTime = parseTimeToSeconds(row.time);
             if (runnerTime !== null && runnerTime > 0) {
               raceWinnerTimes.set(sex, runnerTime);
