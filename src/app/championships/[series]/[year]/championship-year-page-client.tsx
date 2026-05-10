@@ -30,6 +30,8 @@ type StandingRow = {
   categories: string[];
   points: number;
   events: Array<{ raceId: string; points: number }>;
+  countingEvents?: Array<{ raceId: string; points: number }>;
+  remainingEvents?: Array<{ raceId: string; points: number }>;
   runnerEvents?: RunnerEvent[];
   isQualified?: boolean;
 };
@@ -95,38 +97,57 @@ function meetsMinimumRequirements(
   return true;
 }
 
-function totalRunnerPoints(
+function scoreRunnerEvents(
   series: string,
   categories: string[],
   events: RunnerEvent[]
-): number {
+): { points: number; counting: RunnerEvent[]; remaining: RunnerEvent[] } {
+  let counting: RunnerEvent[] = [];
+  let remaining: RunnerEvent[] = [];
+
   if (series === 'Under23') {
-    return [...events]
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 3)
-      .reduce((sum, event) => sum + event.points, 0);
+    const sorted = [...events].sort((a, b) => b.points - a.points);
+    counting = sorted.slice(0, 3);
+    remaining = sorted.slice(3);
+    return {
+      points: counting.reduce((sum, event) => sum + event.points, 0),
+      counting,
+      remaining,
+    };
   }
 
   if (series === 'BogAndBurn') {
     // BogAndBurn: best 6 results (lower points are better since points = position)
-    return [...events]
-      .sort((a, b) => a.points - b.points)
-      .slice(0, 6)
-      .reduce((sum, event) => sum + event.points, 0);
+    const sorted = [...events].sort((a, b) => a.points - b.points);
+    counting = sorted.slice(0, 6);
+    remaining = sorted.slice(6);
+    return {
+      points: counting.reduce((sum, event) => sum + event.points, 0),
+      counting,
+      remaining,
+    };
   }
 
   if (series === 'LongClassics') {
-    return events
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 5)
-      .reduce((sum, event) => sum + event.points, 0);
+    const sorted = [...events].sort((a, b) => b.points - a.points);
+    counting = sorted.slice(0, 5);
+    remaining = sorted.slice(5);
+    return {
+      points: counting.reduce((sum, event) => sum + event.points, 0),
+      counting,
+      remaining,
+    };
   }
 
   if (isSixtyOrOlder(categories)) {
-    return [...events]
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 4)
-      .reduce((sum, event) => sum + event.points, 0);
+    const sorted = [...events].sort((a, b) => b.points - a.points);
+    counting = sorted.slice(0, 4);
+    remaining = sorted.slice(4);
+    return {
+      points: counting.reduce((sum, event) => sum + event.points, 0),
+      counting,
+      remaining,
+    };
   }
 
   const selected = new Set<number>();
@@ -168,10 +189,31 @@ function totalRunnerPoints(
     selected.add(bestRemainingIndex);
   }
 
-  return Array.from(selected).reduce(
-    (sum, index) => sum + events[index].points,
-    0
-  );
+  events.forEach((event, index) => {
+    if (selected.has(index)) {
+      counting.push(event);
+    } else {
+      remaining.push(event);
+    }
+  });
+
+  const sortPointsAsc = series === 'BogAndBurn';
+  const sortEvents = (a: RunnerEvent, b: RunnerEvent) => {
+    if (sortPointsAsc) {
+      return a.points - b.points;
+    } else {
+      return b.points - a.points;
+    }
+  };
+
+  counting.sort(sortEvents);
+  remaining.sort(sortEvents);
+
+  return {
+    points: counting.reduce((sum, event) => sum + event.points, 0),
+    counting,
+    remaining,
+  };
 }
 
 function buildRunnerResultsMap(
@@ -276,13 +318,16 @@ function buildStandings(
     const sortedEvents = [...runner.events].sort((a, b) =>
       a.raceId.localeCompare(b.raceId)
     );
+    const scoring = scoreRunnerEvents(series, runner.categories, runner.runnerEvents);
     return {
       key: runner.key,
       name: runner.name,
       club: runner.club,
       categories: runner.categories,
-      points: totalRunnerPoints(series, runner.categories, runner.runnerEvents),
+      points: scoring.points,
       events: sortedEvents,
+      countingEvents: scoring.counting,
+      remainingEvents: scoring.remaining,
       runnerEvents: runner.runnerEvents,
       isQualified: meetsMinimumRequirements(
         series,
@@ -427,17 +472,16 @@ export default function ChampionshipYearPageClient({
       const sortedEvents = [...runner.events].sort((a, b) =>
         a.raceId.localeCompare(b.raceId)
       );
+      const scoring = scoreRunnerEvents(series, runner.categories, runner.runnerEvents);
       return {
         key: runner.key,
         name: runner.name,
         club: runner.club,
         categories: runner.categories,
-        points: totalRunnerPoints(
-          series,
-          runner.categories,
-          runner.runnerEvents
-        ),
+        points: scoring.points,
         events: sortedEvents,
+        countingEvents: scoring.counting,
+        remainingEvents: scoring.remaining,
         runnerEvents: runner.runnerEvents,
         isQualified: meetsMinimumRequirements(
           series,
@@ -770,12 +814,21 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {runner.events
-                                  .map(
+                                {runner.countingEvents
+                                  ?.map(
                                     (event) =>
                                       `${event.raceId}: ${formatPoints(event.points)}`
                                   )
                                   .join(', ')}
+                                {runner.remainingEvents &&
+                                runner.remainingEvents.length > 0
+                                  ? ` (${runner.remainingEvents
+                                      .map(
+                                        (event) =>
+                                          `${event.raceId}: ${formatPoints(event.points)}`
+                                      )
+                                      .join(', ')})`
+                                  : ''}
                               </td>
                             </tr>
                           ))}
@@ -866,12 +919,26 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {runner.events
-                                  .map(
+                                {runner.countingEvents
+                                  ?.map(
                                     (event) =>
                                       `${event.raceId}: ${formatPoints(event.points)}`
                                   )
                                   .join(', ')}
+                                {runner.remainingEvents &&
+                                runner.remainingEvents.length > 0
+                                  ? `${
+                                      runner.countingEvents &&
+                                      runner.countingEvents.length > 0
+                                        ? ' '
+                                        : ''
+                                    }(${runner.remainingEvents
+                                      .map(
+                                        (event) =>
+                                          `${event.raceId}: ${formatPoints(event.points)}`
+                                      )
+                                      .join(', ')})`
+                                  : ''}
                               </td>
                             </tr>
                           ))}
