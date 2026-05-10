@@ -568,12 +568,16 @@ function writeChampionshipResultsData(
           return match ? parseTimeToSeconds(match[1]) : null;
         };
 
+        // Track which (raceId, sex) pairs have had the winner's actual time checked.
+        // Results are ordered by position, so the first row per sex is the winner.
+        const winnerSeen = new Set<string>();
+
         for (const row of championshipResults) {
           if (!winnerTimesByRaceAndSex.has(row.raceId)) {
             const raceWinnerTimes = new Map<string, number>();
             winnerTimesByRaceAndSex.set(row.raceId, raceWinnerTimes);
 
-            // Try to set records from frontmatter first
+            // Seed from frontmatter record (may be missing or stale)
             const raceIndexPath = contentPath('races', row.raceId, 'index.md');
             if (fs.existsSync(raceIndexPath)) {
               const { data } = matter.read(raceIndexPath);
@@ -585,14 +589,18 @@ function writeChampionshipResultsData(
           }
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
           const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
+          const winnerKey = `${row.raceId}:${sex}`;
 
-          if (!raceWinnerTimes.has(sex)) {
-            // Because results are generally ordered by position within the CSV,
-            // the first runner we see for a given sex should be that sex's winner.
-            // This is used as a fallback if no record exists in the frontmatter.
+          if (!winnerSeen.has(winnerKey)) {
+            // First runner of this sex = this year's winner.
+            // If they ran faster than the stored record (or no record exists), use their time.
+            winnerSeen.add(winnerKey);
             const runnerTime = parseTimeToSeconds(row.time);
             if (runnerTime !== null && runnerTime > 0) {
-              raceWinnerTimes.set(sex, runnerTime);
+              const existing = raceWinnerTimes.get(sex);
+              if (existing === undefined || runnerTime < existing) {
+                raceWinnerTimes.set(sex, runnerTime);
+              }
             }
           }
         }
@@ -609,7 +617,7 @@ function writeChampionshipResultsData(
           row.points =
             !winnerTime || !runnerTime || runnerTime <= 0
               ? 0
-              : Math.round((winnerTime / runnerTime) * 1000);
+              : Math.min(1000, Math.round((winnerTime / runnerTime) * 1000));
         } else if (
           championship.slug === 'SHR' ||
           championship.slug === 'Under23'
