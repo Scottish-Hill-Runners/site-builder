@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import type { RaceInfo } from '@/types/datatable';
 import { useUnits } from '@/components/UnitsProvider';
-import { formatDistance } from '@/lib/units';
+import { formatDistance, formatClimb } from '@/lib/units';
 
 interface RaceListFilterProps {
   races: Array<RaceInfo & { raceId: string }>;
@@ -13,31 +13,87 @@ interface RaceListFilterProps {
 export default function RaceListFilter({ races }: RaceListFilterProps) {
   const { imperial } = useUnits();
   const [query, setQuery] = useState('');
+  const [distanceFilter, setDistanceFilter] = useState('');
+  const [climbFilter, setClimbFilter] = useState('');
 
   const filtered = useMemo(() => {
+    let result = races;
+
     const needle = query.trim().toLowerCase();
-    if (!needle) return races;
-    return races.filter((r) => {
-      const title = (r.title ?? '').toLowerCase();
-      const venue = (r.venue ?? '').toLowerCase();
-      return title.includes(needle) || venue.includes(needle);
-    });
-  }, [races, query]);
+    if (needle) {
+      result = result.filter((r) => {
+        const title = (r.title ?? '').toLowerCase();
+        const venue = (r.venue ?? '').toLowerCase();
+        return title.includes(needle) || venue.includes(needle);
+      });
+    }
+
+    if (distanceFilter) {
+      result = result.filter((r) => {
+        if (r.distance == null) return false;
+        if (distanceFilter === 'S') return r.distance < 10;
+        if (distanceFilter === 'M') return r.distance >= 10 && r.distance < 20;
+        if (distanceFilter === 'L') return r.distance >= 20;
+        return true;
+      });
+    }
+
+    if (climbFilter) {
+      result = result.filter((r) => {
+        if (r.climb == null || r.distance == null || r.distance === 0) return false;
+        const ratio = r.climb / r.distance;
+        if (climbFilter === 'A') return ratio >= 50;
+        if (climbFilter === 'B') return ratio >= 25 && ratio < 50;
+        if (climbFilter === 'C') return ratio >= 20 && ratio < 25;
+        return true;
+      });
+    }
+
+    return result;
+  }, [races, query, distanceFilter, climbFilter]);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="race-search" className="sr-only">
-          Search races
-        </label>
-        <input
-          id="race-search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or venue…"
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-        />
+      <div className="flex flex-col gap-3">
+        <div>
+          <label htmlFor="race-search" className="sr-only">
+            Search races
+          </label>
+          <input
+            id="race-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or venue…"
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3">
+          <select
+            value={distanceFilter}
+            onChange={(e) => setDistanceFilter(e.target.value)}
+            className="w-full sm:w-1/2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            aria-label="Filter by distance category"
+          >
+            <option value="">All Distances</option>
+            <option value="S">Category S (Short, &lt; 10 km)</option>
+            <option value="M">Category M (Medium, 10–20 km)</option>
+            <option value="L">Category L (Long, ≥ 20 km)</option>
+          </select>
+          
+          <select
+            value={climbFilter}
+            onChange={(e) => setClimbFilter(e.target.value)}
+            className="w-full sm:w-1/2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            aria-label="Filter by ascent category"
+          >
+            <option value="">All Ascents</option>
+            <option value="A">Category A (50+ m/km)</option>
+            <option value="B">Category B (25–50 m/km)</option>
+            <option value="C">Category C (20–25 m/km)</option>
+          </select>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -58,6 +114,7 @@ export default function RaceListFilter({ races }: RaceListFilterProps) {
                 <div className="text-sm text-gray-600 dark:text-slate-300">
                   {race.venue ?? 'Unknown venue'} •{' '}
                   {formatDistance(race.distance, imperial)}
+                  {race.climb != null && ` • ${formatClimb(race.climb, imperial)}`}
                 </div>
               </Link>
             </li>
