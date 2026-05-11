@@ -6,7 +6,7 @@ import { writeGz, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { buildElevationChartData } from './elevation-chart';
 import { surnameHash } from '@/lib/runner-name';
-import { Era, RaceInfo, RaceResult } from '@/types/datatable';
+import { ChampionshipYearPayload, DistanceSlotsRule, Era, RaceInfo, RaceResult, ScoringRules } from '@/types/datatable';
 
 type YearInfo = {
   year: string;
@@ -31,6 +31,7 @@ type ChampionshipData = {
   contents: string;
   years: { [year: string]: string[] };
   yearHasData?: { [year: string]: boolean };
+  rules?: { default?: Partial<ScoringRules>; [year: string]: Partial<ScoringRules> | undefined };
 };
 
 type CalendarEntry = {
@@ -462,6 +463,7 @@ function readChampionships(): ChampionshipData[] {
       title: data.title as string,
       contents: content,
       years,
+      rules: data.rules as ChampionshipData['rules'],
     });
   }
 
@@ -532,11 +534,82 @@ function parseTimeToSeconds(time: string): number | null {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function pointsWithWinnerBonus(position: number): number {
-  if (position < 1 || position > 40) return 0;
-  const base = 41 - position;
-  const winnerBonus = position === 1 ? 1 : 0;
-  return base + winnerBonus;
+function pointsWithWinnerBonus(position: number, topN = 40): number {
+  if (position < 1 || position > topN) return 0;
+  const base = topN + 1 - position;
+  return base + (position === 1 ? 1 : 0);
+}
+
+/**
+ * Returns true if the given rules key applies to `yearNum`.
+ * Supported formats: "YYYY", "pre-YYYY", "YYYY-present", "YYYY-YYYY".
+ */
+function yearKeyMatches(key: string, yearNum: number): boolean {
+  const preMatch = key.match(/^pre-(\d{4})$/);
+  if (preMatch) return yearNum < parseInt(preMatch[1], 10);
+  const presentMatch = key.match(/^(\d{4})-present$/);
+  if (presentMatch) return yearNum >= parseInt(presentMatch[1], 10);
+  const rangeMatch = key.match(/^(\d{4})-(\d{4})$/);
+  if (rangeMatch)
+    return yearNum >= parseInt(rangeMatch[1], 10) && yearNum <= parseInt(rangeMatch[2], 10);
+  return /^\d{4}$/.test(key) && parseInt(key, 10) === yearNum;
+}
+
+/**
+ * Merge default rules with all matching year overrides.
+ * Range keys ("pre-YYYY", "YYYY-present", "YYYY-YYYY") are applied in
+ * definition order, then the exact "YYYY" key is applied last so that it
+ * always takes highest precedence.
+ */
+function resolveRules(data: ChampionshipData, year: string): ScoringRules {
+  const defaultRules = data.rules?.default ?? {};
+  const yearNum = parseInt(year, 10);
+
+  // Collect matching overrides: range keys in definition order, exact year last.
+  const matchingOverrides: Partial<ScoringRules>[] = [];
+  if (data.rules) {
+    for (const [key, val] of Object.entries(data.rules)) {
+      if (key === 'default' || /^\d{4}$/.test(key)) continue;
+      if (val && yearKeyMatches(key, yearNum)) matchingOverrides.push(val);
+    }
+    const exactOverride = data.rules[year];
+    if (exactOverride) matchingOverrides.push(exactOverride);
+  }
+
+  const merged = Object.assign({}, defaultRules, ...matchingOverrides);
+
+  // Validate required fields; fall back to legacy behaviour keyed by slug
+  if (!merged.points) {
+    // Legacy fallback: derive rules from slug so old championships without
+    // a rules block still work until their content files are updated.
+    switch (data.slug) {
+      case 'LongClassics':
+        return { points: 'time-ratio', referenceTime: 'min-winner-record', scale: 1000, count: 5, minimum: 5 };
+      case 'BogAndBurn':
+        return { points: 'raw-position', count: 6, minimum: 6 };
+      case 'Under23':
+        return { points: 'position-bonus', count: 3, minimum: 3 };
+      default:
+        return { points: 'position-bonus', count: 4, minimum: 4, distanceSlots: { short: 1, medium: 1, long: 1, ageExemption: 60 } };
+    }
+  }
+
+  // Deep-merge distanceSlots across default and all matching overrides.
+  const withSlots = [defaultRules, ...matchingOverrides].filter((o) => o.distanceSlots);
+  const distanceSlots: DistanceSlotsRule | undefined =
+    withSlots.length > 0
+      ? Object.assign({}, ...withSlots.map((o) => o.distanceSlots))
+      : undefined;
+
+  return {
+    points: merged.points as ScoringRules['points'],
+    referenceTime: merged.referenceTime as ScoringRules['referenceTime'],
+    scale: merged.scale,
+    topN: merged.topN,
+    count: merged.count ?? 5,
+    minimum: merged.minimum ?? merged.count ?? 5,
+    distanceSlots,
+  };
 }
 
 function writeChampionshipResultsData(
@@ -560,17 +633,20 @@ function writeChampionshipResultsData(
       championship.yearHasData[year] =
         raceIds.length > 0 || championshipResults.length > 0;
 
-      // Compute points for this series + year
-      const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
-      if (championship.slug === 'LongClassics') {
+      const rules = resolveRules(championship, year);
+
+      // Compute per-race points according to the resolved rules
+      if (rules.points === 'time-ratio') {
+        const scale = rules.scale ?? 1000;
+        const refMode = rules.referenceTime ?? 'min-winner-record';
+
         const extractRecord = (rec: unknown) => {
           if (typeof rec !== 'string') return null;
           const match = rec.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
           return match ? parseTimeToSeconds(match[1]) : null;
         };
 
-        // Track which (raceId, sex) pairs have had the winner's actual time checked.
-        // Results are ordered by position, so the first row per sex is the winner.
+        const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
         const winnerSeen = new Set<string>();
 
         for (const row of championshipResults) {
@@ -578,62 +654,61 @@ function writeChampionshipResultsData(
             const raceWinnerTimes = new Map<string, number>();
             winnerTimesByRaceAndSex.set(row.raceId, raceWinnerTimes);
 
-            // Seed from frontmatter record (may be missing or stale)
-            const raceIndexPath = contentPath('races', row.raceId, 'index.md');
-            if (fs.existsSync(raceIndexPath)) {
-              const { data } = matter.read(raceIndexPath);
-              const mRec = extractRecord(data.maleRecord ?? data.record);
-              if (mRec) raceWinnerTimes.set('M', mRec);
-              const fRec = extractRecord(data.femaleRecord);
-              if (fRec) raceWinnerTimes.set('F', fRec);
-            }
-          }
-          const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
-          const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
-          const winnerKey = `${row.raceId}:${sex}`;
-
-          if (!winnerSeen.has(winnerKey)) {
-            // First runner of this sex = this year's winner.
-            // If they ran faster than the stored record (or no record exists), use their time.
-            winnerSeen.add(winnerKey);
-            const runnerTime = parseTimeToSeconds(row.time);
-            if (runnerTime !== null && runnerTime > 0) {
-              const existing = raceWinnerTimes.get(sex);
-              if (existing === undefined || runnerTime < existing) {
-                raceWinnerTimes.set(sex, runnerTime);
+            if (refMode === 'record' || refMode === 'min-winner-record') {
+              const raceIndexPath = contentPath('races', row.raceId, 'index.md');
+              if (fs.existsSync(raceIndexPath)) {
+                const { data } = matter.read(raceIndexPath);
+                const mRec = extractRecord(data.maleRecord ?? data.record);
+                if (mRec) raceWinnerTimes.set('M', mRec);
+                const fRec = extractRecord(data.femaleRecord);
+                if (fRec) raceWinnerTimes.set('F', fRec);
               }
             }
           }
-        }
-      }
 
-      for (const row of championshipResults) {
-        const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
-        if (championship.slug === 'LongClassics') {
+          if (refMode === 'winner' || refMode === 'min-winner-record') {
+            const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
+            const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
+            const winnerKey = `${row.raceId}:${sex}`;
+            if (!winnerSeen.has(winnerKey)) {
+              winnerSeen.add(winnerKey);
+              const runnerTime = parseTimeToSeconds(row.time);
+              if (runnerTime !== null && runnerTime > 0) {
+                const existing = raceWinnerTimes.get(sex);
+                if (existing === undefined || runnerTime < existing) {
+                  raceWinnerTimes.set(sex, runnerTime);
+                }
+              }
+            }
+          }
+
+          const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId);
-          const winnerTime = raceWinnerTimes
-            ? raceWinnerTimes.get(sex)
-            : undefined;
+          const winnerTime = raceWinnerTimes?.get(sex);
           const runnerTime = parseTimeToSeconds(row.time);
           row.points =
             !winnerTime || !runnerTime || runnerTime <= 0
               ? 0
-              : Math.min(1000, Math.round((winnerTime / runnerTime) * 1000));
-        } else if (
-          championship.slug === 'SHR' ||
-          championship.slug === 'Under23'
-        ) {
-          const categoryPosition = row.categoryPos[sex] ?? row.position;
-          row.points = pointsWithWinnerBonus(categoryPosition);
-        } else {
-          row.points = row.categoryPos[sex] ?? row.position;
+              : Math.min(scale, Math.round((winnerTime / runnerTime) * scale));
+        }
+      } else {
+        for (const row of championshipResults) {
+          const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
+          if (rules.points === 'position-bonus') {
+            const pos = row.categoryPos[sex] ?? row.position;
+            row.points = pointsWithWinnerBonus(pos, rules.topN ?? 40);
+          } else {
+            // raw-position: store the finish position (lower = better)
+            row.points = row.categoryPos[sex] ?? row.position;
+          }
         }
       }
 
+      const payload: ChampionshipYearPayload = { rules, results: championshipResults };
       writeGz(
         outputDir,
         `${championship.slug}-${year}.json`,
-        JSON.stringify(championshipResults)
+        JSON.stringify(payload)
       );
     }
   }

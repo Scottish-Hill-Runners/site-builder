@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
-import type { RaceInfo, RaceResult } from '@/types/datatable';
+import type { ChampionshipYearPayload, RaceInfo, RaceResult, ScoringRules } from '@/types/datatable';
 
 interface ChampionshipYearPageClientProps {
   series: string;
@@ -46,10 +46,11 @@ function parseCategoryAge(category: string): number | null {
   return Number.isNaN(age) ? null : age;
 }
 
-function isSixtyOrOlder(categories: string[]): boolean {
+function isAgeExempt(categories: string[], ageExemption?: number): boolean {
+  if (ageExemption === undefined) return false;
   return categories.some((category) => {
     const age = parseCategoryAge(category);
-    return age !== null && age >= 60;
+    return age !== null && age >= ageExemption;
   });
 }
 
@@ -68,149 +69,79 @@ function getDistanceBucket(distance?: number): DistanceBucket {
 }
 
 function meetsMinimumRequirements(
-  series: string,
+  rules: ScoringRules,
   categories: string[],
   events: RunnerEvent[]
 ): boolean {
-  if (series === 'BogAndBurn') {
-    return events.length >= 6;
-  }
-
-  if (series === 'LongClassics') {
-    return events.length >= 5;
-  }
-
-  if (series === 'SHR') {
-    if (events.length < 4) {
-      return false;
-    }
-
-    if (isSixtyOrOlder(categories)) {
-      return true;
-    }
-
-    const buckets = new Set(events.map((e) => e.bucket));
-    return buckets.has('short') && buckets.has('medium') && buckets.has('long');
-  }
-
-  // Other series have no minimum requirement
+  if (events.length < rules.minimum) return false;
+  if (!rules.distanceSlots) return true;
+  if (isAgeExempt(categories, rules.distanceSlots.ageExemption)) return true;
+  const buckets = new Set(events.map((e) => e.bucket));
+  if (rules.distanceSlots.short && !buckets.has('short')) return false;
+  if (rules.distanceSlots.medium && !buckets.has('medium')) return false;
+  if (rules.distanceSlots.long && !buckets.has('long')) return false;
   return true;
 }
 
 function scoreRunnerEvents(
-  series: string,
+  rules: ScoringRules,
   categories: string[],
   events: RunnerEvent[]
 ): { points: number; counting: RunnerEvent[]; remaining: RunnerEvent[] } {
-  let counting: RunnerEvent[] = [];
-  let remaining: RunnerEvent[] = [];
+  const ascending = rules.points === 'raw-position';
+  const sortFn = (a: RunnerEvent, b: RunnerEvent) =>
+    ascending ? a.points - b.points : b.points - a.points;
 
-  if (series === 'Under23') {
-    const sorted = [...events].sort((a, b) => b.points - a.points);
-    counting = sorted.slice(0, 3);
-    remaining = sorted.slice(3);
+  if (!rules.distanceSlots || isAgeExempt(categories, rules.distanceSlots.ageExemption)) {
+    // Plain best-N
+    const sorted = [...events].sort(sortFn);
+    const counting = sorted.slice(0, rules.count);
+    const remaining = sorted.slice(rules.count);
     return {
-      points: counting.reduce((sum, event) => sum + event.points, 0),
+      points: counting.reduce((sum, e) => sum + e.points, 0),
       counting,
       remaining,
     };
   }
 
-  if (series === 'BogAndBurn') {
-    // BogAndBurn: best 6 results (lower points are better since points = position)
-    const sorted = [...events].sort((a, b) => a.points - b.points);
-    counting = sorted.slice(0, 6);
-    remaining = sorted.slice(6);
-    return {
-      points: counting.reduce((sum, event) => sum + event.points, 0),
-      counting,
-      remaining,
-    };
-  }
-
-  if (series === 'LongClassics') {
-    const sorted = [...events].sort((a, b) => b.points - a.points);
-    counting = sorted.slice(0, 5);
-    remaining = sorted.slice(5);
-    return {
-      points: counting.reduce((sum, event) => sum + event.points, 0),
-      counting,
-      remaining,
-    };
-  }
-
-  if (isSixtyOrOlder(categories)) {
-    const sorted = [...events].sort((a, b) => b.points - a.points);
-    counting = sorted.slice(0, 4);
-    remaining = sorted.slice(4);
-    return {
-      points: counting.reduce((sum, event) => sum + event.points, 0),
-      counting,
-      remaining,
-    };
-  }
-
+  // Bucket-based selection (SHR style)
+  const { short = 0, medium = 0, long: longSlots = 0 } = rules.distanceSlots;
   const selected = new Set<number>();
-  const scoredBuckets: DistanceBucket[] = ['short', 'medium', 'long'];
 
-  scoredBuckets.forEach((bucket) => {
-    let bestIndex = -1;
-    let bestPoints = Number.NEGATIVE_INFINITY;
-
-    events.forEach((event, index) => {
-      if (event.bucket !== bucket) {
-        return;
-      }
-
-      if (event.points > bestPoints) {
-        bestPoints = event.points;
-        bestIndex = index;
-      }
-    });
-
-    if (bestIndex >= 0) {
-      selected.add(bestIndex);
-    }
-  });
-
-  let bestRemainingIndex = -1;
-  let bestRemainingPoints = Number.NEGATIVE_INFINITY;
-  events.forEach((event, index) => {
-    if (selected.has(index)) {
-      return;
-    }
-    if (event.points > bestRemainingPoints) {
-      bestRemainingPoints = event.points;
-      bestRemainingIndex = index;
-    }
-  });
-
-  if (bestRemainingIndex >= 0) {
-    selected.add(bestRemainingIndex);
-  }
-
-  events.forEach((event, index) => {
-    if (selected.has(index)) {
-      counting.push(event);
-    } else {
-      remaining.push(event);
-    }
-  });
-
-  const sortPointsAsc = series === 'BogAndBurn';
-  const sortEvents = (a: RunnerEvent, b: RunnerEvent) => {
-    if (sortPointsAsc) {
-      return a.points - b.points;
-    } else {
-      return b.points - a.points;
-    }
+  const claimBest = (bucket: DistanceBucket, needed: number) => {
+    events
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => e.bucket === bucket)
+      .sort((a, b) => b.e.points - a.e.points)
+      .slice(0, needed)
+      .forEach(({ i }) => selected.add(i));
   };
 
-  counting.sort(sortEvents);
-  remaining.sort(sortEvents);
+  if (short) claimBest('short', short);
+  if (medium) claimBest('medium', medium);
+  if (longSlots) claimBest('long', longSlots);
+
+  const fillCount = rules.count - selected.size;
+  if (fillCount > 0) {
+    events
+      .map((e, i) => ({ e, i }))
+      .filter(({ i }) => !selected.has(i))
+      .sort((a, b) => b.e.points - a.e.points)
+      .slice(0, fillCount)
+      .forEach(({ i }) => selected.add(i));
+  }
+
+  const counting: RunnerEvent[] = [];
+  const remaining: RunnerEvent[] = [];
+  events.forEach((e, i) => {
+    if (selected.has(i)) counting.push(e);
+    else remaining.push(e);
+  });
+  counting.sort(sortFn);
+  remaining.sort(sortFn);
 
   return {
-    points: counting.reduce((sum, event) => sum + event.points, 0),
+    points: counting.reduce((sum, e) => sum + e.points, 0),
     counting,
     remaining,
   };
@@ -273,10 +204,11 @@ function formatPoints(points: number): string {
 }
 
 function buildStandings(
-  series: string,
+  rules: ScoringRules,
   rows: RaceResult[],
   raceMetadata: RaceMetadata
 ): StandingRow[] {
+  const ascending = rules.points === 'raw-position';
   const grouped = new Map<
     string,
     StandingRow & { runnerEvents: RunnerEvent[] }
@@ -318,7 +250,7 @@ function buildStandings(
     const sortedEvents = [...runner.events].sort((a, b) =>
       a.raceId.localeCompare(b.raceId)
     );
-    const scoring = scoreRunnerEvents(series, runner.categories, runner.runnerEvents);
+    const scoring = scoreRunnerEvents(rules, runner.categories, runner.runnerEvents);
     return {
       key: runner.key,
       name: runner.name,
@@ -330,7 +262,7 @@ function buildStandings(
       remainingEvents: scoring.remaining,
       runnerEvents: runner.runnerEvents,
       isQualified: meetsMinimumRequirements(
-        series,
+        rules,
         runner.categories,
         runner.runnerEvents
       ),
@@ -339,7 +271,7 @@ function buildStandings(
 
   return finalized.sort((a, b) => {
     const pointsDiff =
-      series === 'BogAndBurn' ? a.points - b.points : b.points - a.points;
+      ascending ? a.points - b.points : b.points - a.points;
     if (pointsDiff !== 0) {
       return pointsDiff;
     }
@@ -364,6 +296,7 @@ export default function ChampionshipYearPageClient({
   year,
 }: ChampionshipYearPageClientProps) {
   const [results, setResults] = useState<RaceResult[] | null>(null);
+  const [scoringRules, setScoringRules] = useState<ScoringRules | null>(null);
   const [raceMetadata, setRaceMetadata] = useState<RaceMetadata>({});
   const [activeTab, setActiveTab] = useState<ChampionshipTab>(() => {
     try {
@@ -401,8 +334,8 @@ export default function ChampionshipYearPageClient({
   }, []);
 
   const allStandings = useMemo(
-    () => buildStandings(series, results ?? [], raceMetadata),
-    [results, raceMetadata, series]
+    () => scoringRules ? buildStandings(scoringRules, results ?? [], raceMetadata) : [],
+    [results, raceMetadata, scoringRules]
   );
 
   const availableCategoryPos = useMemo(() => {
@@ -472,7 +405,7 @@ export default function ChampionshipYearPageClient({
       const sortedEvents = [...runner.events].sort((a, b) =>
         a.raceId.localeCompare(b.raceId)
       );
-      const scoring = scoreRunnerEvents(series, runner.categories, runner.runnerEvents);
+      const scoring = scoreRunnerEvents(scoringRules!, runner.categories, runner.runnerEvents);
       return {
         key: runner.key,
         name: runner.name,
@@ -484,16 +417,17 @@ export default function ChampionshipYearPageClient({
         remainingEvents: scoring.remaining,
         runnerEvents: runner.runnerEvents,
         isQualified: meetsMinimumRequirements(
-          series,
+          scoringRules!,
           runner.categories,
           runner.runnerEvents
         ),
       };
     });
 
+    const ascending = scoringRules!.points === 'raw-position';
     return finalized.sort((a, b) => {
       const pointsDiff =
-        series === 'BogAndBurn' ? a.points - b.points : b.points - a.points;
+        ascending ? a.points - b.points : b.points - a.points;
       if (pointsDiff !== 0) {
         return pointsDiff;
       }
@@ -509,7 +443,7 @@ export default function ChampionshipYearPageClient({
       // Final tie-breaker: alphabetical by name
       return a.name.localeCompare(b.name);
     });
-  }, [selectedCategoryPos, allStandings, results, series, raceMetadata]);
+  }, [selectedCategoryPos, allStandings, results, scoringRules, raceMetadata]);
 
   const clubFilteredStandings = useMemo(() => {
     if (selectedClub === 'All') {
@@ -543,7 +477,7 @@ export default function ChampionshipYearPageClient({
 
       try {
         const [result, racesResult] = await Promise.all([
-          fetchGzipJson<RaceResult[]>(
+          fetchGzipJson<ChampionshipYearPayload>(
             `/results/${encodeURIComponent(series)}-${encodeURIComponent(year)}.json.gz`
           ),
           fetchGzipJson<RaceMetadata>('/results/races.json.gz'),
@@ -551,9 +485,11 @@ export default function ChampionshipYearPageClient({
 
         if (!isCancelled) {
           if (result.status === 'ok') {
-            setResults(result.data);
+            setScoringRules(result.data.rules);
+            setResults(result.data.results);
           } else if (result.status === 'not-found') {
             setIsNotFound(true);
+            setScoringRules(null);
             setResults(null);
           } else {
             throw result.error;
@@ -574,6 +510,7 @@ export default function ChampionshipYearPageClient({
           setErrorMessage(
             'Failed to load championship results. Please try again later.'
           );
+          setScoringRules(null);
           setResults(null);
         }
       } finally {
