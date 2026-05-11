@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';
+import HighlightBar from './HighlightBar';
 
 type CalendarEntry = {
   Date: string;
@@ -129,6 +130,57 @@ function isPastRace(dateString: string): boolean {
   return raceDate < today;
 }
 
+function matchesHighlights(
+  entry: CalendarEntry,
+  active: Set<string>,
+): boolean {
+  if (active.size === 0) return true;
+
+  // Championship group — OR within
+  const champKeys = [...active].filter((k) => k.startsWith('champ:'));
+  if (champKeys.length > 0) {
+    const entryChamps = Object.keys(entry.championships ?? {});
+    if (!champKeys.some((k) => entryChamps.includes(k.slice(6)))) return false;
+  }
+
+  // Distance group — OR within
+  const distKeys = [...active].filter((k) => k.startsWith('dist:'));
+  if (distKeys.length > 0) {
+    const d = entry.distance;
+    const matches = distKeys.some((k) => {
+      if (d === undefined) return false;
+      const cat = k.slice(5);
+      if (cat === 'S') return d < 10;
+      if (cat === 'M') return d >= 10 && d < 20;
+      if (cat === 'L') return d >= 20;
+      return false;
+    });
+    if (!matches) return false;
+  }
+
+  // Ascent group — OR within
+  const ascKeys = [...active].filter((k) => k.startsWith('asc:'));
+  if (ascKeys.length > 0) {
+    const ratio =
+      entry.climb !== undefined &&
+      entry.distance !== undefined &&
+      entry.distance > 0
+        ? entry.climb / entry.distance
+        : undefined;
+    const matches = ascKeys.some((k) => {
+      if (ratio === undefined) return false;
+      const cat = k.slice(4);
+      if (cat === 'A') return ratio >= 50;
+      if (cat === 'B') return ratio >= 25 && ratio < 50;
+      if (cat === 'C') return ratio >= 20 && ratio < 25;
+      return false;
+    });
+    if (!matches) return false;
+  }
+
+  return true;
+}
+
 export default function CalendarPageClient() {
   const { imperial } = useUnits();
   const [entries, setEntries] = useState<CalendarEntry[] | null>(null);
@@ -136,6 +188,31 @@ export default function CalendarPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
+  const [activeHighlights, setActiveHighlights] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const toggleHighlight = (key: string) => {
+    setActiveHighlights((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const clearHighlights = () => setActiveHighlights(new Set());
+
+  const availableChampionships = useMemo(() => {
+    if (!entries) return [];
+    const map = new Map<string, string>();
+    for (const entry of entries) {
+      for (const [slug, title] of Object.entries(entry.championships ?? {})) {
+        map.set(slug, title);
+      }
+    }
+    return [...map.entries()].map(([slug, title]) => ({ slug, title }));
+  }, [entries]);
 
   const monthGroups = useMemo(() => {
     return entries ? buildMonthGroups(entries) : [];
@@ -389,6 +466,13 @@ export default function CalendarPageClient() {
               </div>
             </section>
 
+            <HighlightBar
+              championships={availableChampionships}
+              active={activeHighlights}
+              onToggle={toggleHighlight}
+              onClear={clearHighlights}
+            />
+
             <section className="rounded-lg bg-white p-4 shadow-md dark:bg-slate-900 sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
@@ -405,6 +489,10 @@ export default function CalendarPageClient() {
                 <div className="space-y-3">
                   {selectedMonth.entries.map((entry, index) => {
                     const pastRace = isPastRace(entry.Date);
+                    const visible =
+                      activeHighlights.size === 0 ||
+                      matchesHighlights(entry, activeHighlights);
+                    if (!visible) return null;
                     const champSeries = entry.championships
                       ? Object.entries(entry.championships).map(([slug, title]) => ({ slug, title }))
                       : [];
@@ -415,7 +503,7 @@ export default function CalendarPageClient() {
                         className={[
                           'rounded-lg border px-4 py-3',
                           pastRace
-                            ? 'border-stone-200 bg-stone-100 dark:border-slate-700 dark:bg-slate-800/80'
+                            ? 'border-stone-200 bg-stone-100 opacity-50 dark:border-slate-700 dark:bg-slate-800/80'
                             : 'border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-950',
                         ].join(' ')}
                       >
