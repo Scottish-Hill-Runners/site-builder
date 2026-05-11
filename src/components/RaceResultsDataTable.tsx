@@ -41,6 +41,7 @@ type SortDirection = 'asc' | 'desc';
 interface Filters {
   year: string;
   name: string;
+  raceTitle: string;
   club: string;
   category: string;
 }
@@ -99,6 +100,7 @@ export default function RaceResultsDataTable({
   const [filters, setFilters] = useState<Filters>({
     year: initialYearFilter,
     name: initialNameFilter,
+    raceTitle: '',
     club: '',
     category: '',
   });
@@ -135,10 +137,16 @@ export default function RaceResultsDataTable({
           : activeEra != null
             ? eraContainsYear(activeEra, yearNum)
             : row.year.toString().includes(filters.year);
+      const raceTitleMatch =
+        filters.raceTitle === '' ||
+        (races?.[row.raceId]?.title ?? row.raceId)
+          .toLowerCase()
+          .includes(filters.raceTitle.toLowerCase());
       return (
         yearMatch &&
         (filters.name === '' ||
           row.name.toLowerCase().includes(filters.name.toLowerCase())) &&
+        raceTitleMatch &&
         (filters.club === '' ||
           row.club.toLowerCase().includes(filters.club.toLowerCase())) &&
         (filters.category === '' || filters.category in row.categoryPos)
@@ -220,7 +228,7 @@ export default function RaceResultsDataTable({
   };
 
   const clearFilters = () => {
-    setFilters({ year: '', name: '', club: '', category: '' });
+    setFilters({ year: '', name: '', raceTitle: '', club: '', category: '' });
     setSortColumn(showRaceColumn ? 'raceTitle' : 'year');
     setSortDirection(showRaceColumn ? 'asc' : 'desc');
   };
@@ -400,13 +408,23 @@ export default function RaceResultsDataTable({
                   )}
                 </select>
               )}
-              <input
-                type="text"
-                placeholder="Filter by Name..."
-                value={filters.name}
-                onChange={(e) => handleFilterChange('name', e.target.value)}
-                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
+              {showRaceTitle ? (
+                <input
+                  type="text"
+                  placeholder="Filter by Race..."
+                  value={filters.raceTitle}
+                  onChange={(e) => handleFilterChange('raceTitle', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Filter by Name..."
+                  value={filters.name}
+                  onChange={(e) => handleFilterChange('name', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              )}
               <input
                 type="text"
                 placeholder="Filter by Club..."
