@@ -433,7 +433,28 @@ function summariseCategories(allResults: RaceResult[]): void {
   progress(`Clean categories: ${Array.from(cleanCats.values()).join(', ')}\n`);
 }
 
-function readChampionships(): ChampionshipData[] {
+function buildCalendarDateLookup(): Map<string, string> {
+  const calendarPath = contentPath('calendar.csv');
+  const lookup = new Map<string, string>();
+  for (const line of fs.readFileSync(calendarPath, 'utf-8').split('\n')) {
+    const commaIdx = line.indexOf(',');
+    if (commaIdx === -1) continue;
+    const date = line.slice(0, commaIdx).trim();
+    const raceId = line.slice(commaIdx + 1).trim();
+    if (!date || !raceId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    lookup.set(`${date.slice(0, 4)}/${raceId}`, date);
+  }
+  return lookup;
+}
+
+function formatCalendarDate(isoDate: string): string {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  const [, month, day] = isoDate.split('-');
+  return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
+}
+
+function readChampionships(calendarDates: Map<string, string>): ChampionshipData[] {
   const champDir = contentPath('championships');
   const championships: ChampionshipData[] = [];
 
@@ -458,10 +479,48 @@ function readChampionships(): ChampionshipData[] {
       }
     }
 
+    let contents = content;
+    if (contents.includes('@Schedule')) {
+      const latestYear = Object.keys(years)
+        .filter((y) => years[y].length > 0)
+        .sort((a, b) => parseInt(b) - parseInt(a))[0];
+      const hasDistanceSlots = !!(data.rules as ChampionshipData['rules'])?.default?.distanceSlots;
+      let scheduleBlock = '';
+      if (latestYear) {
+        const raceIds = years[latestYear];
+        const items = raceIds
+          .filter((id) => !id.startsWith('no-slug('))
+          .map((raceId) => {
+            const raceIndexPath = contentPath('races', raceId, 'index.md');
+            let title = raceId;
+            let distancePart = '';
+            const hasPage = fs.existsSync(raceIndexPath);
+            if (hasPage) {
+              const { data: raceData } = matter.read(raceIndexPath);
+              title = (raceData.title as string) ?? raceId;
+              if (hasDistanceSlots) {
+                const distance = parseFloat(String(raceData.distance ?? ''));
+                if (!Number.isNaN(distance)) {
+                  const bucket = distance < 10 ? 'short' : distance > 20 ? 'long' : 'medium';
+                  distancePart = ` (${bucket})`;
+                }
+              }
+            }
+            const isoDate = calendarDates.get(`${latestYear}/${raceId}`);
+            const datePart = isoDate ? ` - ${formatCalendarDate(isoDate)}` : '';
+            const titlePart = hasPage ? `[${title}](/races/${raceId})` : title;
+            return `* ${titlePart}${distancePart}${datePart}`;
+          })
+          .join('\n');
+        scheduleBlock = `## ${latestYear} race schedule\n\nThe ${raceIds.length} races in the ${latestYear} ${data.title} series are:\n\n${items}`;
+      }
+      contents = contents.replace('@Schedule', scheduleBlock);
+    }
+
     championships.push({
       slug,
       title: data.title as string,
-      contents: content,
+      contents,
       years,
       rules: data.rules as ChampionshipData['rules'],
     });
@@ -802,7 +861,8 @@ async function writeCalendarData(championships: ChampionshipData[]): Promise<voi
 async function main() {
   progress(`Using content root: ${contentRoot()}`);
   const allResults = await readResults();
-  const championships = readChampionships();
+  const calendarDates = buildCalendarDateLookup();
+  const championships = readChampionships(calendarDates);
   writeClubData(clubs, allResults);
   writeYearData(allResults);
   writeRaceData(allResults);
