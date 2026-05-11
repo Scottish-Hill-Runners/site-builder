@@ -41,6 +41,7 @@ type CalendarEntry = {
   climb?: number;
   latitude?: number;
   longitude?: number;
+  championships?: { [slug: string]: string };
 };
 
 function formatTime(time: string): string {
@@ -640,7 +641,21 @@ function writeChampionshipResultsData(
   progress('Wrote championship series-year result files');
 }
 
-async function writeCalendarData(): Promise<void> {
+async function writeCalendarData(championships: ChampionshipData[]): Promise<void> {
+  // Build championship lookup: "year/raceId" -> { [slug]: title }
+  const champLookup = new Map<string, { [slug: string]: string }>();
+  for (const champ of championships) {
+    for (const [year, raceIds] of Object.entries(champ.years)) {
+      for (const raceId of raceIds) {
+        if (!raceId || raceId.startsWith('no-slug(')) continue;
+        const key = `${year}/${raceId}`;
+        const existing = champLookup.get(key) ?? {};
+        existing[champ.slug] = champ.title;
+        champLookup.set(key, existing);
+      }
+    }
+  }
+
   const rows = await csv({
     noheader: true,
     headers: ['Date', 'Race'],
@@ -692,6 +707,12 @@ async function writeCalendarData(): Promise<void> {
       if (data.latitude !== undefined) entry.latitude = parseFloat(data.latitude);
       if (data.longitude !== undefined) entry.longitude = parseFloat(data.longitude);
 
+      const year = entry.Date.slice(0, 4);
+      const champMap = champLookup.get(`${year}/${raceId}`);
+      if (champMap && Object.keys(champMap).length > 0) {
+        entry.championships = champMap;
+      }
+
       return entry;
     });
 
@@ -714,7 +735,7 @@ async function main() {
   summariseCategories(allResults);
   writeChampionshipResultsData(allResults, championships);
   writeChampionshipData(championships);
-  await writeCalendarData();
+  await writeCalendarData(championships);
 
   progress('Done\n');
 }

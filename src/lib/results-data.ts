@@ -30,6 +30,7 @@ export type CalendarEntry = {
   climb?: number;
   latitude?: number;
   longitude?: number;
+  championships?: { [slug: string]: string };
 };
 
 export async function loadCalendar(): Promise<CalendarEntry[]> {

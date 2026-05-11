@@ -12,12 +12,7 @@ type CalendarEntry = {
   raceId?: string;
   distance?: number;
   climb?: number;
-};
-
-type ChampionshipData = {
-  slug: string;
-  title: string;
-  years: { [year: string]: string[] };
+  championships?: { [slug: string]: string };
 };
 
 type MonthGroup = {
@@ -137,28 +132,10 @@ function isPastRace(dateString: string): boolean {
 export default function CalendarPageClient() {
   const { imperial } = useUnits();
   const [entries, setEntries] = useState<CalendarEntry[] | null>(null);
-  const [championships, setChampionships] = useState<ChampionshipData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
-
-  // Map of "year/raceId" -> { slug, title }[]
-  const championshipLookup = useMemo(() => {
-    const map = new Map<string, Array<{ slug: string; title: string }>>();
-    for (const champ of championships) {
-      for (const [year, raceIds] of Object.entries(champ.years)) {
-        for (const raceId of raceIds) {
-          if (!raceId || raceId.startsWith('no-slug(')) continue;
-          const key = `${year}/${raceId}`;
-          const existing = map.get(key) ?? [];
-          existing.push({ slug: champ.slug, title: champ.title });
-          map.set(key, existing);
-        }
-      }
-    }
-    return map;
-  }, [championships]);
 
   const monthGroups = useMemo(() => {
     return entries ? buildMonthGroups(entries) : [];
@@ -202,10 +179,7 @@ export default function CalendarPageClient() {
       setIsNotFound(false);
 
       try {
-        const [calendarResult, champsResult] = await Promise.all([
-          fetchGzipJson<CalendarEntry[]>('/calendar.json.gz'),
-          fetchGzipJson<ChampionshipData[]>('/championships.json.gz'),
-        ]);
+        const calendarResult = await fetchGzipJson<CalendarEntry[]>('/calendar.json.gz');
 
         if (!isCancelled) {
           if (calendarResult.status === 'ok') {
@@ -215,10 +189,6 @@ export default function CalendarPageClient() {
             setEntries(null);
           } else {
             throw calendarResult.error;
-          }
-
-          if (champsResult.status === 'ok') {
-            setChampionships(champsResult.data);
           }
         }
       } catch (error) {
@@ -435,11 +405,8 @@ export default function CalendarPageClient() {
                 <div className="space-y-3">
                   {selectedMonth.entries.map((entry, index) => {
                     const pastRace = isPastRace(entry.Date);
-                    const entryYear = entry.Date.slice(0, 4);
-                    const champSeries = entry.raceId
-                      ? (championshipLookup.get(
-                          `${entryYear}/${entry.raceId}`
-                        ) ?? [])
+                    const champSeries = entry.championships
+                      ? Object.entries(entry.championships).map(([slug, title]) => ({ slug, title }))
                       : [];
 
                     return (
