@@ -780,20 +780,11 @@ export default function ChampionshipYearPageClient({
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
                       Unqualified Runners
                     </h3>
-                    {series === 'SHR' && (
+                    {scoringRules && (
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Runners below minimum requirement (4 races, at least one
-                        in each distance category for under-60)
-                      </p>
-                    )}
-                    {series === 'LongClassics' && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Runners below minimum requirement (5 races)
-                      </p>
-                    )}
-                    {series === 'BogAndBurn' && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Runners below minimum requirement (6 races)
+                        {scoringRules.distanceSlots
+                          ? `Runners below minimum requirement (${scoringRules.minimum} races, at least one in each distance category for under-${scoringRules.distanceSlots.ageExemption})`
+                          : `Runners below minimum requirement (${scoringRules.minimum} races)`}
                       </p>
                     )}
                     <div className="overflow-x-auto rounded-lg bg-white shadow-md dark:bg-slate-900">

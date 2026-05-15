@@ -665,7 +665,7 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
     referenceTime: merged.referenceTime as ScoringRules['referenceTime'],
     scale: merged.scale,
     topN: merged.topN,
-    count: merged.count ?? 5,
+    count: Math.min(merged.count ?? 5, merged.minimum ?? merged.count ?? 5),
     minimum: merged.minimum ?? merged.count ?? 5,
     distanceSlots,
   };
