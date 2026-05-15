@@ -643,7 +643,7 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
     // a rules block still work until their content files are updated.
     switch (data.slug) {
       case 'LongClassics':
-        return { points: 'time-ratio', referenceTime: 'min-winner-record', scale: 1000, count: 5, minimum: 5 };
+        return { points: 'time-ratio', referenceTime: 'mf-record', scale: 1000, count: 5, minimum: 5 };
       case 'BogAndBurn':
         return { points: 'raw-position', count: 6, minimum: 6 };
       case 'Under23':
@@ -697,7 +697,7 @@ function writeChampionshipResultsData(
       // Compute per-race points according to the resolved rules
       if (rules.points === 'time-ratio') {
         const scale = rules.scale ?? 1000;
-        const refMode = rules.referenceTime ?? 'min-winner-record';
+        const refMode = rules.referenceTime ?? 'mf-record';
 
         const extractRecord = (rec: unknown) => {
           if (typeof rec !== 'string') return null;
@@ -713,7 +713,7 @@ function writeChampionshipResultsData(
             const raceWinnerTimes = new Map<string, number>();
             winnerTimesByRaceAndSex.set(row.raceId, raceWinnerTimes);
 
-            if (refMode === 'record' || refMode === 'min-winner-record') {
+            if (refMode === 'mf-record') {
               const raceIndexPath = contentPath('races', row.raceId, 'index.md');
               if (fs.existsSync(raceIndexPath)) {
                 const { data } = matter.read(raceIndexPath);
@@ -725,7 +725,7 @@ function writeChampionshipResultsData(
             }
           }
 
-          if (refMode === 'winner' || refMode === 'min-winner-record') {
+          if (refMode === 'mf-winner') {
             const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
             const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
             const winnerKey = `${row.raceId}:${sex}`;
@@ -741,9 +741,20 @@ function writeChampionshipResultsData(
             }
           }
 
+          if (refMode === 'overall-winner') {
+            const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
+            const runnerTime = parseTimeToSeconds(row.time);
+            if (runnerTime !== null && runnerTime > 0) {
+              const existing = raceWinnerTimes.get('all');
+              if (existing === undefined || runnerTime < existing) {
+                raceWinnerTimes.set('all', runnerTime);
+              }
+            }
+          }
+
           const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId);
-          const winnerTime = raceWinnerTimes?.get(sex);
+          const winnerTime = raceWinnerTimes?.get(refMode === 'overall-winner' ? 'all' : sex);
           const runnerTime = parseTimeToSeconds(row.time);
           row.points =
             !winnerTime || !runnerTime || runnerTime <= 0

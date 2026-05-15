@@ -65,11 +65,11 @@ export interface ScoringRules {
   points: 'position-bonus' | 'raw-position' | 'time-ratio';
   /**
    * Reference time used when points === 'time-ratio'.
-   * - 'winner'            – this year's actual winning time
-   * - 'record'            – stored maleRecord/femaleRecord in race index.md
-   * - 'min-winner-record' – min(winner, record) — use whichever is faster
+   * - 'overall-winner'    – this year's single fastest time across all runners (one value for everyone)
+   * - 'mf-winner'         – this year's gender-specific winning time (male/female winner separately)
+   * - 'mf-record'         – min(mf-winner, stored maleRecord/femaleRecord in race index.md)
    */
-  referenceTime?: 'winner' | 'record' | 'min-winner-record';
+  referenceTime?: 'overall-winner' | 'mf-winner' | 'mf-record';
   /** Multiplier for time-ratio points (default 1000). */
   scale?: number;
   /** Positions that earn points for position-bonus mode (default 40). */
