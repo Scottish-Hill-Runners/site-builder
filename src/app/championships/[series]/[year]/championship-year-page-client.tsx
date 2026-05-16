@@ -13,6 +13,8 @@ interface ChampionshipYearPageClientProps {
 
 type ChampionshipTab = 'results' | 'standings';
 
+type RunnerGrouping = 'name' | 'name-and-club';
+
 type DistanceBucket = 'short' | 'medium' | 'long' | 'unknown';
 
 type RaceMetadata = Record<string, RaceInfo>;
@@ -27,6 +29,7 @@ type StandingRow = {
   key: string;
   name: string;
   club: string;
+  clubs: string[];
   categories: string[];
   points: number;
   events: Array<{ raceId: string; points: number }>;
@@ -150,7 +153,8 @@ function scoreRunnerEvents(
 function buildRunnerResultsMap(
   rows: RaceResult[],
   runnerName: string,
-  runnerClub: string
+  runnerClub: string,
+  grouping: RunnerGrouping
 ): Map<string, RaceResult> {
   const map = new Map<string, RaceResult>();
   const normalizedSearchName = runnerName.toLowerCase();
@@ -158,9 +162,12 @@ function buildRunnerResultsMap(
   rows.forEach((row) => {
     if (
       row.name.toLowerCase() === normalizedSearchName &&
-      row.club.toLowerCase() === normalizedSearchClub
+      (grouping === 'name' || row.club.toLowerCase() === normalizedSearchClub)
     ) {
-      map.set(row.raceId, row);
+      const existing = map.get(row.raceId);
+      if (!existing || row.position < existing.position) {
+        map.set(row.raceId, row);
+      }
     }
   });
   return map;
@@ -169,17 +176,20 @@ function buildRunnerResultsMap(
 function countHeadToHeadWins(
   runnerA: StandingRow,
   runnerB: StandingRow,
-  allResults: RaceResult[]
+  allResults: RaceResult[],
+  grouping: RunnerGrouping
 ): number {
   const resultsMapA = buildRunnerResultsMap(
     allResults,
     runnerA.name,
-    runnerA.club
+    runnerA.club,
+    grouping
   );
   const resultsMapB = buildRunnerResultsMap(
     allResults,
     runnerB.name,
-    runnerB.club
+    runnerB.club,
+    grouping
   );
 
   let aWins = 0;
@@ -203,10 +213,28 @@ function formatPoints(points: number): string {
   return String(Math.round(points));
 }
 
+function estimateRawPositionTotal(
+  runner: StandingRow,
+  totalRaceCount: number
+): number {
+  const completedEvents = runner.runnerEvents ?? [];
+  if (completedEvents.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const worstResult = completedEvents.reduce(
+    (max, event) => Math.max(max, event.points),
+    Number.NEGATIVE_INFINITY
+  );
+  const remainingRaceCount = Math.max(0, totalRaceCount - completedEvents.length);
+  return runner.points + worstResult * remainingRaceCount;
+}
+
 function buildStandings(
   rules: ScoringRules,
   rows: RaceResult[],
-  raceMetadata: RaceMetadata
+  raceMetadata: RaceMetadata,
+  grouping: RunnerGrouping
 ): StandingRow[] {
   const ascending = rules.points === 'raw-position';
   const grouped = new Map<
@@ -217,12 +245,19 @@ function buildStandings(
   rows.forEach((row) => {
     const normalizedName = row.name.trim() || 'Unknown';
     const normalizedClub = row.club.trim();
-    const groupKey = `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
+    const groupKey =
+      grouping === 'name'
+        ? normalizedName.toLowerCase()
+        : `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
     const racePoints = row.points ?? 0;
     const bucket = getDistanceBucket(raceMetadata[row.raceId]?.distance);
     const existing = grouped.get(groupKey);
 
     if (existing) {
+      if (normalizedClub && !existing.clubs.includes(normalizedClub)) {
+        existing.clubs.push(normalizedClub);
+        existing.clubs.sort((a, b) => a.localeCompare(b));
+      }
       if (!existing.categories.includes(row.category)) {
         existing.categories.push(row.category);
       }
@@ -239,6 +274,7 @@ function buildStandings(
       key: groupKey,
       name: normalizedName,
       club: normalizedClub,
+      clubs: normalizedClub ? [normalizedClub] : [],
       categories: [row.category],
       points: 0,
       runnerEvents: [{ raceId: row.raceId, points: racePoints, bucket }],
@@ -254,7 +290,8 @@ function buildStandings(
     return {
       key: runner.key,
       name: runner.name,
-      club: runner.club,
+      club: runner.clubs.join(', '),
+      clubs: runner.clubs,
       categories: runner.categories,
       points: scoring.points,
       events: sortedEvents,
@@ -277,8 +314,8 @@ function buildStandings(
     }
 
     // Tie-breaker: head-to-head comparison in shared races
-    const aHeadToHeadWins = countHeadToHeadWins(a, b, rows);
-    const bHeadToHeadWins = countHeadToHeadWins(b, a, rows);
+    const aHeadToHeadWins = countHeadToHeadWins(a, b, rows, grouping);
+    const bHeadToHeadWins = countHeadToHeadWins(b, a, rows, grouping);
 
     if (aHeadToHeadWins !== bHeadToHeadWins) {
       return bHeadToHeadWins - aHeadToHeadWins;
@@ -290,6 +327,7 @@ function buildStandings(
 }
 
 const CHAMP_TAB_STORAGE_KEY = 'championship.activeTab';
+const CHAMP_GROUPING_STORAGE_KEY = 'championship.runnerGrouping';
 
 export default function ChampionshipYearPageClient({
   series,
@@ -312,6 +350,13 @@ export default function ChampionshipYearPageClient({
   }, [activeTab]);
 
   const [selectedRunnerName, setSelectedRunnerName] = useState('');
+  const [selectedGrouping, setSelectedGrouping] = useState<RunnerGrouping>(() => {
+    try {
+      const saved = window.localStorage.getItem(CHAMP_GROUPING_STORAGE_KEY);
+      if (saved === 'name' || saved === 'name-and-club') return saved;
+    } catch {}
+    return 'name-and-club';
+  });
   const [selectedCategoryPos, setSelectedCategoryPos] = useState<string>('All');
   const [selectedClub, setSelectedClub] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(true);
@@ -320,6 +365,12 @@ export default function ChampionshipYearPageClient({
   const [clubNameToSlug, setClubNameToSlug] = useState<Record<string, string>>(
     {}
   );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CHAMP_GROUPING_STORAGE_KEY, selectedGrouping);
+    } catch {}
+  }, [selectedGrouping]);
 
   useEffect(() => {
     fetchGzipJson<Array<{ name: string; slug: string }>>('/clubs.json.gz')
@@ -334,8 +385,11 @@ export default function ChampionshipYearPageClient({
   }, []);
 
   const allStandings = useMemo(
-    () => scoringRules ? buildStandings(scoringRules, results ?? [], raceMetadata) : [],
-    [results, raceMetadata, scoringRules]
+    () =>
+      scoringRules
+        ? buildStandings(scoringRules, results ?? [], raceMetadata, selectedGrouping)
+        : [],
+    [results, raceMetadata, scoringRules, selectedGrouping]
   );
 
   const availableCategoryPos = useMemo(() => {
@@ -372,7 +426,10 @@ export default function ChampionshipYearPageClient({
     filteredRows.forEach((row) => {
       const normalizedName = row.name.trim() || 'Unknown';
       const normalizedClub = row.club.trim();
-      const groupKey = `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
+      const groupKey =
+        selectedGrouping === 'name'
+          ? normalizedName.toLowerCase()
+          : `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
 
       const racePoints = row.points ?? 0;
 
@@ -380,6 +437,13 @@ export default function ChampionshipYearPageClient({
       const existing = grouped.get(groupKey);
 
       if (existing) {
+        if (normalizedClub && !existing.clubs.includes(normalizedClub)) {
+          existing.clubs.push(normalizedClub);
+          existing.clubs.sort((a, b) => a.localeCompare(b));
+        }
+        if (!existing.categories.includes(selectedCategoryPos)) {
+          existing.categories.push(selectedCategoryPos);
+        }
         existing.runnerEvents.push({
           raceId: row.raceId,
           points: racePoints,
@@ -393,6 +457,7 @@ export default function ChampionshipYearPageClient({
         key: groupKey,
         name: normalizedName,
         club: normalizedClub,
+        clubs: normalizedClub ? [normalizedClub] : [],
         categories: [selectedCategoryPos],
         points: 0,
         runnerEvents: [{ raceId: row.raceId, points: racePoints, bucket }],
@@ -409,7 +474,8 @@ export default function ChampionshipYearPageClient({
       return {
         key: runner.key,
         name: runner.name,
-        club: runner.club,
+        club: runner.clubs.join(', '),
+        clubs: runner.clubs,
         categories: runner.categories,
         points: scoring.points,
         events: sortedEvents,
@@ -433,8 +499,18 @@ export default function ChampionshipYearPageClient({
       }
 
       // Tie-breaker: head-to-head comparison in shared races
-      const aHeadToHeadWins = countHeadToHeadWins(a, b, results ?? []);
-      const bHeadToHeadWins = countHeadToHeadWins(b, a, results ?? []);
+      const aHeadToHeadWins = countHeadToHeadWins(
+        a,
+        b,
+        results ?? [],
+        selectedGrouping
+      );
+      const bHeadToHeadWins = countHeadToHeadWins(
+        b,
+        a,
+        results ?? [],
+        selectedGrouping
+      );
 
       if (aHeadToHeadWins !== bHeadToHeadWins) {
         return bHeadToHeadWins - aHeadToHeadWins;
@@ -443,24 +519,76 @@ export default function ChampionshipYearPageClient({
       // Final tie-breaker: alphabetical by name
       return a.name.localeCompare(b.name);
     });
-  }, [selectedCategoryPos, allStandings, results, scoringRules, raceMetadata]);
+  }, [
+    selectedCategoryPos,
+    allStandings,
+    results,
+    scoringRules,
+    raceMetadata,
+    selectedGrouping,
+  ]);
 
   const clubFilteredStandings = useMemo(() => {
     if (selectedClub === 'All') {
       return filteredStandings;
     }
 
-    return filteredStandings.filter((runner) => runner.club === selectedClub);
+    return filteredStandings.filter((runner) =>
+      runner.clubs.includes(selectedClub)
+    );
   }, [filteredStandings, selectedClub]);
 
   const qualifiedStandings = useMemo(
     () => clubFilteredStandings?.filter((r) => r.isQualified) ?? [],
     [clubFilteredStandings]
   );
-  const unqualifiedStandings = useMemo(
-    () => clubFilteredStandings?.filter((r) => !r.isQualified) ?? [],
-    [clubFilteredStandings]
-  );
+  const totalRaceCountForSelection = useMemo(() => {
+    if (!results) return 0;
+
+    const raceIds = new Set<string>();
+    if (selectedCategoryPos === 'All') {
+      results.forEach((row) => raceIds.add(row.raceId));
+    } else {
+      results
+        .filter((row) => selectedCategoryPos in row.categoryPos)
+        .forEach((row) => raceIds.add(row.raceId));
+    }
+
+    return raceIds.size;
+  }, [results, selectedCategoryPos]);
+
+  const unqualifiedStandings = useMemo(() => {
+    const unqualified = clubFilteredStandings?.filter((r) => !r.isQualified) ?? [];
+
+    if (scoringRules?.points !== 'raw-position') {
+      return unqualified;
+    }
+
+    return [...unqualified].sort((a, b) => {
+      const estimateA = estimateRawPositionTotal(a, totalRaceCountForSelection);
+      const estimateB = estimateRawPositionTotal(b, totalRaceCountForSelection);
+      if (estimateA !== estimateB) {
+        return estimateA - estimateB;
+      }
+
+      const completedA = a.runnerEvents?.length ?? 0;
+      const completedB = b.runnerEvents?.length ?? 0;
+      if (completedA !== completedB) {
+        return completedB - completedA;
+      }
+
+      // Fallback to current points then name for deterministic ordering.
+      if (a.points !== b.points) {
+        return a.points - b.points;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [
+    clubFilteredStandings,
+    scoringRules?.points,
+    totalRaceCountForSelection,
+  ]);
 
   const handleRunnerClick = (runnerName: string) => {
     setSelectedRunnerName(runnerName);
@@ -637,6 +765,26 @@ export default function ChampionshipYearPageClient({
             {activeTab === 'standings' ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="grouping-select"
+                      className="text-sm font-semibold text-slate-700 dark:text-slate-200"
+                    >
+                      Group runners:
+                    </label>
+                    <select
+                      id="grouping-select"
+                      value={selectedGrouping}
+                      onChange={(e) =>
+                        setSelectedGrouping(e.target.value as RunnerGrouping)
+                      }
+                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                      <option value="name">Name only</option>
+                      <option value="name-and-club">Name and club</option>
+                    </select>
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <label
                       htmlFor="categorypos-select"
