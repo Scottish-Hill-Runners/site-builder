@@ -17,9 +17,11 @@ interface DataTableProps {
   races?: { [raceId: string]: RaceInfo };
   eras?: Era[];
   showRaceColumn?: boolean;
+  showRaceFilter?: boolean;
   showRaceTitle?: boolean;
   showYearFilter?: boolean;
   initialNameFilter?: string;
+  initialRaceFilter?: string;
   initialYearFilter?: string;
   enableRowFocus?: boolean;
   onFocusContextChange?: (context: ResultsFocusContext | null) => void;
@@ -41,6 +43,7 @@ type SortDirection = 'asc' | 'desc';
 interface Filters {
   year: string;
   name: string;
+  raceId: string;
   raceTitle: string;
   club: string;
   category: string;
@@ -59,9 +62,11 @@ export default function RaceResultsDataTable({
   races,
   eras,
   showRaceColumn = false,
+  showRaceFilter = false,
   showRaceTitle = false,
   showYearFilter = true,
   initialNameFilter = '',
+  initialRaceFilter = '',
   initialYearFilter = '',
   enableRowFocus = false,
   onFocusContextChange,
@@ -100,6 +105,7 @@ export default function RaceResultsDataTable({
   const [filters, setFilters] = useState<Filters>({
     year: initialYearFilter,
     name: initialNameFilter,
+    raceId: initialRaceFilter,
     raceTitle: '',
     club: '',
     category: '',
@@ -142,8 +148,11 @@ export default function RaceResultsDataTable({
         (races?.[row.raceId]?.title ?? row.raceId)
           .toLowerCase()
           .includes(filters.raceTitle.toLowerCase());
+      const raceMatch =
+        !showRaceFilter || filters.raceId === '' || row.raceId === filters.raceId;
       return (
         yearMatch &&
+        raceMatch &&
         (filters.name === '' ||
           row.name.toLowerCase().includes(filters.name.toLowerCase())) &&
         raceTitleMatch &&
@@ -204,7 +213,16 @@ export default function RaceResultsDataTable({
     });
 
     return result;
-  }, [data, filters, sortColumn, sortDirection, showYearFilter, races, eras]);
+  }, [
+    data,
+    filters,
+    sortColumn,
+    sortDirection,
+    showYearFilter,
+    showRaceFilter,
+    races,
+    eras,
+  ]);
 
   // Reset scroll position when filters/sort change
   useEffect(() => {
@@ -228,7 +246,14 @@ export default function RaceResultsDataTable({
   };
 
   const clearFilters = () => {
-    setFilters({ year: '', name: '', raceTitle: '', club: '', category: '' });
+    setFilters({
+      year: '',
+      name: '',
+      raceId: '',
+      raceTitle: '',
+      club: '',
+      category: '',
+    });
     setSortColumn(showRaceColumn ? 'raceTitle' : 'year');
     setSortDirection(showRaceColumn ? 'asc' : 'desc');
   };
@@ -261,6 +286,7 @@ export default function RaceResultsDataTable({
             : row.year.includes(filters.year);
       return (
         yearMatch &&
+        (filters.raceId === '' || row.raceId === filters.raceId) &&
         (filters.name === '' ||
           row.name.toLowerCase().includes(filters.name.toLowerCase())) &&
         (filters.club === '' ||
@@ -274,7 +300,39 @@ export default function RaceResultsDataTable({
       Object.keys(row.categoryPos).forEach((cat) => uniq.add(cat));
     });
     return Array.from(uniq).sort();
-  }, [data, filters.year, filters.name, filters.club, showYearFilter, eras]);
+  }, [
+    data,
+    filters.year,
+    filters.raceId,
+    filters.name,
+    filters.club,
+    showYearFilter,
+    eras,
+  ]);
+
+  const availableRaces = useMemo(() => {
+    const uniqueRaceIds = Array.from(new Set(data.map((row) => row.raceId)));
+    return uniqueRaceIds
+      .map((raceId) => ({
+        raceId,
+        title: races?.[raceId]?.title ?? raceId,
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [data, races]);
+
+  useEffect(() => {
+    if (!showRaceFilter) return;
+    if (!initialRaceFilter) {
+      setFilters((prev) => ({ ...prev, raceId: '' }));
+      return;
+    }
+
+    const hasRace = data.some((row) => row.raceId === initialRaceFilter);
+    setFilters((prev) => ({
+      ...prev,
+      raceId: hasRace ? initialRaceFilter : '',
+    }));
+  }, [data, initialRaceFilter, showRaceFilter]);
 
   // Get unique years from data, sorted in ascending order
   const availableYears = useMemo(() => {
@@ -354,6 +412,7 @@ export default function RaceResultsDataTable({
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
               </button>
               {((showYearFilter && filters.year) ||
+                (showRaceFilter && filters.raceId) ||
                 filters.name ||
                 filters.club ||
                 filters.category ||
@@ -406,6 +465,20 @@ export default function RaceResultsDataTable({
                       </option>
                     ))
                   )}
+                </select>
+              )}
+              {showRaceFilter && (
+                <select
+                  value={filters.raceId}
+                  onChange={(e) => handleFilterChange('raceId', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  <option value="">All Races</option>
+                  {availableRaces.map((race) => (
+                    <option key={race.raceId} value={race.raceId}>
+                      {race.title}
+                    </option>
+                  ))}
                 </select>
               )}
               {showRaceTitle ? (
@@ -598,7 +671,7 @@ export default function RaceResultsDataTable({
                           {showRaceColumn && (
                             <td className="px-2 py-4 text-sm text-gray-800 sm:px-6 dark:text-slate-200">
                               <Link
-                                href={`/races/${encodeURIComponent(row.raceId)}`}
+                                href={`/races/${encodeURIComponent(row.raceId)}?year=${encodeURIComponent(row.year)}`}
                                 className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                               >
                                 {races?.[row.raceId]?.title ?? row.raceId}
@@ -608,7 +681,7 @@ export default function RaceResultsDataTable({
                           {!showRaceColumn && (
                             <td className="px-2 py-4 text-sm text-gray-800 sm:px-6 dark:text-slate-200">
                               <Link
-                                href={`/years/${encodeURIComponent(row.year.substring(0, 4))}`}
+                                href={`/years/${encodeURIComponent(row.year.substring(0, 4))}?race=${encodeURIComponent(row.raceId)}`}
                                 className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                               >
                                 {row.year}
@@ -623,7 +696,7 @@ export default function RaceResultsDataTable({
                           {showRaceTitle ? (
                             <td className="px-2 py-4 text-sm text-gray-800 sm:px-6 dark:text-slate-200">
                               <Link
-                                href={`/races/${encodeURIComponent(row.raceId)}`}
+                                href={`/races/${encodeURIComponent(row.raceId)}?year=${encodeURIComponent(row.year)}`}
                                 className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                               >
                                 {races?.[row.raceId]?.title ?? row.raceId}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import RaceDetailsTabs from '@/components/RaceDetailsTabs';
 import { fetchJsonWithApiFallback } from '@/lib/client-results-fetch';
 import type { RaceData } from '@/types/datatable';
@@ -18,6 +19,9 @@ export default function RacePageClient({
   raceId,
   raceImages,
 }: RacePageClientProps) {
+  const searchParams = useSearchParams();
+  const initialYearFilter = searchParams.get('year') ?? '';
+  const initialTab = initialYearFilter ? 'results' : undefined;
   const [data, setData] = useState<RaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -146,6 +150,8 @@ export default function RacePageClient({
               resultsError={null}
               heroImage={raceImages?.hero?.[0] ?? null}
               galleryImages={raceImages?.gallery ?? []}
+              initialTab={initialTab}
+              initialYearFilter={initialYearFilter}
             />
           </>
         ) : (

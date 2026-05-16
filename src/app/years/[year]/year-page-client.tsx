@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import {
   fetchJsonWithApiFallback,
@@ -19,6 +20,8 @@ interface YearPageClientProps {
 }
 
 export default function YearPageClient({ year }: YearPageClientProps) {
+  const searchParams = useSearchParams();
+  const initialRaceFilter = searchParams.get('race') ?? '';
   const [results, setResults] = useState<RaceResult[] | null>(null);
   const [races, setRaces] = useState<{ [raceId: string]: RaceInfo }>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -146,6 +149,8 @@ export default function YearPageClient({ year }: YearPageClientProps) {
               data={results}
               races={races}
               showRaceColumn
+              showRaceFilter
+              initialRaceFilter={initialRaceFilter}
               showYearFilter={false}
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}

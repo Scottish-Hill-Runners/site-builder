@@ -445,7 +445,7 @@ function writeRunnerData(allResults: RaceResult[]) {
     JSON.stringify(
       Array.from(runnerCounts.entries())
         .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => b.count - a.count)
     )
   );
   const byRunnerHash = groupBy(allResults, (r) => surnameHash(r.name) % 100);
