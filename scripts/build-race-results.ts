@@ -6,7 +6,14 @@ import { writeGz, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { buildElevationChartData } from './elevation-chart';
 import { surnameHash } from '@/lib/runner-name';
-import { ChampionshipYearPayload, DistanceSlotsRule, Era, RaceInfo, RaceResult, ScoringRules } from '@/types/datatable';
+import {
+  ChampionshipYearPayload,
+  DistanceSlotsRule,
+  Era,
+  RaceInfo,
+  RaceResult,
+  ScoringRules,
+} from '@/types/datatable';
 
 type YearInfo = {
   year: string;
@@ -31,7 +38,10 @@ type ChampionshipData = {
   contents: string;
   years: { [year: string]: string[] };
   yearHasData?: { [year: string]: boolean };
-  rules?: { default?: Partial<ScoringRules>; [year: string]: Partial<ScoringRules> | undefined };
+  rules?: {
+    default?: Partial<ScoringRules>;
+    [year: string]: Partial<ScoringRules> | undefined;
+  };
 };
 
 type CalendarEntry = {
@@ -43,6 +53,20 @@ type CalendarEntry = {
   latitude?: number;
   longitude?: number;
   championships?: { [slug: string]: string };
+};
+
+type RaceMeta = {
+  info: RaceInfo;
+  content: string;
+  latitude?: number;
+  longitude?: number;
+  hasGpx: boolean;
+  hasRaceMap: boolean;
+};
+
+type RaceEntry = {
+  meta: RaceMeta;
+  results: RaceResult[];
 };
 
 function formatTime(time: string): string {
@@ -238,15 +262,53 @@ async function readRaceResults(raceId: string): Promise<RaceResult[]> {
   ).then((results) => results.flat());
 }
 
-async function readResults(): Promise<RaceResult[]> {
-  return await Promise.all(
+async function readResults(): Promise<Map<string, RaceEntry>> {
+  const racesDir = contentPath('races');
+  const encoder = new TextEncoder();
+  const raceMap = new Map<string, RaceEntry>();
+  await Promise.all(
     fs
-      .readdirSync(contentPath('races'), { withFileTypes: true })
-      .flatMap((raceId) => {
-        if (!raceId.isDirectory()) return Promise.resolve([] as RaceResult[]);
-        return readRaceResults(path.join(contentPath('races'), raceId.name));
+      .readdirSync(racesDir, { withFileTypes: true })
+      .filter(
+        (d) =>
+          d.isDirectory() &&
+          fs.existsSync(path.join(racesDir, d.name, 'index.md'))
+      )
+      .map(async (d) => {
+        const raceId = d.name;
+        const raceDir = path.join(racesDir, raceId);
+        const { data, content } = matter.read(path.join(raceDir, 'index.md'));
+        const info: RaceInfo = {
+          title: data.title,
+          venue: data.venue,
+          distance: parseFloat(data.distance),
+          climb: parseFloat(data.climb),
+          maleRecord: data.maleRecord ?? data.record,
+          femaleRecord: data.femaleRecord,
+          nonBinaryRecord: data.nonBinaryRecord,
+          web: data.web,
+          organiser: data.organiser
+            ? Array.from(encoder.encode(data.organiser))
+            : undefined,
+          eras: parseEras(data.eras as string | undefined),
+        };
+        const meta: RaceMeta = {
+          info,
+          content,
+          latitude:
+            data.latitude !== undefined ? parseFloat(data.latitude) : undefined,
+          longitude:
+            data.longitude !== undefined
+              ? parseFloat(data.longitude)
+              : undefined,
+          hasGpx: fs.existsSync(path.join(raceDir, 'route.gpx')),
+          hasRaceMap: fs.existsSync(path.join(raceDir, 'race-map.webp')),
+        };
+        const results = await readRaceResults(raceDir);
+        raceMap.set(raceId, { meta, results });
       })
-  ).then((result) => result.flat());
+  );
+  return raceMap;
 }
 
 function groupBy<K, V>(data: V[], key: (t: V) => K): Map<K, V[]> {
@@ -333,40 +395,13 @@ function parseEras(raw: string | undefined): Era[] | undefined {
   return eras.length > 0 ? eras : undefined;
 }
 
-function writeRaceData(allResults: RaceResult[]) {
-  const byRaceId = groupBy(allResults, (r) => r.raceId);
-  const encoder = new TextEncoder();
+function writeRaceData(raceMap: Map<string, RaceEntry>) {
   const raceInfo: { [raceId: string]: RaceInfo } = {};
   const racesDir = contentPath('races');
-  const allRaceDirs = fs
-    .readdirSync(racesDir, { withFileTypes: true })
-    .filter(
-      (d) =>
-        d.isDirectory() &&
-        fs.existsSync(path.join(racesDir, d.name, 'index.md'))
-    )
-    .map((d) => d.name);
-  for (const raceId of allRaceDirs) {
-    const results = byRaceId.get(raceId) ?? [];
-    const raceDir = path.join(racesDir, raceId);
-    const { data, content } = matter.read(path.join(raceDir, 'index.md'));
-    const info = {
-      title: data.title,
-      venue: data.venue,
-      distance: parseFloat(data.distance),
-      climb: parseFloat(data.climb),
-      maleRecord: data.maleRecord ?? data.record,
-      femaleRecord: data.femaleRecord,
-      nonBinaryRecord: data.nonBinaryRecord,
-      web: data.web,
-      organiser: data.organiser
-        ? Array.from(encoder.encode(data.organiser))
-        : undefined,
-      eras: parseEras(data.eras as string | undefined),
-    };
+  for (const [raceId, { meta, results }] of raceMap) {
+    const { info, content, hasGpx, hasRaceMap } = meta;
     raceInfo[raceId] = info;
-    const hasGpx = fs.existsSync(path.join(raceDir, 'route.gpx'));
-    const hasRaceMap = fs.existsSync(path.join(raceDir, 'race-map.webp'));
+    const raceDir = path.join(racesDir, raceId);
     if (hasGpx) {
       const gpxSrc = path.join(raceDir, 'route.gpx');
       fs.copyFileSync(gpxSrc, `${outputDir}/${raceId}.gpx`);
@@ -388,11 +423,11 @@ function writeRaceData(allResults: RaceResult[]) {
       outputDir,
       `${raceId}.json`,
       JSON.stringify({
-        info: info,
+        info,
         contents: content,
-        results: results,
-        hasGpx: hasGpx,
-        hasRaceMap: hasRaceMap,
+        results,
+        hasGpx,
+        hasRaceMap,
       })
     );
   }
@@ -448,13 +483,28 @@ function buildCalendarDateLookup(): Map<string, string> {
 }
 
 function formatCalendarDate(isoDate: string): string {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
   const [, month, day] = isoDate.split('-');
   return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
 }
 
-function readChampionships(calendarDates: Map<string, string>): ChampionshipData[] {
+function readChampionships(
+  calendarDates: Map<string, string>,
+  raceMap: Map<string, RaceEntry>
+): ChampionshipData[] {
   const champDir = contentPath('championships');
   const championships: ChampionshipData[] = [];
 
@@ -484,24 +534,25 @@ function readChampionships(calendarDates: Map<string, string>): ChampionshipData
       const latestYear = Object.keys(years)
         .filter((y) => years[y].length > 0)
         .sort((a, b) => parseInt(b) - parseInt(a))[0];
-      const hasDistanceSlots = !!(data.rules as ChampionshipData['rules'])?.default?.distanceSlots;
+      const hasDistanceSlots = !!(data.rules as ChampionshipData['rules'])
+        ?.default?.distanceSlots;
       let scheduleBlock = '';
       if (latestYear) {
         const raceIds = years[latestYear];
         const items = raceIds
           .filter((id) => !id.startsWith('no-slug('))
           .map((raceId) => {
-            const raceIndexPath = contentPath('races', raceId, 'index.md');
+            const raceEntry = raceMap.get(raceId);
             let title = raceId;
             let distancePart = '';
-            const hasPage = fs.existsSync(raceIndexPath);
+            const hasPage = raceEntry !== undefined;
             if (hasPage) {
-              const { data: raceData } = matter.read(raceIndexPath);
-              title = (raceData.title as string) ?? raceId;
+              title = raceEntry.meta.info.title ?? raceId;
               if (hasDistanceSlots) {
-                const distance = parseFloat(String(raceData.distance ?? ''));
+                const distance = raceEntry.meta.info.distance;
                 if (!Number.isNaN(distance)) {
-                  const bucket = distance < 10 ? 'short' : distance > 20 ? 'long' : 'medium';
+                  const bucket =
+                    distance < 10 ? 'short' : distance > 20 ? 'long' : 'medium';
                   distancePart = ` (${bucket})`;
                 }
               }
@@ -610,7 +661,10 @@ function yearKeyMatches(key: string, yearNum: number): boolean {
   if (presentMatch) return yearNum >= parseInt(presentMatch[1], 10);
   const rangeMatch = key.match(/^(\d{4})-(\d{4})$/);
   if (rangeMatch)
-    return yearNum >= parseInt(rangeMatch[1], 10) && yearNum <= parseInt(rangeMatch[2], 10);
+    return (
+      yearNum >= parseInt(rangeMatch[1], 10) &&
+      yearNum <= parseInt(rangeMatch[2], 10)
+    );
   return /^\d{4}$/.test(key) && parseInt(key, 10) === yearNum;
 }
 
@@ -643,18 +697,31 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
     // a rules block still work until their content files are updated.
     switch (data.slug) {
       case 'LongClassics':
-        return { points: 'time-ratio', referenceTime: 'mf-record', scale: 1000, count: 5, minimum: 5 };
+        return {
+          points: 'time-ratio',
+          referenceTime: 'mf-record',
+          scale: 1000,
+          count: 5,
+          minimum: 5,
+        };
       case 'BogAndBurn':
         return { points: 'raw-position', count: 6, minimum: 6 };
       case 'Under23':
         return { points: 'position-bonus', count: 3, minimum: 3 };
       default:
-        return { points: 'position-bonus', count: 4, minimum: 4, distanceSlots: { short: 1, medium: 1, long: 1, ageExemption: 60 } };
+        return {
+          points: 'position-bonus',
+          count: 4,
+          minimum: 4,
+          distanceSlots: { short: 1, medium: 1, long: 1, ageExemption: 60 },
+        };
     }
   }
 
   // Deep-merge distanceSlots across default and all matching overrides.
-  const withSlots = [defaultRules, ...matchingOverrides].filter((o) => o.distanceSlots);
+  const withSlots = [defaultRules, ...matchingOverrides].filter(
+    (o) => o.distanceSlots
+  );
   const distanceSlots: DistanceSlotsRule | undefined =
     withSlots.length > 0
       ? Object.assign({}, ...withSlots.map((o) => o.distanceSlots))
@@ -673,7 +740,8 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
 
 function writeChampionshipResultsData(
   allResults: RaceResult[],
-  championships: ChampionshipData[]
+  championships: ChampionshipData[],
+  raceMap: Map<string, RaceEntry>
 ): void {
   for (const championship of championships) {
     championship.yearHasData = {};
@@ -696,9 +764,6 @@ function writeChampionshipResultsData(
 
       // Compute per-race points according to the resolved rules
       if (rules.points === 'time-ratio') {
-        const scale = rules.scale ?? 1000;
-        const refMode = rules.referenceTime ?? 'mf-record';
-
         const extractRecord = (rec: unknown) => {
           if (typeof rec !== 'string') return null;
           const match = rec.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
@@ -707,6 +772,7 @@ function writeChampionshipResultsData(
 
         const winnerTimesByRaceAndSex = new Map<string, Map<string, number>>();
         const winnerSeen = new Set<string>();
+        const refMode = rules.referenceTime ?? 'mf-record';
 
         for (const row of championshipResults) {
           if (!winnerTimesByRaceAndSex.has(row.raceId)) {
@@ -714,48 +780,38 @@ function writeChampionshipResultsData(
             winnerTimesByRaceAndSex.set(row.raceId, raceWinnerTimes);
 
             if (refMode === 'mf-record') {
-              const raceIndexPath = contentPath('races', row.raceId, 'index.md');
-              if (fs.existsSync(raceIndexPath)) {
-                const { data } = matter.read(raceIndexPath);
-                const mRec = extractRecord(data.maleRecord ?? data.record);
+              const raceEntry = raceMap.get(row.raceId);
+              if (raceEntry) {
+                const mRec = extractRecord(raceEntry.meta.info.maleRecord);
                 if (mRec) raceWinnerTimes.set('M', mRec);
-                const fRec = extractRecord(data.femaleRecord);
+                const fRec = extractRecord(raceEntry.meta.info.femaleRecord);
                 if (fRec) raceWinnerTimes.set('F', fRec);
               }
             }
           }
 
-          if (refMode === 'mf-winner') {
-            const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
-            const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
-            const winnerKey = `${row.raceId}:${sex}`;
-            if (!winnerSeen.has(winnerKey)) {
-              winnerSeen.add(winnerKey);
-              const runnerTime = parseTimeToSeconds(row.time);
-              if (runnerTime !== null && runnerTime > 0) {
-                const existing = raceWinnerTimes.get(sex);
-                if (existing === undefined || runnerTime < existing) {
-                  raceWinnerTimes.set(sex, runnerTime);
-                }
-              }
-            }
-          }
+          const sex =
+            refMode === 'overall-winner'
+              ? 'M'
+              : likelySex(row.category) === 'F'
+                ? 'F'
+                : 'M';
+          const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
 
-          if (refMode === 'overall-winner') {
-            const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
+          const winnerKey = `${row.raceId}:${sex}`;
+          if (!winnerSeen.has(winnerKey)) {
+            winnerSeen.add(winnerKey);
             const runnerTime = parseTimeToSeconds(row.time);
             if (runnerTime !== null && runnerTime > 0) {
-              const existing = raceWinnerTimes.get('all');
-              if (existing === undefined || runnerTime < existing) {
-                raceWinnerTimes.set('all', runnerTime);
-              }
+              const existing = raceWinnerTimes.get(sex);
+              if (existing === undefined || runnerTime < existing)
+                raceWinnerTimes.set(sex, runnerTime);
             }
           }
 
-          const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
-          const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId);
-          const winnerTime = raceWinnerTimes?.get(refMode === 'overall-winner' ? 'all' : sex);
+          const winnerTime = raceWinnerTimes?.get(sex);
           const runnerTime = parseTimeToSeconds(row.time);
+          const scale = rules.scale ?? 1000;
           row.points =
             !winnerTime || !runnerTime || runnerTime <= 0
               ? 0
@@ -774,7 +830,10 @@ function writeChampionshipResultsData(
         }
       }
 
-      const payload: ChampionshipYearPayload = { rules, results: championshipResults };
+      const payload: ChampionshipYearPayload = {
+        rules,
+        results: championshipResults,
+      };
       writeGz(
         outputDir,
         `${championship.slug}-${year}.json`,
@@ -786,7 +845,10 @@ function writeChampionshipResultsData(
   progress('Wrote championship series-year result files');
 }
 
-async function writeCalendarData(championships: ChampionshipData[]): Promise<void> {
+async function writeCalendarData(
+  championships: ChampionshipData[],
+  raceMap: Map<string, RaceEntry>
+): Promise<void> {
   // Build championship lookup: "year/raceId" -> { [slug]: title }
   const champLookup = new Map<string, { [slug: string]: string }>();
   for (const champ of championships) {
@@ -828,29 +890,28 @@ async function writeCalendarData(championships: ChampionshipData[]): Promise<voi
     })
     .map((row) => {
       const raceId = String(row.Race ?? '').trim();
-      const raceIndexPath = contentPath('races', raceId, 'index.md');
-      if (!raceId || !fs.existsSync(raceIndexPath)) {
+      const raceEntry = raceMap.get(raceId);
+      if (!raceId || !raceEntry) {
         return {
           Date: String(row.Date ?? '').trim(),
           raceName: raceId,
         };
       }
 
-      const { data } = matter.read(raceIndexPath);
+      const { info, latitude, longitude } = raceEntry.meta;
       const entry: CalendarEntry = {
         Date: String(row.Date ?? '').trim(),
-        raceName: String(data.title ?? raceId),
+        raceName: String(info.title ?? raceId),
         raceId,
       };
 
-      const distance = parseFloat(String(data.distance ?? ''));
-      if (!Number.isNaN(distance)) entry.distance = distance;
+      if (!Number.isNaN(info.distance)) entry.distance = info.distance;
 
-      const climb = parseFloat(String(data.climb ?? ''));
-      if (!Number.isNaN(climb)) entry.climb = climb;
+      if (info.climb !== undefined && !Number.isNaN(info.climb))
+        entry.climb = info.climb;
 
-      if (data.latitude !== undefined) entry.latitude = parseFloat(data.latitude);
-      if (data.longitude !== undefined) entry.longitude = parseFloat(data.longitude);
+      if (latitude !== undefined) entry.latitude = latitude;
+      if (longitude !== undefined) entry.longitude = longitude;
 
       const year = entry.Date.slice(0, 4);
       const champMap = champLookup.get(`${year}/${raceId}`);
@@ -871,17 +932,18 @@ async function writeCalendarData(championships: ChampionshipData[]): Promise<voi
 
 async function main() {
   progress(`Using content root: ${contentRoot()}`);
-  const allResults = await readResults();
+  const raceMap = await readResults();
+  const allResults = [...raceMap.values()].flatMap((e) => e.results);
   const calendarDates = buildCalendarDateLookup();
-  const championships = readChampionships(calendarDates);
+  const championships = readChampionships(calendarDates, raceMap);
   writeClubData(clubs, allResults);
   writeYearData(allResults);
-  writeRaceData(allResults);
+  writeRaceData(raceMap);
   writeRunnerData(allResults);
   summariseCategories(allResults);
-  writeChampionshipResultsData(allResults, championships);
+  writeChampionshipResultsData(allResults, championships, raceMap);
   writeChampionshipData(championships);
-  await writeCalendarData(championships);
+  await writeCalendarData(championships, raceMap);
 
   progress('Done\n');
 }
