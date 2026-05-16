@@ -395,6 +395,25 @@ function parseEras(raw: string | undefined): Era[] | undefined {
   return eras.length > 0 ? eras : undefined;
 }
 
+function parseChampionshipRaceIds(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((value) => String(value).trim())
+      .filter((value) => value.length > 0 && value !== 'n/a');
+  }
+
+  if (typeof raw === 'string') {
+    return raw === 'n/a'
+      ? []
+      : raw
+          .split(';')
+          .map((id) => id.trim())
+          .filter((id) => id);
+  }
+
+  return [];
+}
+
 function writeRaceData(raceMap: Map<string, RaceEntry>) {
   const raceInfo: { [raceId: string]: RaceInfo } = {};
   const racesDir = contentPath('races');
@@ -517,14 +536,8 @@ function readChampionships(
 
     // Extract year data from frontmatter
     for (const [key, value] of Object.entries(data)) {
-      if (/^\d{4}$/.test(key) && typeof value === 'string') {
-        const raceIds =
-          value === 'n/a'
-            ? []
-            : value
-                .split(';')
-                .map((id: string) => id.trim())
-                .filter((id: string) => id);
+      if (/^\d{4}$/.test(key)) {
+        const raceIds = parseChampionshipRaceIds(value);
         years[key] = raceIds;
       }
     }
