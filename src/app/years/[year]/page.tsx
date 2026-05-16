@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import YearPageClient from '@/app/years/[year]/year-page-client';
 import { loadAvailableYears } from '@/lib/results-data';
 
@@ -12,5 +13,9 @@ export default async function YearPage({
   params: Promise<{ year: string }>;
 }) {
   const { year } = await params;
-  return <YearPageClient year={year} />;
+  return (
+    <Suspense fallback={null}>
+      <YearPageClient year={year} />
+    </Suspense>
+  );
 }
