@@ -552,7 +552,19 @@ function readChampionships(
       let scheduleBlock = '';
       if (latestYear) {
         const raceIds = years[latestYear];
-        const items = raceIds
+        const sortedRaceIds = [...raceIds].sort((a, b) => {
+          const dateA = calendarDates.get(`${latestYear}/${a}`);
+          const dateB = calendarDates.get(`${latestYear}/${b}`);
+
+          if (dateA && dateB) {
+            return dateA.localeCompare(dateB);
+          }
+          if (dateA) return -1;
+          if (dateB) return 1;
+          return a.localeCompare(b);
+        });
+
+        const items = sortedRaceIds
           .filter((id) => !id.startsWith('no-slug('))
           .map((raceId) => {
             const raceEntry = raceMap.get(raceId);
