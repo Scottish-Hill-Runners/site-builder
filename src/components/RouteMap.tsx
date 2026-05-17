@@ -34,11 +34,21 @@ function getBounds(geojson: GeoJSON): maplibregl.LngLatBoundsLike | null {
   }
   collect(geojson);
   if (coords.length === 0) return null;
-  const lngs = coords.map((c) => c[0]);
-  const lats = coords.map((c) => c[1]);
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+
+  for (const [lng, lat] of coords) {
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
+  }
+
   return [
-    [Math.min(...lngs), Math.min(...lats)],
-    [Math.max(...lngs), Math.max(...lats)],
+    [minLng, minLat],
+    [maxLng, maxLat],
   ];
 }
 

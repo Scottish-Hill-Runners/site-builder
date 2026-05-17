@@ -7,6 +7,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import sharedStyles from './shared.module.css';
 import SiteHeader from '@/components/SiteHeader';
 import UnitsProvider from '@/components/UnitsProvider';
+import PreferenceInitializer from '@/components/PreferenceInitializer';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,33 +28,6 @@ export const metadata: Metadata = {
   },
 };
 
-const unitsScript = `
-(() => {
-  try {
-    if (window.localStorage.getItem('shr-units') === 'imperial') {
-      document.documentElement.dataset.units = 'imperial';
-    }
-  } catch {}
-})();`;
-
-const themeScript = `
-(() => {
-  try {
-    const storageKey = 'shr-theme';
-    const storedPreference = window.localStorage.getItem(storageKey) || 'system';
-    const isDark = storedPreference === 'dark'
-      || (storedPreference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    const resolvedTheme = isDark ? 'dark' : 'light';
-    document.documentElement.dataset.themePreference = storedPreference;
-    document.documentElement.dataset.theme = resolvedTheme;
-    document.documentElement.style.colorScheme = resolvedTheme;
-  } catch {
-    document.documentElement.dataset.themePreference = 'system';
-    document.documentElement.dataset.theme = 'light';
-    document.documentElement.style.colorScheme = 'light';
-  }
-})();`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -61,13 +35,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: unitsScript }} suppressHydrationWarning />
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} suppressHydrationWarning />
-      </head>
+      <head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <PreferenceInitializer />
         <a href="#main-content" className={`${sharedStyles.srOnly}`}>
           Skip to content
         </a>

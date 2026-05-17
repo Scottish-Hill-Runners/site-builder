@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type { RaceInfo } from '@/types/datatable';
@@ -19,23 +19,43 @@ interface RaceListFilterProps {
 }
 
 const VIEW_STORAGE_KEY = 'shr-race-list-view';
+const VIEW_CHANGE_EVENT = 'shr-race-list-view-change';
+
+type RaceListView = 'list' | 'map';
+
+function getStoredView(): RaceListView {
+  if (typeof window === 'undefined') return 'list';
+  try {
+    const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    return saved === 'map' ? 'map' : 'list';
+  } catch {
+    return 'list';
+  }
+}
+
+function subscribeToStoredView(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const handleChange = () => onStoreChange();
+
+  window.addEventListener('storage', handleChange);
+  window.addEventListener(VIEW_CHANGE_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener('storage', handleChange);
+    window.removeEventListener(VIEW_CHANGE_EVENT, handleChange);
+  };
+}
 
 export default function RaceListFilter({ races, calendar }: RaceListFilterProps) {
   const { imperial } = useUnits();
-  
-  const [view, setView] = useState<'list' | 'map'>(() => {
-    if (typeof window === 'undefined') return 'list';
-    try {
-      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
-      if (saved === 'list' || saved === 'map') return saved;
-    } catch {}
-    return 'list';
-  });
 
-  const handleSetView = (newView: 'list' | 'map') => {
-    setView(newView);
+  const view = useSyncExternalStore(subscribeToStoredView, getStoredView, () => 'list');
+
+  const handleSetView = (newView: RaceListView) => {
     try {
       window.localStorage.setItem(VIEW_STORAGE_KEY, newView);
+      window.dispatchEvent(new Event(VIEW_CHANGE_EVENT));
     } catch {}
   };
 
