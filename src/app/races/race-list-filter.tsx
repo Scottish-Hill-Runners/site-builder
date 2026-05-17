@@ -22,6 +22,29 @@ const VIEW_STORAGE_KEY = 'shr-race-list-view';
 const VIEW_CHANGE_EVENT = 'shr-race-list-view-change';
 
 type RaceListView = 'list' | 'map';
+type DistanceCategory = '' | 'S' | 'M' | 'L';
+type AscentCategory = '' | 'A' | 'B' | 'C';
+
+function matchesDistance(distance: number | undefined, filter: DistanceCategory): boolean {
+  if (!filter) return true;
+  if (distance == null) return false;
+  if (filter === 'S') return distance < 10;
+  if (filter === 'M') return distance >= 10 && distance < 20;
+  return distance >= 20;
+}
+
+function matchesAscent(
+  distance: number | undefined,
+  climb: number | undefined,
+  filter: AscentCategory,
+): boolean {
+  if (!filter) return true;
+  if (distance == null || climb == null || distance === 0) return false;
+  const ratio = climb / distance;
+  if (filter === 'A') return ratio >= 50;
+  if (filter === 'B') return ratio >= 25 && ratio < 50;
+  return ratio >= 20 && ratio < 25;
+}
 
 function getStoredView(): RaceListView {
   if (typeof window === 'undefined') return 'list';
@@ -60,8 +83,37 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
   };
 
   const [query, setQuery] = useState('');
-  const [distanceFilter, setDistanceFilter] = useState('');
-  const [climbFilter, setClimbFilter] = useState('');
+  const [distanceFilter, setDistanceFilter] = useState<DistanceCategory>('');
+  const [climbFilter, setClimbFilter] = useState<AscentCategory>('');
+  const [championshipFilter, setChampionshipFilter] = useState('');
+
+  const championshipOptions = useMemo(() => {
+    const bySlug = new Map<string, string>();
+    calendar.forEach((entry) => {
+      Object.entries(entry.championships ?? {}).forEach(([slug, name]) => {
+        if (!bySlug.has(slug)) {
+          bySlug.set(slug, name);
+        }
+      });
+    });
+
+    return Array.from(bySlug.entries())
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [calendar]);
+
+  const championshipRaceIds = useMemo(() => {
+    if (!championshipFilter) return null;
+
+    const raceIds = new Set<string>();
+    calendar.forEach((entry) => {
+      if (entry.raceId && entry.championships && championshipFilter in entry.championships) {
+        raceIds.add(entry.raceId);
+      }
+    });
+
+    return raceIds;
+  }, [calendar, championshipFilter]);
 
   const filtered = useMemo(() => {
     let result = races;
@@ -75,29 +127,44 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
       });
     }
 
-    if (distanceFilter) {
-      result = result.filter((r) => {
-        if (r.distance == null) return false;
-        if (distanceFilter === 'S') return r.distance < 10;
-        if (distanceFilter === 'M') return r.distance >= 10 && r.distance < 20;
-        if (distanceFilter === 'L') return r.distance >= 20;
-        return true;
-      });
-    }
-
-    if (climbFilter) {
-      result = result.filter((r) => {
-        if (r.climb == null || r.distance == null || r.distance === 0) return false;
-        const ratio = r.climb / r.distance;
-        if (climbFilter === 'A') return ratio >= 50;
-        if (climbFilter === 'B') return ratio >= 25 && ratio < 50;
-        if (climbFilter === 'C') return ratio >= 20 && ratio < 25;
-        return true;
-      });
-    }
+    result = result.filter((r) => {
+      if (!matchesDistance(r.distance, distanceFilter)) return false;
+      if (!matchesAscent(r.distance, r.climb, climbFilter)) return false;
+      if (championshipRaceIds && !championshipRaceIds.has(r.raceId)) return false;
+      return true;
+    });
 
     return result;
-  }, [races, query, distanceFilter, climbFilter]);
+  }, [races, query, distanceFilter, climbFilter, championshipRaceIds]);
+
+  const filteredCalendar = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+
+    return calendar.filter((entry) => {
+      if (needle && !entry.raceName.toLowerCase().includes(needle)) return false;
+      if (!matchesDistance(entry.distance, distanceFilter)) return false;
+      if (!matchesAscent(entry.distance, entry.climb, climbFilter)) return false;
+      if (championshipFilter && !(entry.championships && championshipFilter in entry.championships)) {
+        return false;
+      }
+      return true;
+    });
+  }, [calendar, query, distanceFilter, climbFilter, championshipFilter]);
+
+  const selectedChampionshipName = useMemo(() => {
+    if (!championshipFilter) return null;
+    const match = championshipOptions.find((option) => option.slug === championshipFilter);
+    return match?.name ?? championshipFilter;
+  }, [championshipFilter, championshipOptions]);
+
+  const activeFilters = useMemo(() => {
+    const filters: string[] = [];
+    if (query.trim()) filters.push(`Search: ${query.trim()}`);
+    if (selectedChampionshipName) filters.push(`Championship: ${selectedChampionshipName}`);
+    if (distanceFilter) filters.push(`Distance: ${distanceFilter}`);
+    if (climbFilter) filters.push(`Ascent: ${climbFilter}`);
+    return filters;
+  }, [query, selectedChampionshipName, distanceFilter, climbFilter]);
 
   return (
     <div className="space-y-4">
@@ -124,49 +191,80 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
         </button>
       </div>
 
+      <div className="flex flex-col gap-3">
+        <div>
+          <label htmlFor="race-search" className="sr-only">
+            Search races
+          </label>
+          <input
+            id="race-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or venue…"
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+
+        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-3">
+          <select
+            value={championshipFilter}
+            onChange={(e) => setChampionshipFilter(e.target.value)}
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            aria-label="Filter by championship"
+          >
+            <option value="">All Championships</option>
+            {championshipOptions.map((option) => (
+              <option key={option.slug} value={option.slug}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={distanceFilter}
+            onChange={(e) => setDistanceFilter(e.target.value as DistanceCategory)}
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            aria-label="Filter by distance category"
+          >
+            <option value="">All Distances</option>
+            <option value="S">Category S (Short, &lt; 10 km)</option>
+            <option value="M">Category M (Medium, 10–20 km)</option>
+            <option value="L">Category L (Long, ≥ 20 km)</option>
+          </select>
+
+          <select
+            value={climbFilter}
+            onChange={(e) => setClimbFilter(e.target.value as AscentCategory)}
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            aria-label="Filter by ascent category"
+          >
+            <option value="">All Ascents</option>
+            <option value="A">Category A (50+ m/km)</option>
+            <option value="B">Category B (25–50 m/km)</option>
+            <option value="C">Category C (20–25 m/km)</option>
+          </select>
+        </div>
+
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Active filters
+            </span>
+            {activeFilters.map((filterText) => (
+              <span
+                key={filterText}
+                className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300"
+              >
+                {filterText}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {view === 'list' ? (
         <>
-          <div className="flex flex-col gap-3">
-            <div>
-              <label htmlFor="race-search" className="sr-only">
-                Search races
-              </label>
-              <input
-                id="race-search"
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name or venue…"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-              <select
-                value={distanceFilter}
-                onChange={(e) => setDistanceFilter(e.target.value)}
-                className="w-full sm:w-1/2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                aria-label="Filter by distance category"
-              >
-                <option value="">All Distances</option>
-                <option value="S">Category S (Short, &lt; 10 km)</option>
-                <option value="M">Category M (Medium, 10–20 km)</option>
-                <option value="L">Category L (Long, ≥ 20 km)</option>
-              </select>
-              
-              <select
-                value={climbFilter}
-                onChange={(e) => setClimbFilter(e.target.value)}
-                className="w-full sm:w-1/2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                aria-label="Filter by ascent category"
-              >
-                <option value="">All Ascents</option>
-                <option value="A">Category A (50+ m/km)</option>
-                <option value="B">Category B (25–50 m/km)</option>
-                <option value="C">Category C (20–25 m/km)</option>
-              </select>
-            </div>
-          </div>
 
           {filtered.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-500 dark:text-slate-400">
@@ -195,7 +293,13 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
           )}
         </>
       ) : (
-        <CalendarMap entries={calendar} />
+        filteredCalendar.length === 0 ? (
+          <p className="py-6 text-center text-sm text-gray-500 dark:text-slate-400">
+            No calendar races match your filters.
+          </p>
+        ) : (
+          <CalendarMap entries={filteredCalendar} />
+        )
       )}
     </div>
   );
