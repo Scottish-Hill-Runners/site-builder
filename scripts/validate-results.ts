@@ -32,6 +32,8 @@ const SURNAME_KEYS = ['Surname', 'LastName'];
 const CLUB_KEYS = ['Club'];
 const CATEGORY_KEYS = ['RunnerCategory', 'Category', 'Cat'];
 const TIME_KEYS = ['FinishTime', 'Time'];
+const TEAM_KEYS = ['Team', 'TeamName', 'Group', 'Squad'];
+const LEG_KEYS = ['Leg', 'Stage', 'LegNum', 'LegNumber', 'Section'];
 const ALLOWED_RUNNER_CATEGORIES =
   'F,F40,F50,F60,F65,F70,F75,F80,M,M40,M50,M60,M65,M70,M75,M80,NB,NB40,NB50,NB60,NB65,NB70,NB75,NB80'
     .split(',')
@@ -135,6 +137,8 @@ function validateHeaders(
     (FIRST_NAME_KEYS.some((k) => keys.has(k)) &&
       SURNAME_KEYS.some((k) => keys.has(k)));
   const hasTime = TIME_KEYS.some((k) => keys.has(k));
+  const hasTeam = TEAM_KEYS.some((k) => keys.has(k));
+  const hasLeg = LEG_KEYS.some((k) => keys.has(k));
 
   if (!hasPosition) {
     issues.push({
@@ -180,6 +184,25 @@ function validateHeaders(
       message: `Missing category column (expected one of: ${CATEGORY_KEYS.join(', ')})`,
     });
   }
+
+  // Team/Leg validation: if one is present, warn if the other is missing
+  if (hasTeam && !hasLeg) {
+    issues.push({
+      file: filePath,
+      row: null,
+      level: 'warning',
+      message: `Team column found but no Leg column (expected one of: ${LEG_KEYS.join(', ')})`,
+    });
+  }
+
+  if (hasLeg && !hasTeam) {
+    issues.push({
+      file: filePath,
+      row: null,
+      level: 'warning',
+      message: `Leg column found but no Team column (expected one of: ${TEAM_KEYS.join(', ')})`,
+    });
+  }
 }
 
 function validateTime(time: string): boolean {
@@ -204,6 +227,8 @@ function validateRows(
       `${findValue(row, FIRST_NAME_KEYS)} ${findValue(row, SURNAME_KEYS)}`.trim();
     const time = findValue(row, TIME_KEYS);
     const category = findValue(row, CATEGORY_KEYS);
+    const team = findValue(row, TEAM_KEYS);
+    const leg = findValue(row, LEG_KEYS);
 
     if (!position || Number.isNaN(parseInt(position, 10))) {
       issues.push({
@@ -258,6 +283,38 @@ function validateRows(
           `Unexpected runner category '${category}' ` +
           `(expected one of: ${Array.from(ALLOWED_RUNNER_CATEGORIES).join(', ')})`,
       });
+    }
+
+    // Validate team/leg values if present
+    if (team && !leg) {
+      issues.push({
+        file: filePath,
+        row: rowNumber,
+        level: 'warning',
+        message: `Team '${team}' specified but no leg value`,
+      });
+    }
+
+    if (leg && !team) {
+      issues.push({
+        file: filePath,
+        row: rowNumber,
+        level: 'warning',
+        message: `Leg '${leg}' specified but no team value`,
+      });
+    }
+
+    if (leg && !Number.isNaN(parseInt(leg, 10))) {
+      // Leg is numeric - validate it's a reasonable integer
+      const legNum = parseInt(leg, 10);
+      if (legNum < 1 || legNum > 99) {
+        issues.push({
+          file: filePath,
+          row: rowNumber,
+          level: 'warning',
+          message: `Leg value '${leg}' is outside expected range (1-99)`,
+        });
+      }
     }
   });
 

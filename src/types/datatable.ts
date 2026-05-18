@@ -8,6 +8,10 @@ export interface RaceResult {
   categoryPos: { [cat: string]: number };
   time: string;
   points?: number;
+  /** Optional team name (ephemeral, scoped to race instance). E.g., "Carnethy A". */
+  team?: string;
+  /** Optional leg identifier (numeric or string). E.g., 1, 2, or "Prologue". */
+  leg?: number | string;
 }
 
 export interface ResultsFocusContext {
@@ -33,6 +37,10 @@ export interface RaceInfo {
   web?: string;
   organiser?: number[];
   eras?: Era[];
+  /** Whether this race has team entries (based on Team column in CSV). */
+  hasTeams?: boolean;
+  /** Whether this race has leg/relay entries (based on Leg column in CSV). */
+  hasLegs?: boolean;
 }
 
 export interface RaceData {

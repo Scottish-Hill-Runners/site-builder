@@ -22,6 +22,7 @@ const ElevationProfile = dynamic(
 );
 import remarkGfm from 'remark-gfm';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
+import TeamResultsDataTable from '@/components/TeamResultsDataTable';
 import {
   buildResultsEditUrl,
   getLatestResultYear,
@@ -94,11 +95,34 @@ export default function RaceDetailsTabs({
     } catch {}
     return 'info';
   });
+  const [viewMode, setViewMode] = useState<'individual' | 'team'>(() => {
+    // Auto-detect: if race has teams/legs, default to team view; otherwise individual
+    if (race.hasTeams || race.hasLegs) {
+      try {
+        const saved = window.localStorage.getItem(
+          `raceDetails.resultViewMode.${raceId}`
+        );
+        if (saved === 'individual' || saved === 'team') return saved;
+      } catch {}
+      return 'team';
+    }
+    return 'individual';
+  });
   useEffect(() => {
     try {
       window.localStorage.setItem(TAB_STORAGE_KEY, activeTab);
     } catch {}
   }, [activeTab]);
+  
+  // Persist view mode preference
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        `raceDetails.resultViewMode.${raceId}`,
+        viewMode
+      );
+    } catch {}
+  }, [viewMode, raceId]);
   const [focusedResultContext, setFocusedResultContext] =
     useState<ResultsFocusContext | null>(null);
   const hasRouteAssets = hasGpx || hasRaceMap;
@@ -174,13 +198,49 @@ export default function RaceDetailsTabs({
               </div>
             ) : results.length > 0 ? (
               <div className="space-y-4">
-                <RaceResultsDataTable
-                  data={results}
-                  eras={race.eras}
-                  enableRowFocus
-                  initialYearFilter={initialYearFilter}
-                  onFocusContextChange={setFocusedResultContext}
-                />
+                {/* View mode toggle - only show if race has team/leg data */}
+                {(race.hasTeams || race.hasLegs) && (
+                  <div className="flex gap-2 border-b border-gray-200 pb-4 dark:border-slate-700">
+                    <button
+                      onClick={() => setViewMode('individual')}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        viewMode === 'individual'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      Individual Results
+                    </button>
+                    <button
+                      onClick={() => setViewMode('team')}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        viewMode === 'team'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      Team Results
+                    </button>
+                  </div>
+                )}
+
+                {/* Render appropriate results view */}
+                {viewMode === 'individual' ? (
+                  <RaceResultsDataTable
+                    data={results}
+                    eras={race.eras}
+                    enableRowFocus
+                    initialYearFilter={initialYearFilter}
+                    onFocusContextChange={setFocusedResultContext}
+                  />
+                ) : (
+                  <TeamResultsDataTable
+                    data={results}
+                    showYearFilter
+                    initialYearFilter={initialYearFilter}
+                  />
+                )}
+
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
                   <p className="font-semibold">
                     Spot an error in these results?

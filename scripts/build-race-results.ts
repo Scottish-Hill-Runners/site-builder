@@ -98,6 +98,56 @@ function formatTime(time: string): string {
   return 'n/a'; // Compares less than any hh:mm:ss time.
 }
 
+/**
+ * Normalize team name: trim whitespace, preserve case.
+ * Return undefined if empty or null.
+ */
+function normaliseTeamName(rawTeam: unknown): string | undefined {
+  if (typeof rawTeam !== 'string') return undefined;
+  const team = rawTeam.trim();
+  return team ? team : undefined;
+}
+
+/**
+ * Normalize leg identifier: accept numeric or string.
+ * If numeric string, convert to number; otherwise keep as string.
+ * Return undefined if empty or null.
+ */
+function normaliseLeg(rawLeg: unknown): number | string | undefined {
+  if (typeof rawLeg !== 'string') return undefined;
+  const leg = rawLeg.trim();
+  if (!leg) return undefined;
+  const numLeg = parseInt(leg, 10);
+  if (!isNaN(numLeg)) return numLeg;
+  return leg;
+}
+
+/**
+ * Extract Team column value from a CSV row.
+ * Tries multiple possible column names.
+ */
+function extractTeamColumn(json: Record<string, unknown>): string | undefined {
+  const TEAM_KEYS = ['Team', 'TeamName', 'TeamName', 'Group', 'Squad'];
+  for (const key of TEAM_KEYS) {
+    if (key in json) return normaliseTeamName(json[key]);
+  }
+  return undefined;
+}
+
+/**
+ * Extract Leg column value from a CSV row.
+ * Tries multiple possible column names.
+ */
+function extractLegColumn(
+  json: Record<string, unknown>
+): number | string | undefined {
+  const LEG_KEYS = ['Leg', 'Stage', 'LegNum', 'LegNumber', 'Section'];
+  for (const key of LEG_KEYS) {
+    if (key in json) return normaliseLeg(json[key]);
+  }
+  return undefined;
+}
+
 function normaliseRunnerName(rawName: unknown): string | null {
   if (typeof rawName !== 'string') return null;
 
@@ -227,24 +277,31 @@ async function readRaceInstance(
         )
           .trim()
           .toUpperCase();
-        return [
-          {
-            raceId: raceId,
-            year: path.basename(raceInstancePath, '.csv'),
-            position: parseInt(
-              json.RunnerPosition ??
-                json.FinishPosition ??
-                json.Position ??
-                json.Pos
-            ),
-            name,
-            club:
-              clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club,
-            category: category == '' ? 'M' : category,
-            categoryPos: updateCategoryPos(category),
-            time: formatTime((json.FinishTime ?? json.Time) as string),
-          },
-        ];
+        const team = extractTeamColumn(json as Record<string, unknown>);
+        const leg = extractLegColumn(json as Record<string, unknown>);
+
+        const result: RaceResult = {
+          raceId: raceId,
+          year: path.basename(raceInstancePath, '.csv'),
+          position: parseInt(
+            json.RunnerPosition ??
+              json.FinishPosition ??
+              json.Position ??
+              json.Pos
+          ),
+          name,
+          club:
+            clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club,
+          category: category == '' ? 'M' : category,
+          categoryPos: updateCategoryPos(category),
+          time: formatTime((json.FinishTime ?? json.Time) as string),
+        };
+
+        // Add optional team/leg fields
+        if (team) result.team = team;
+        if (leg !== undefined) result.leg = leg;
+
+        return [result];
       });
     });
 }
@@ -305,6 +362,13 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           hasRaceMap: fs.existsSync(path.join(raceDir, 'race-map.webp')),
         };
         const results = await readRaceResults(raceDir);
+
+        // Detect if race has team/leg data
+        const hasTeams = results.some((r) => r.team !== undefined);
+        const hasLegs = results.some((r) => r.leg !== undefined);
+        if (hasTeams) info.hasTeams = true;
+        if (hasLegs) info.hasLegs = true;
+
         raceMap.set(raceId, { meta, results });
       })
   );
