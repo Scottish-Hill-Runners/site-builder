@@ -319,6 +319,18 @@ async function readRaceResults(raceId: string): Promise<RaceResult[]> {
   ).then((results) => results.flat());
 }
 
+function gpxFirstPoint(gpxXml: string): { latitude: number; longitude: number } | undefined {
+  const m = /<trkpt\b([^>]*)>/.exec(gpxXml);
+  if (!m) return undefined;
+  const latM = /\blat="([^"]+)"/.exec(m[1]);
+  const lonM = /\blon="([^"]+)"/.exec(m[1]);
+  if (!latM || !lonM) return undefined;
+  const latitude = parseFloat(latM[1]);
+  const longitude = parseFloat(lonM[1]);
+  if (!isFinite(latitude) || !isFinite(longitude)) return undefined;
+  return { latitude, longitude };
+}
+
 async function readResults(): Promise<Map<string, RaceEntry>> {
   const racesDir = contentPath('races');
   const encoder = new TextEncoder();
@@ -349,16 +361,21 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
             : undefined,
           eras: parseEras(data.eras as string | undefined),
         };
+        const gpxPath = path.join(raceDir, 'route.gpx');
+        const hasGpx = fs.existsSync(gpxPath);
+        const gpxPoint = hasGpx ? gpxFirstPoint(fs.readFileSync(gpxPath, 'utf-8')) : undefined;
         const meta: RaceMeta = {
           info,
           content,
           latitude:
-            data.latitude !== undefined ? parseFloat(data.latitude) : undefined,
+            gpxPoint?.latitude ??
+            (data.latitude !== undefined ? parseFloat(data.latitude) : undefined),
           longitude:
-            data.longitude !== undefined
+            gpxPoint?.longitude ??
+            (data.longitude !== undefined
               ? parseFloat(data.longitude)
-              : undefined,
-          hasGpx: fs.existsSync(path.join(raceDir, 'route.gpx')),
+              : undefined),
+          hasGpx,
           hasRaceMap: fs.existsSync(path.join(raceDir, 'race-map.webp')),
         };
         const results = await readRaceResults(raceDir);
