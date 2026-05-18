@@ -205,7 +205,7 @@ export function aggregateTeamResults(
   for (const result of results) {
     if (!result.team) continue; // Skip non-team results
 
-    const teamKey = `${result.raceId}|${result.year}|${result.team}`;
+    const teamKey = `${result.raceId}|${result.year}|${result.position}|${result.team}`;
 
     if (!teamMap.has(teamKey)) {
       teamMap.set(teamKey, {
@@ -291,12 +291,40 @@ export function aggregateTeamResults(
     teamResult.hasIncomplete = hasIncomplete || totalIncomplete;
   }
 
+  // Second pass: determine expected legs per race and flag teams with missing
+  // leg times as DNC (they sort after all complete teams).
+  if (hasAnyLegData) {
+    const raceLegSets = new Map<string, Set<number | string>>();
+    for (const [key, teamResult] of teamMap.entries()) {
+      const raceKey = key.split('|').slice(0, 2).join('|');
+      if (!raceLegSets.has(raceKey)) raceLegSets.set(raceKey, new Set());
+      for (const leg of teamResult.sortedLegs) {
+        raceLegSets.get(raceKey)!.add(leg);
+      }
+    }
+
+    for (const [key, teamResult] of teamMap.entries()) {
+      const raceKey = key.split('|').slice(0, 2).join('|');
+      const expectedLegs = raceLegSets.get(raceKey)!;
+      const hasMissingLeg = Array.from(expectedLegs).some(
+        (leg) => !teamResult.legResults.has(leg)
+      );
+      const hasMissingLegTime = Array.from(teamResult.legResults.values()).some(
+        (lr) => lr.time === 'n/a'
+      );
+      if (hasMissingLeg || hasMissingLegTime) {
+        teamResult.totalTime = 'DNC';
+        teamResult.hasIncomplete = true;
+      }
+    }
+  }
+
   return teamMap;
 }
 
 /**
  * Convert aggregated team results into a sorted array for display.
- * Sorts by total time (fastest first), with 'n/a' times at the end.
+ * Sorts by total time (fastest first), with DNC / 'n/a' times at the end.
  */
 export function sortAggregatedTeams(
   teamMap: Map<string, AggregatedTeamResult>

@@ -10,6 +10,7 @@ import {
 import {
   aggregateTeamResults,
   sortAggregatedTeams,
+  timeToSeconds,
 } from '@/lib/team-results-aggregator';
 
 interface TeamResultsDataTableProps {
@@ -116,16 +117,15 @@ export default function TeamResultsDataTable({
           sortDirection === 'asc'
             ? aYear.localeCompare(bYear)
             : bYear.localeCompare(aYear);
-      } else if (primaryCol === 'team' || primaryCol === 'totalTime') {
-        const aVal: string | number = a[primaryCol];
-        const bVal: string | number = b[primaryCol];
-
-        if (typeof aVal === 'string' && typeof bVal === 'string') {
-          comparison =
-            sortDirection === 'asc'
-              ? aVal.localeCompare(bVal)
-              : bVal.localeCompare(aVal);
-        }
+      } else if (primaryCol === 'totalTime') {
+        const aSeconds = timeToSeconds(a.totalTime);
+        const bSeconds = timeToSeconds(b.totalTime);
+        comparison = sortDirection === 'asc' ? aSeconds - bSeconds : bSeconds - aSeconds;
+      } else if (primaryCol === 'team') {
+        comparison =
+          sortDirection === 'asc'
+            ? a.team.localeCompare(b.team)
+            : b.team.localeCompare(a.team);
       }
 
       return comparison;
