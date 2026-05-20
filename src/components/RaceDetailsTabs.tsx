@@ -35,6 +35,14 @@ import type {
   ResultsFocusContext,
 } from '@/types/datatable';
 
+interface RaceImageProp {
+  sourcePath: string;
+  imageUrl: string;
+  caption?: string;
+  year?: number;
+  tags?: string[];
+}
+
 interface RaceDetailsTabsProps {
   raceId: string;
   race: RaceInfo;
@@ -43,8 +51,8 @@ interface RaceDetailsTabsProps {
   hasRaceMap: boolean;
   results: RaceResult[];
   resultsError: string | null;
-  heroImage: { sourcePath: string; imageUrl: string } | null;
-  galleryImages: Array<{ sourcePath: string; imageUrl: string }>;
+  heroImages: RaceImageProp[];
+  galleryImages: RaceImageProp[];
   initialTab?: TabKey;
   initialYearFilter?: string;
 }
@@ -67,7 +75,7 @@ export default function RaceDetailsTabs({
   hasRaceMap,
   results,
   resultsError,
-  heroImage,
+  heroImages,
   galleryImages,
   initialTab,
   initialYearFilter = '',
@@ -125,8 +133,38 @@ export default function RaceDetailsTabs({
   }, [viewMode, raceId]);
   const [focusedResultContext, setFocusedResultContext] =
     useState<ResultsFocusContext | null>(null);
+  const [heroImage] = useState<RaceImageProp | null>(() =>
+    heroImages.length > 0
+      ? heroImages[Math.floor(Math.random() * heroImages.length)]
+      : null
+  );
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const hasRouteAssets = hasGpx || hasRaceMap;
   const hasGallery = galleryImages.length > 0;
+  const allTags = [
+    ...new Set(galleryImages.flatMap((img) => img.tags ?? [])),
+  ].sort();
+  const filteredImages =
+    activeTags.size === 0
+      ? galleryImages
+      : galleryImages.filter((img) => img.tags?.some((t) => activeTags.has(t)));
+  const yearMap = new Map<number | null, RaceImageProp[]>();
+  for (const img of filteredImages) {
+    const y = img.year ?? null;
+    if (!yearMap.has(y)) yearMap.set(y, []);
+    yearMap.get(y)!.push(img);
+  }
+  const imagesByYear = [...yearMap.keys()]
+    .sort((a, b) => (a === null ? 1 : b === null ? -1 : b - a))
+    .map((year) => ({ year, images: yearMap.get(year)! }));
+  function toggleTag(tag: string) {
+    setActiveTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  }
   const pageDefaultYear = useMemo(
     () => getLatestResultYear(results),
     [results]
@@ -292,7 +330,7 @@ export default function RaceDetailsTabs({
               <figure className="overflow-hidden rounded-xl border border-gray-200 bg-gray-100 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <Image
                   src={heroImage.imageUrl}
-                  alt={`${race.title} hero image: ${filenameToAltText(heroImage.sourcePath)}`}
+                  alt={heroImage.caption ?? `${race.title}: ${filenameToAltText(heroImage.sourcePath)}`}
                   width={1600}
                   height={900}
                   sizes="(min-width: 1024px) 900px, 100vw"
@@ -403,31 +441,73 @@ export default function RaceDetailsTabs({
             role="tabpanel"
             id="race-tab-panel-gallery"
             aria-labelledby="race-tab-gallery"
-            className="space-y-3"
+            className="space-y-4"
           >
-            <p className="text-sm text-gray-700 dark:text-slate-300">
-              Photos from {race.title}.
-            </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {galleryImages.map((image, index) => (
-                <figure
-                  key={`${image.sourcePath}-${index}`}
-                  className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-800"
-                >
-                  <Image
-                    src={image.imageUrl}
-                    alt={`${race.title} gallery image ${index + 1}: ${filenameToAltText(image.sourcePath)}`}
-                    width={800}
-                    height={600}
-                    sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                    unoptimized
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="h-48 w-full object-cover"
-                  />
-                </figure>
-              ))}
-            </div>
+            {allTags.length > 0 && (
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label="Filter by tag"
+              >
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    aria-pressed={activeTags.has(tag)}
+                    className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                      activeTags.has(tag)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
+            {filteredImages.length === 0 ? (
+              <p className="text-sm text-gray-600 dark:text-slate-300">
+                No photos match the selected tags.
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {imagesByYear.map(({ year, images }) => (
+                  <div key={year ?? 'other'}>
+                    {(year !== null || imagesByYear.length > 1) && (
+                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                        {year ?? 'Other'}
+                      </h3>
+                    )}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {images.map((image, index) => (
+                        <figure
+                          key={`${image.sourcePath}-${index}`}
+                          className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          <Image
+                            src={image.imageUrl}
+                            alt={image.caption ?? filenameToAltText(image.sourcePath)}
+                            width={800}
+                            height={600}
+                            sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+                            unoptimized
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="h-48 w-full object-cover"
+                          />
+                          {image.caption && (
+                            <figcaption className="px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
+                              {image.caption}
+                            </figcaption>
+                          )}
+                        </figure>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

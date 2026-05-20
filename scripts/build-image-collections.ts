@@ -16,8 +16,8 @@ interface SourceImageItem {
 }
 
 interface SourceRaceImagesFile {
-  hero?: Array<{ path: string }>;
-  gallery?: Array<{ path: string }>;
+  hero?: Array<{ path: string; caption?: string; year?: number; tags?: string[] }>;
+  gallery?: Array<{ path: string; caption?: string; year?: number; tags?: string[] }>;
 }
 
 interface SourceHomepageFile {

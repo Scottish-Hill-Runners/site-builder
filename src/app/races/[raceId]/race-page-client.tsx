@@ -5,14 +5,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import RaceDetailsTabs from '@/components/RaceDetailsTabs';
 import { fetchJsonWithApiFallback } from '@/lib/client-results-fetch';
+import type { RaceImagesBySlugEntry } from '@/lib/imageCollections';
 import type { RaceData } from '@/types/datatable';
 
 interface RacePageClientProps {
   raceId: string;
-  raceImages: {
-    hero: Array<{ sourcePath: string; imageUrl: string }>;
-    gallery: Array<{ sourcePath: string; imageUrl: string }>;
-  } | null;
+  raceImages: RaceImagesBySlugEntry | null;
 }
 
 export default function RacePageClient({
@@ -148,7 +146,7 @@ export default function RacePageClient({
               hasRaceMap={Boolean(data.hasRaceMap)}
               results={data.results}
               resultsError={null}
-              heroImage={raceImages?.hero?.[0] ?? null}
+              heroImages={raceImages?.hero ?? []}
               galleryImages={raceImages?.gallery ?? []}
               initialTab={initialTab}
               initialYearFilter={initialYearFilter}

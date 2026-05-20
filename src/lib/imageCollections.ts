@@ -16,6 +16,9 @@ export interface RaceImageItem {
   path: string;
   sourcePath: string;
   imageUrl: string;
+  caption?: string;
+  year?: number;
+  tags?: string[];
 }
 
 export interface RaceImagesBySlugEntry {
