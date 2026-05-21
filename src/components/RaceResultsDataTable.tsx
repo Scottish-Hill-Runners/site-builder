@@ -40,6 +40,10 @@ type SortColumn =
   | null;
 type SortDirection = 'asc' | 'desc';
 
+type YearVirtualItem =
+  | { type: 'row'; data: RaceResult; dataIndex: number }
+  | { type: 'year-header'; year: string; count: number };
+
 interface Filters {
   year: string;
   name: string;
@@ -112,6 +116,12 @@ export default function RaceResultsDataTable({
   });
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const theadRef = useRef<HTMLTableSectionElement>(null);
+  const [theadHeight, setTheadHeight] = useState(0);
+  const [stickyHeader, setStickyHeader] = useState<{
+    year: string;
+    count: number;
+  } | null>(null);
 
   const getRowKey = (row: RaceResult) =>
     [row.raceId, row.year, row.position, row.name, row.time].join('|');
@@ -223,6 +233,54 @@ export default function RaceResultsDataTable({
     races,
     eras,
   ]);
+  const effectiveSortColumn = sortColumn ?? 'year';
+
+  const virtualItemList = useMemo((): YearVirtualItem[] => {
+    if (effectiveSortColumn !== 'year') {
+      return processedData.map((data, dataIndex) => ({
+        type: 'row' as const,
+        data,
+        dataIndex,
+      }));
+    }
+    const yearCounts: Record<string, number> = {};
+    for (const row of processedData) {
+      const y = row.year.substring(0, 4);
+      yearCounts[y] = (yearCounts[y] ?? 0) + 1;
+    }
+    const items: YearVirtualItem[] = [];
+    let lastYear: string | null = null;
+    for (let i = 0; i < processedData.length; i++) {
+      const row = processedData[i];
+      const year = row.year.substring(0, 4);
+      if (year !== lastYear) {
+        items.push({ type: 'year-header', year, count: yearCounts[year] });
+        lastYear = year;
+      }
+      items.push({ type: 'row', data: row, dataIndex: i });
+    }
+    return items;
+  }, [processedData, effectiveSortColumn]);
+
+  // Pre-compute the scroll offset of each year-header so the scroll listener
+  // can determine which year is currently "behind" the sticky column header.
+  // Formula: a year-header at offset `start` (with height 36) has fully scrolled
+  // behind the sticky thead when scrollTop >= start + 36.
+  const yearHeaderPositions = useMemo((): Array<{
+    year: string;
+    start: number;
+    count: number;
+  }> => {
+    const positions: Array<{ year: string; start: number; count: number }> = [];
+    let offset = 0;
+    for (const item of virtualItemList) {
+      if (item.type === 'year-header') {
+        positions.push({ year: item.year, start: offset, count: item.count });
+      }
+      offset += item.type === 'year-header' ? 36 : 52;
+    }
+    return positions;
+  }, [virtualItemList]);
 
   // Reset scroll position when filters/sort change
   useEffect(() => {
@@ -379,10 +437,42 @@ export default function RaceResultsDataTable({
     onFocusContextChange(activeFocusContext);
   }, [activeFocusContext, onFocusContextChange]);
 
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const update = () => {
+      const scrollTop = el.scrollTop;
+      let current: { year: string; count: number } | null = null;
+      for (const { year, start, count } of yearHeaderPositions) {
+        if (scrollTop >= start + 36) {
+          current = { year, count };
+        } else {
+          break;
+        }
+      }
+      setStickyHeader(current);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    return () => el.removeEventListener('scroll', update);
+  }, [yearHeaderPositions]);
+
+  useEffect(() => {
+    const el = theadRef.current;
+    if (!el) return;
+    setTheadHeight(el.offsetHeight);
+    const observer = new ResizeObserver(() => {
+      setTheadHeight(el.offsetHeight);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const rowVirtualizer = useVirtualizer({
-    count: processedData.length,
+    count: virtualItemList.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 52,
+    estimateSize: (index) =>
+      virtualItemList[index].type === 'year-header' ? 36 : 52,
     overscan: 5,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
@@ -529,8 +619,30 @@ export default function RaceResultsDataTable({
             className="max-h-screen overflow-y-auto"
             ref={scrollContainerRef}
           >
+            {stickyHeader !== null && (
+              <div
+                style={{
+                  position: 'sticky',
+                  top: theadHeight,
+                  height: 36,
+                  marginBottom: -36,
+                  zIndex: 15,
+                  pointerEvents: 'none',
+                }}
+                className="flex items-center border-b-2 border-gray-300 bg-gray-100 px-2 sm:px-6 dark:border-slate-700 dark:bg-slate-800"
+                aria-hidden
+              >
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-slate-300">
+                  {stickyHeader.year}
+                </span>
+                <span className="ml-2 text-xs text-gray-400 dark:text-slate-500">
+                  — {stickyHeader.count} result
+                  {stickyHeader.count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
             <table className="w-full border-collapse bg-white dark:bg-slate-900">
-              <thead>
+              <thead ref={theadRef}>
                 <tr className="sticky top-0 border-b-2 border-gray-300 bg-gray-100 dark:border-slate-700 dark:bg-slate-800">
                   {showRaceColumn && (
                     <th
@@ -637,12 +749,33 @@ export default function RaceResultsDataTable({
                       </tr>
                     )}
                     {virtualItems.map((virtualRow) => {
-                      const row = processedData[virtualRow.index];
+                      const item = virtualItemList[virtualRow.index];
+                      if (item.type === 'year-header') {
+                        return (
+                          <tr
+                            key={virtualRow.key}
+                            className="border-b-2 border-gray-300 bg-gray-100 dark:border-slate-700 dark:bg-slate-800"
+                          >
+                            <td
+                              colSpan={showPointsColumn ? 7 : 6}
+                              className="px-2 py-2 sm:px-6"
+                            >
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-slate-300">
+                                {item.year}
+                              </span>
+                              <span className="ml-2 text-xs text-gray-400 dark:text-slate-500">
+                                — {item.count} result{item.count !== 1 ? 's' : ''}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      const row = item.data;
                       const rowKey = getRowKey(row);
                       const isSelected =
                         enableRowFocus && selectedRowKey === rowKey;
                       const zebraTone =
-                        virtualRow.index % 2 === 0
+                        item.dataIndex % 2 === 0
                           ? 'bg-white dark:bg-slate-900'
                           : 'bg-gray-50 dark:bg-slate-950';
                       return (
