@@ -48,12 +48,15 @@ export default function NewsList({ items }: NewsListProps) {
                     day: 'numeric',
                   })}
                 </time>
-                <h3 className="mt-1 text-lg font-semibold leading-tight text-gray-900 dark:text-slate-50">
-                  {item.title}
-                </h3>
-                <p className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-slate-300">
-                  {item.excerpt}
-                </p>
+                {expandedId !== item.slug &&
+                <div>
+                  <h3 className="mt-1 text-lg font-semibold leading-tight text-gray-900 dark:text-slate-50">
+                    {item.title}
+                  </h3>                 
+                  <p className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-slate-300">
+                    {item.excerpt}
+                  </p>
+                </div>}
               </div>
               <div className="ml-4 flex-shrink-0 flex items-center">
                 <span
