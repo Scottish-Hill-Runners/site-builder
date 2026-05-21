@@ -515,7 +515,7 @@ export default function CalendarPageClient() {
                             <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
                               {entry.raceId ? (
                                 <Link
-                                  href={`/races/${encodeURIComponent(entry.raceId)}`}
+                                  href={`/races/${encodeURIComponent(entry.raceId)}${pastRace ? `?year=${parseRaceDate(entry.Date)!.getFullYear()}` : ''}`}
                                   className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                   {entry.raceName}
