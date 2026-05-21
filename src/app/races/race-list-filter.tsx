@@ -7,6 +7,7 @@ import type { RaceInfo } from '@/types/datatable';
 import type { CalendarEntry } from '@/lib/results-data';
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';
+import HighlightBar from '@/app/calendar/HighlightBar';
 
 const CalendarMap = dynamic(() => import('@/components/CalendarMap'), {
   loading: () => <div className="h-[600px] w-full animate-pulse bg-gray-200 dark:bg-slate-800 rounded-xl" />,
@@ -22,28 +23,51 @@ const VIEW_STORAGE_KEY = 'shr-race-list-view';
 const VIEW_CHANGE_EVENT = 'shr-race-list-view-change';
 
 type RaceListView = 'list' | 'map';
-type DistanceCategory = '' | 'S' | 'M' | 'L';
-type AscentCategory = '' | 'A' | 'B' | 'C';
 
-function matchesDistance(distance: number | undefined, filter: DistanceCategory): boolean {
-  if (!filter) return true;
-  if (distance == null) return false;
-  if (filter === 'S') return distance < 10;
-  if (filter === 'M') return distance >= 10 && distance < 20;
-  return distance >= 20;
-}
-
-function matchesAscent(
-  distance: number | undefined,
-  climb: number | undefined,
-  filter: AscentCategory,
+function matchesHighlights(
+  entry: { distance?: number; climb?: number; championships?: Record<string, string> },
+  active: Set<string>,
 ): boolean {
-  if (!filter) return true;
-  if (distance == null || climb == null || distance === 0) return false;
-  const ratio = climb / distance;
-  if (filter === 'A') return ratio >= 50;
-  if (filter === 'B') return ratio >= 25 && ratio < 50;
-  return ratio >= 20 && ratio < 25;
+  if (active.size === 0) return true;
+
+  const champKeys = [...active].filter((k) => k.startsWith('champ:'));
+  if (champKeys.length > 0) {
+    const entryChamps = Object.keys(entry.championships ?? {});
+    if (!champKeys.some((k) => entryChamps.includes(k.slice(6)))) return false;
+  }
+
+  const distKeys = [...active].filter((k) => k.startsWith('dist:'));
+  if (distKeys.length > 0) {
+    const d = entry.distance;
+    const matches = distKeys.some((k) => {
+      if (d === undefined) return false;
+      const cat = k.slice(5);
+      if (cat === 'S') return d < 10;
+      if (cat === 'M') return d >= 10 && d < 20;
+      if (cat === 'L') return d >= 20;
+      return false;
+    });
+    if (!matches) return false;
+  }
+
+  const ascKeys = [...active].filter((k) => k.startsWith('asc:'));
+  if (ascKeys.length > 0) {
+    const ratio =
+      entry.climb !== undefined && entry.distance !== undefined && entry.distance > 0
+        ? entry.climb / entry.distance
+        : undefined;
+    const matches = ascKeys.some((k) => {
+      if (ratio === undefined) return false;
+      const cat = k.slice(4);
+      if (cat === 'A') return ratio >= 50;
+      if (cat === 'B') return ratio >= 25 && ratio < 50;
+      if (cat === 'C') return ratio >= 20 && ratio < 25;
+      return false;
+    });
+    if (!matches) return false;
+  }
+
+  return true;
 }
 
 function getStoredView(): RaceListView {
@@ -83,37 +107,41 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
   };
 
   const [query, setQuery] = useState('');
-  const [distanceFilter, setDistanceFilter] = useState<DistanceCategory>('');
-  const [climbFilter, setClimbFilter] = useState<AscentCategory>('');
-  const [championshipFilter, setChampionshipFilter] = useState('');
+  const [activeHighlights, setActiveHighlights] = useState<Set<string>>(new Set());
+
+  const toggleHighlight = (key: string) => {
+    setActiveHighlights((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const clearHighlights = () => setActiveHighlights(new Set());
 
   const championshipOptions = useMemo(() => {
     const bySlug = new Map<string, string>();
     calendar.forEach((entry) => {
-      Object.entries(entry.championships ?? {}).forEach(([slug, name]) => {
-        if (!bySlug.has(slug)) {
-          bySlug.set(slug, name);
-        }
+      Object.entries(entry.championships ?? {}).forEach(([slug, title]) => {
+        if (!bySlug.has(slug)) bySlug.set(slug, title);
       });
     });
-
     return Array.from(bySlug.entries())
-      .map(([slug, name]) => ({ slug, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .map(([slug, title]) => ({ slug, title }))
+      .sort((a, b) => a.title.localeCompare(b.title));
   }, [calendar]);
 
-  const championshipRaceIds = useMemo(() => {
-    if (!championshipFilter) return null;
-
-    const raceIds = new Set<string>();
+  // Map raceId → championship slugs so we can filter the race list by championship.
+  const raceChampionships = useMemo(() => {
+    const map = new Map<string, Record<string, string>>();
     calendar.forEach((entry) => {
-      if (entry.raceId && entry.championships && championshipFilter in entry.championships) {
-        raceIds.add(entry.raceId);
+      if (entry.raceId && entry.championships) {
+        map.set(entry.raceId, entry.championships);
       }
     });
-
-    return raceIds;
-  }, [calendar, championshipFilter]);
+    return map;
+  }, [calendar]);
 
   const filtered = useMemo(() => {
     let result = races;
@@ -127,44 +155,23 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
       });
     }
 
-    result = result.filter((r) => {
-      if (!matchesDistance(r.distance, distanceFilter)) return false;
-      if (!matchesAscent(r.distance, r.climb, climbFilter)) return false;
-      if (championshipRaceIds && !championshipRaceIds.has(r.raceId)) return false;
-      return true;
-    });
+    result = result.filter((r) =>
+      matchesHighlights(
+        { distance: r.distance, climb: r.climb, championships: raceChampionships.get(r.raceId) },
+        activeHighlights,
+      )
+    );
 
     return result;
-  }, [races, query, distanceFilter, climbFilter, championshipRaceIds]);
+  }, [races, query, activeHighlights, raceChampionships]);
 
   const filteredCalendar = useMemo(() => {
     const needle = query.trim().toLowerCase();
-
     return calendar.filter((entry) => {
       if (needle && !entry.raceName.toLowerCase().includes(needle)) return false;
-      if (!matchesDistance(entry.distance, distanceFilter)) return false;
-      if (!matchesAscent(entry.distance, entry.climb, climbFilter)) return false;
-      if (championshipFilter && !(entry.championships && championshipFilter in entry.championships)) {
-        return false;
-      }
-      return true;
+      return matchesHighlights(entry, activeHighlights);
     });
-  }, [calendar, query, distanceFilter, climbFilter, championshipFilter]);
-
-  const selectedChampionshipName = useMemo(() => {
-    if (!championshipFilter) return null;
-    const match = championshipOptions.find((option) => option.slug === championshipFilter);
-    return match?.name ?? championshipFilter;
-  }, [championshipFilter, championshipOptions]);
-
-  const activeFilters = useMemo(() => {
-    const filters: string[] = [];
-    if (query.trim()) filters.push(`Search: ${query.trim()}`);
-    if (selectedChampionshipName) filters.push(`Championship: ${selectedChampionshipName}`);
-    if (distanceFilter) filters.push(`Distance: ${distanceFilter}`);
-    if (climbFilter) filters.push(`Ascent: ${climbFilter}`);
-    return filters;
-  }, [query, selectedChampionshipName, distanceFilter, climbFilter]);
+  }, [calendar, query, activeHighlights]);
 
   return (
     <div className="space-y-4">
@@ -206,61 +213,12 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
           />
         </div>
 
-        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-3">
-          <select
-            value={championshipFilter}
-            onChange={(e) => setChampionshipFilter(e.target.value)}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            aria-label="Filter by championship"
-          >
-            <option value="">All Championships</option>
-            {championshipOptions.map((option) => (
-              <option key={option.slug} value={option.slug}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={distanceFilter}
-            onChange={(e) => setDistanceFilter(e.target.value as DistanceCategory)}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            aria-label="Filter by distance category"
-          >
-            <option value="">All Distances</option>
-            <option value="S">Category S (Short, &lt; 10 km)</option>
-            <option value="M">Category M (Medium, 10–20 km)</option>
-            <option value="L">Category L (Long, ≥ 20 km)</option>
-          </select>
-
-          <select
-            value={climbFilter}
-            onChange={(e) => setClimbFilter(e.target.value as AscentCategory)}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            aria-label="Filter by ascent category"
-          >
-            <option value="">All Ascents</option>
-            <option value="A">Category A (50+ m/km)</option>
-            <option value="B">Category B (25–50 m/km)</option>
-            <option value="C">Category C (20–25 m/km)</option>
-          </select>
-        </div>
-
-        {activeFilters.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Active filters
-            </span>
-            {activeFilters.map((filterText) => (
-              <span
-                key={filterText}
-                className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300"
-              >
-                {filterText}
-              </span>
-            ))}
-          </div>
-        )}
+        <HighlightBar
+          championships={championshipOptions}
+          active={activeHighlights}
+          onToggle={toggleHighlight}
+          onClear={clearHighlights}
+        />
       </div>
 
       {view === 'list' ? (
