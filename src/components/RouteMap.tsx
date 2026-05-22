@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { gpx } from '@tmcw/togeojson';
 import type { GeoJSON } from 'geojson';
 
 interface RouteMapProps {
@@ -15,7 +14,87 @@ interface LngLat {
   lat: number;
 }
 
+interface CheckpointProperties {
+  type: 'checkpoint';
+  name?: string;
+  cutoff?: string;
+  notes?: string;
+}
+
 function getBounds(geojson: GeoJSON): maplibregl.LngLatBoundsLike | null {
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+  function expand(lng: number, lat: number) {
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
+  }
+  function collect(obj: GeoJSON) {
+    if (obj.type === 'FeatureCollection') {
+      obj.features.forEach(collect);
+    } else if (obj.type === 'Feature') {
+      collect(obj.geometry);
+    } else if (obj.type === 'LineString') {
+      obj.coordinates.forEach((c) => expand(c[0], c[1]));
+    } else if (obj.type === 'MultiLineString') {
+      obj.coordinates.forEach((line) => line.forEach((c) => expand(c[0], c[1])));
+    } else if (obj.type === 'GeometryCollection') {
+      obj.geometries.forEach(collect);
+    }
+  }
+  collect(geojson);
+  if (minLng === Infinity) return null;
+  return [
+    [minLng, minLat],
+    [maxLng, maxLat],
+  ];
+}
+
+function getEndpoints(geojson: GeoJSON): {
+  start: LngLat | null;
+  end: LngLat | null;
+} {
+  let start: LngLat | null = null;
+  let end: LngLat | null = null;
+  function visit(c: number[]) {
+    if (!start) start = { lng: c[0], lat: c[1] };
+    end = { lng: c[0], lat: c[1] };
+  }
+  function collect(obj: GeoJSON) {
+    if (obj.type === 'FeatureCollection') {
+      obj.features.forEach(collect);
+    } else if (obj.type === 'Feature') {
+      collect(obj.geometry);
+    } else if (obj.type === 'LineString') {
+      obj.coordinates.forEach(visit);
+    } else if (obj.type === 'MultiLineString') {
+      obj.coordinates.forEach((line) => line.forEach(visit));
+    } else if (obj.type === 'GeometryCollection') {
+      obj.geometries.forEach(collect);
+    }
+  }
+  collect(geojson);
+  return { start, end };
+}
+
+function createMarkerEl(label: string, color: string): HTMLElement {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    width: 28px; height: 28px; border-radius: 50%;
+    background: ${color}; border: 3px solid white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    cursor: default; user-select: none;
+  `;
+  el.textContent = label;
+  return el;
+}
+
+function getAllCoordinates(geojson: GeoJSON): [number, number][] {
   const coords: [number, number][] = [];
   function collect(obj: GeoJSON) {
     if (obj.type === 'FeatureCollection') {
@@ -33,68 +112,60 @@ function getBounds(geojson: GeoJSON): maplibregl.LngLatBoundsLike | null {
     }
   }
   collect(geojson);
-  if (coords.length === 0) return null;
-  let minLng = Infinity;
-  let minLat = Infinity;
-  let maxLng = -Infinity;
-  let maxLat = -Infinity;
-
-  for (const [lng, lat] of coords) {
-    if (lng < minLng) minLng = lng;
-    if (lat < minLat) minLat = lat;
-    if (lng > maxLng) maxLng = lng;
-    if (lat > maxLat) maxLat = lat;
-  }
-
-  return [
-    [minLng, minLat],
-    [maxLng, maxLat],
-  ];
+  return coords;
 }
 
-function getEndpoints(geojson: GeoJSON): {
-  start: LngLat | null;
-  end: LngLat | null;
-} {
-  const lines: [number, number][][] = [];
-  function collect(obj: GeoJSON) {
-    if (obj.type === 'FeatureCollection') {
-      obj.features.forEach(collect);
-    } else if (obj.type === 'Feature') {
-      collect(obj.geometry);
-    } else if (obj.type === 'LineString') {
-      lines.push(obj.coordinates.map((c) => [c[0], c[1]]));
-    } else if (obj.type === 'MultiLineString') {
-      obj.coordinates.forEach((line) =>
-        lines.push(line.map((c) => [c[0], c[1]]))
-      );
-    } else if (obj.type === 'GeometryCollection') {
-      obj.geometries.forEach(collect);
-    }
-  }
-  collect(geojson);
-  const allCoords = lines.flat();
-  if (allCoords.length === 0) return { start: null, end: null };
-  const first = allCoords[0];
-  const last = allCoords[allCoords.length - 1];
-  return {
-    start: { lng: first[0], lat: first[1] },
-    end: { lng: last[0], lat: last[1] },
-  };
+function haversineMetres(a: [number, number], b: [number, number]): number {
+  const R = 6_371_000;
+  const lat1 = (a[1] * Math.PI) / 180;
+  const lat2 = (b[1] * Math.PI) / 180;
+  const dLat = ((b[1] - a[1]) * Math.PI) / 180;
+  const dLng = ((b[0] - a[0]) * Math.PI) / 180;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
 }
 
-function createMarkerEl(label: string, color: string): HTMLElement {
-  const el = document.createElement('div');
-  el.style.cssText = `
-    width: 28px; height: 28px; border-radius: 50%;
-    background: ${color}; border: 3px solid white;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; color: white;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
-    cursor: default; user-select: none;
-  `;
-  el.textContent = label;
-  return el;
+function buildCumulativeDistances(coords: [number, number][]): number[] {
+  const cumDists = [0];
+  for (let i = 1; i < coords.length; i++) {
+    cumDists.push(cumDists[i - 1] + haversineMetres(coords[i - 1], coords[i]));
+  }
+  return cumDists;
+}
+
+function sampleRoute(
+  coords: [number, number][],
+  cumDists: number[],
+  totalDist: number,
+  t: number,
+): [number, number] {
+  const target = Math.min(t * totalDist, totalDist);
+  let lo = 0;
+  let hi = cumDists.length - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (cumDists[mid] <= target) lo = mid;
+    else hi = mid;
+  }
+  const segLen = cumDists[hi] - cumDists[lo];
+  if (segLen === 0) return coords[lo];
+  const frac = (target - cumDists[lo]) / segLen;
+  const a = coords[lo];
+  const b = coords[hi];
+  return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
+}
+
+function bearingDeg(a: [number, number], b: [number, number]): number {
+  const lat1 = (a[1] * Math.PI) / 180;
+  const lat2 = (b[1] * Math.PI) / 180;
+  const dLng = ((b[0] - a[0]) * Math.PI) / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
 export default function RouteMap({ raceId, raceName }: RouteMapProps) {
@@ -117,23 +188,18 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
 
     async function init() {
       try {
-        // Fetch and parse GPX
-        const gpxUrl = `/results/${encodeURIComponent(raceId)}.gpx`;
-        const res = await fetch(gpxUrl);
+        // Fetch GeoJSON route
+        const geojsonUrl = `/results/${encodeURIComponent(raceId)}.geojson`;
+        const res = await fetch(geojsonUrl);
         if (cancelled) return;
-        if (!res.ok) throw new Error(`GPX file not found (${res.status})`);
-        const xmlText = await res.text();
+        if (!res.ok) throw new Error(`Route file not found (${res.status})`);
+        const geojson = (await res.json()) as GeoJSON;
         if (cancelled) return;
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
-        const parseErr = xmlDoc.querySelector('parsererror');
-        if (parseErr) throw new Error('GPX file could not be parsed');
-        const geojson = gpx(xmlDoc);
 
         const bounds = getBounds(geojson);
         const { start, end } = getEndpoints(geojson);
 
-        if (!bounds) throw new Error('No route coordinates found in GPX file');
+        if (!bounds) throw new Error('No route coordinates found in GeoJSON file');
         if (!containerRef.current || cancelled) return;
 
         // Derive initial centre from the route bounding box so the first tile
@@ -291,14 +357,31 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
         map.on('load', () => {
           if (cancelled) return;
           try {
-            // Add GPX route
-            map.addSource('gpx-route', { type: 'geojson', data: geojson });
+            // Satellite imagery — added now (hidden) so it sits below the route
+            // layers; swapped in as the basemap during fly-through.
+            if (maptilerKey.length > 0) {
+              map.addSource('satellite', {
+                type: 'raster',
+                url: `https://api.maptiler.com/tiles/satellite-v2/tiles.json?key=${maptilerKey}`,
+                tileSize: 512,
+              });
+              map.addLayer({
+                id: 'satellite-layer',
+                type: 'raster',
+                source: 'satellite',
+                layout: { visibility: 'none' },
+              });
+            }
+
+            // Add route
+            map.addSource('route', { type: 'geojson', data: geojson });
 
             // Shadow / halo beneath the route line
             map.addLayer({
               id: 'route-shadow',
               type: 'line',
-              source: 'gpx-route',
+              source: 'route',
+              filter: ['==', '$type', 'LineString'],
               layout: { 'line-join': 'round', 'line-cap': 'round' },
               paint: {
                 'line-color': '#000000',
@@ -312,7 +395,8 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
             map.addLayer({
               id: 'route-line',
               type: 'line',
-              source: 'gpx-route',
+              source: 'route',
+              filter: ['==', '$type', 'LineString'],
               layout: { 'line-join': 'round', 'line-cap': 'round' },
               paint: {
                 'line-color': '#e63012',
@@ -349,6 +433,31 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
                 .addTo(map);
             }
 
+            // Checkpoint markers
+            if (geojson.type === 'FeatureCollection') {
+              for (const feature of geojson.features) {
+                if (
+                  feature.type === 'Feature' &&
+                  feature.geometry?.type === 'Point' &&
+                  (feature.properties as CheckpointProperties | null)?.type === 'checkpoint'
+                ) {
+                  const props = feature.properties as CheckpointProperties;
+                  const [lng, lat] = (feature.geometry as import('geojson').Point).coordinates;
+                  const name = props.name ?? 'CP';
+                  let popupHtml = `<strong>${name}</strong>`;
+                  if (props.cutoff) popupHtml += `<br>Cutoff: ${props.cutoff}`;
+                  if (props.notes) popupHtml += `<br>${props.notes}`;
+                  new maplibregl.Marker({
+                    element: createMarkerEl(name, '#f97316'),
+                    anchor: 'center',
+                  })
+                    .setLngLat([lng, lat])
+                    .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(popupHtml))
+                    .addTo(map);
+                }
+              }
+            }
+
             map.fitBounds(bounds as maplibregl.LngLatBoundsLike, {
               padding: 72,
               pitch: 0,
@@ -357,6 +466,115 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
             // Ensure canvas dimensions match the container after fitBounds may
             // have triggered a layout change.
             map.resize();
+
+            // Fly-through animation — camera travels along the route.
+            const routeCoords = getAllCoordinates(geojson);
+            if (routeCoords.length >= 2) {
+              const cumDists = buildCumulativeDistances(routeCoords);
+              const totalDist = cumDists[cumDists.length - 1];
+              // Ground speed ~5 m/s ≈ 1 min per km; floor at 30 s for short routes.
+              const durationMs = Math.max(30_000, totalDist / 5);
+              // Look-ahead: fixed 300 m gives stable bearing across route lengths.
+              const lookAheadFrac = Math.min(300 / Math.max(totalDist, 1), 0.05);
+              const flyPitch = hasDem ? 50 : 35;
+              let flyRafId: number | null = null;
+              let flyStartTime: number | null = null;
+
+              const flyBtn = document.createElement('button');
+              flyBtn.type = 'button';
+              flyBtn.title = 'Fly through route';
+              flyBtn.setAttribute('aria-label', 'Fly through route');
+              flyBtn.setAttribute('aria-pressed', 'false');
+              flyBtn.style.cssText = [
+                'width:29px;height:29px;cursor:not-allowed;border:none;background:white;',
+                'font-size:13px;font-weight:700;color:#333;letter-spacing:0;',
+                'display:flex;align-items:center;justify-content:center;opacity:0.35;',
+              ].join('');
+              flyBtn.textContent = '\u25b6';
+              flyBtn.disabled = true;
+
+              const stopFly = () => {
+                if (flyRafId !== null) {
+                  cancelAnimationFrame(flyRafId);
+                  flyRafId = null;
+                }
+                flyStartTime = null;
+                flyBtn.textContent = '\u25b6';
+                flyBtn.title = 'Fly through route';
+                flyBtn.setAttribute('aria-pressed', 'false');
+                flyBtn.style.color = '#333';
+                // Guard against calling map methods after the map has been
+                // removed (e.g. cleanup fires while a RAF frame is in flight).
+                if (!cancelled && maptilerKey.length > 0) {
+                  map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+                  map.setLayoutProperty('os-raster', 'visibility', 'visible');
+                  if (hasDem) map.setLayoutProperty('hillshade', 'visibility', 'visible');
+                }
+              };
+
+              const startFly = () => {
+                flyStartTime = null;
+                flyBtn.textContent = '\u25a0';
+                flyBtn.title = 'Stop fly-through';
+                flyBtn.setAttribute('aria-pressed', 'true');
+                flyBtn.style.color = '#2563eb';
+                if (maptilerKey.length > 0) {
+                  map.setLayoutProperty('os-raster', 'visibility', 'none');
+                  if (hasDem) map.setLayoutProperty('hillshade', 'visibility', 'none');
+                  map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+                }
+
+                const frame = (timestamp: number) => {
+                  if (cancelled) { stopFly(); return; }
+                  if (flyStartTime === null) flyStartTime = timestamp;
+                  const elapsed = timestamp - flyStartTime;
+                  const t = Math.min(elapsed / durationMs, 1);
+
+                  const pos = sampleRoute(routeCoords, cumDists, totalDist, t);
+                  const lookAheadT = Math.min(t + lookAheadFrac, 1);
+                  const ahead = sampleRoute(routeCoords, cumDists, totalDist, lookAheadT);
+                  const bearing =
+                    ahead[0] !== pos[0] || ahead[1] !== pos[1]
+                      ? bearingDeg(pos, ahead)
+                      : map.getBearing();
+
+                  // easeTo with a short linear duration blends successive frames
+                  // smoothly instead of jumping to each position instantly.
+                  map.easeTo({
+                    center: pos as maplibregl.LngLatLike,
+                    bearing,
+                    pitch: flyPitch,
+                    zoom: 15.5,
+                    duration: 100,
+                    easing: (x) => x,
+                  });
+
+                  if (t < 1) {
+                    flyRafId = requestAnimationFrame(frame);
+                  } else {
+                    stopFly();
+                  }
+                };
+
+                flyRafId = requestAnimationFrame(frame);
+              };
+
+              flyBtn.addEventListener('click', () => {
+                if (flyRafId !== null) stopFly();
+                else startFly();
+              });
+
+              const flyContainer = document.createElement('div');
+              flyContainer.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+              flyContainer.appendChild(flyBtn);
+              map.addControl(
+                {
+                  onAdd: () => flyContainer,
+                  onRemove: () => { stopFly(); flyContainer.remove(); },
+                },
+                'top-right',
+              );
+            }
           } catch (overlayErr) {
             console.warn('Error adding route overlay:', overlayErr);
           }
@@ -364,12 +582,25 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
           setStatus('ready');
         });
 
+        // Track whether we've already fallen back from OS to OpenTopoMap.
+        let osTilesFailed = false;
         map.on('error', (e) => {
           const msg =
             e && typeof e === 'object' && 'error' in e
               ? ((e as { error: Error }).error?.message ?? String(e))
               : String(e);
           console.warn('MapLibre error:', msg);
+          // If the OS Maps API rejects a tile (403 Premium required), swap the
+          // basemap to OpenTopoMap so the map stays usable without a premium key.
+          if (hasOs && !osTilesFailed && msg.includes('os.uk')) {
+            osTilesFailed = true;
+            console.warn(
+              'OS Maps API access denied — falling back to OpenTopoMap. ' +
+              'Outdoor_3857 requires a premium OS Maps API plan.'
+            );
+            const src = map.getSource('os-raster') as maplibregl.RasterTileSource | undefined;
+            src?.setTiles(['https://tile.opentopomap.org/{z}/{x}/{y}.png']);
+          }
         });
       } catch (err) {
         if (!cancelled) {
@@ -385,7 +616,12 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
 
     return () => {
       cancelled = true;
-      mapRef.current?.remove();
+      try {
+        mapRef.current?.remove();
+      } catch {
+        // Suppress WebGL errors thrown when in-flight tile callbacks fire
+        // after the context is destroyed (common in React Strict Mode / HMR).
+      }
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

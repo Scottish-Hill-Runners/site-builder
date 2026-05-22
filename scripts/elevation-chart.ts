@@ -15,30 +15,27 @@ const PLOT_H = H - PAD.top - PAD.bottom;
 const BASELINE = PAD.top + PLOT_H;
 
 // ---------------------------------------------------------------------------
-// GPX parsing — regex-based; avoids needing DOMParser in Node.js
+// GeoJSON parsing — extracts [lon, lat, ele] triples from the LineString feature
 // ---------------------------------------------------------------------------
-function parseGpxCoords(xml: string): [number, number, number][] {
-  const coords: [number, number, number][] = [];
-  // Match each <trkpt> block (handles multiline bodies)
-  const trkptRe = /<trkpt\b([^>]*)>([\s\S]*?)<\/trkpt>/g;
-  const latRe = /\blat="([^"]+)"/;
-  const lonRe = /\blon="([^"]+)"/;
-  const eleRe = /<ele>\s*([^<\s]+)\s*<\/ele>/;
-  let m: RegExpExecArray | null;
-  while ((m = trkptRe.exec(xml)) !== null) {
-    const latM = latRe.exec(m[1]);
-    const lonM = lonRe.exec(m[1]);
-    const eleM = eleRe.exec(m[2]);
-    if (latM && lonM && eleM) {
-      const lat = parseFloat(latM[1]);
-      const lon = parseFloat(lonM[1]);
-      const ele = parseFloat(eleM[1]);
-      if (isFinite(lat) && isFinite(lon) && isFinite(ele)) {
-        coords.push([lon, lat, ele]);
+function parseGeoJsonCoords(geojsonStr: string): [number, number, number][] {
+  try {
+    const geojson = JSON.parse(geojsonStr);
+    for (const feature of geojson?.features ?? []) {
+      if (feature?.geometry?.type === 'LineString') {
+        const raw: unknown[] = feature.geometry.coordinates;
+        if (!Array.isArray(raw)) continue;
+        const coords: [number, number, number][] = [];
+        for (const c of raw) {
+          if (!Array.isArray(c) || c.length < 3) continue;
+          const lon = c[0] as number, lat = c[1] as number, ele = c[2] as number;
+          if (isFinite(lon) && isFinite(lat) && isFinite(ele))
+            coords.push([lon, lat, ele]);
+        }
+        return coords;
       }
     }
-  }
-  return coords;
+  } catch {}
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -123,12 +120,12 @@ export interface ElevationChartData {
 }
 
 // ---------------------------------------------------------------------------
-// Pure entry point — called by build-race-results.ts for each race with a GPX
+// Pure entry point — called by build-race-results.ts for each race with a GeoJSON route
 // ---------------------------------------------------------------------------
 export function buildElevationChartData(
-  gpxXml: string
+  geojsonStr: string
 ): ElevationChartData | null {
-  const coords = parseGpxCoords(gpxXml);
+  const coords = parseGeoJsonCoords(geojsonStr);
   if (coords.length === 0) return null;
 
   const profile = buildElevationProfile(coords);

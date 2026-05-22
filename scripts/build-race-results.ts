@@ -319,16 +319,20 @@ async function readRaceResults(raceId: string): Promise<RaceResult[]> {
   ).then((results) => results.flat());
 }
 
-function gpxFirstPoint(gpxXml: string): { latitude: number; longitude: number } | undefined {
-  const m = /<trkpt\b([^>]*)>/.exec(gpxXml);
-  if (!m) return undefined;
-  const latM = /\blat="([^"]+)"/.exec(m[1]);
-  const lonM = /\blon="([^"]+)"/.exec(m[1]);
-  if (!latM || !lonM) return undefined;
-  const latitude = parseFloat(latM[1]);
-  const longitude = parseFloat(lonM[1]);
-  if (!isFinite(latitude) || !isFinite(longitude)) return undefined;
-  return { latitude, longitude };
+function geojsonFirstPoint(geojsonStr: string): { latitude: number; longitude: number } | undefined {
+  try {
+    const geojson = JSON.parse(geojsonStr);
+    for (const feature of geojson?.features ?? []) {
+      if (feature?.geometry?.type === 'LineString') {
+        const coords = feature.geometry.coordinates;
+        if (Array.isArray(coords) && coords.length > 0) {
+          const [lon, lat] = coords[0];
+          if (isFinite(lon) && isFinite(lat)) return { latitude: lat, longitude: lon };
+        }
+      }
+    }
+  } catch {}
+  return undefined;
 }
 
 async function readResults(): Promise<Map<string, RaceEntry>> {
@@ -361,9 +365,9 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
             : undefined,
           eras: parseEras(data.eras as string | undefined),
         };
-        const gpxPath = path.join(raceDir, 'route.gpx');
-        const hasGpx = fs.existsSync(gpxPath);
-        const gpxPoint = hasGpx ? gpxFirstPoint(fs.readFileSync(gpxPath, 'utf-8')) : undefined;
+        const geojsonPath = path.join(raceDir, 'route.geojson');
+        const hasGpx = fs.existsSync(geojsonPath);
+        const gpxPoint = hasGpx ? geojsonFirstPoint(fs.readFileSync(geojsonPath, 'utf-8')) : undefined;
         const meta: RaceMeta = {
           info,
           content,
@@ -503,10 +507,10 @@ function writeRaceData(raceMap: Map<string, RaceEntry>) {
     raceInfo[raceId] = info;
     const raceDir = path.join(racesDir, raceId);
     if (hasGpx) {
-      const gpxSrc = path.join(raceDir, 'route.gpx');
-      fs.copyFileSync(gpxSrc, `${outputDir}/${raceId}.gpx`);
+      const geojsonSrc = path.join(raceDir, 'route.geojson');
+      fs.copyFileSync(geojsonSrc, `${outputDir}/${raceId}.geojson`);
       const elevationData = buildElevationChartData(
-        fs.readFileSync(gpxSrc, 'utf-8')
+        fs.readFileSync(geojsonSrc, 'utf-8')
       );
       if (elevationData)
         fs.writeFileSync(

@@ -47,3 +47,4 @@ public/
 
 .gitignore
 .env*
+graphify-out/
