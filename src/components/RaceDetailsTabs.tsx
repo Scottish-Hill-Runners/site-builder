@@ -169,6 +169,7 @@ export default function RaceDetailsTabs({
     () => getLatestResultYear(results),
     [results]
   );
+  const effectiveInitialYearFilter = initialYearFilter || pageDefaultYear || '';
   const correctionRaceId = focusedResultContext?.raceId ?? raceId;
   const correctionYear = focusedResultContext?.year ?? pageDefaultYear;
   const correctionLink =
@@ -268,14 +269,14 @@ export default function RaceDetailsTabs({
                     data={results}
                     eras={race.eras}
                     enableRowFocus
-                    initialYearFilter={initialYearFilter}
+                    initialYearFilter={effectiveInitialYearFilter}
                     onFocusContextChange={setFocusedResultContext}
                   />
                 ) : (
                   <TeamResultsDataTable
                     data={results}
                     showYearFilter
-                    initialYearFilter={initialYearFilter}
+                    initialYearFilter={effectiveInitialYearFilter}
                   />
                 )}
 

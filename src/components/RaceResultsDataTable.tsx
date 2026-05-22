@@ -54,6 +54,7 @@ interface Filters {
 }
 
 const FILTER_VISIBILITY_STORAGE_KEY = 'raceResults.showFilters';
+const MOBILE_BREAKPOINT = 640;
 
 function eraContainsYear(era: Era, year: number): boolean {
   if (era.from !== undefined && year < era.from) return false;
@@ -117,11 +118,14 @@ export default function RaceResultsDataTable({
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
+  const lastFocusContextRef = useRef<ResultsFocusContext | null>(null);
   const [theadHeight, setTheadHeight] = useState(0);
   const [stickyHeader, setStickyHeader] = useState<{
     year: string;
     count: number;
   } | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(true);
+  const [visibleLimit, setVisibleLimit] = useState(500);
 
   const getRowKey = (row: RaceResult) =>
     [row.raceId, row.year, row.position, row.name, row.time].join('|');
@@ -235,23 +239,83 @@ export default function RaceResultsDataTable({
   ]);
   const effectiveSortColumn = sortColumn ?? 'year';
 
+  useEffect(() => {
+    const updateViewport = () => {
+      setIsMobileViewport(window.innerWidth < MOBILE_BREAKPOINT);
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
+  const capConfig = useMemo(
+    () =>
+      isMobileViewport
+        ? { initial: 500, step: 250, hardCap: 2500 }
+        : { initial: 1000, step: 500, hardCap: 5000 },
+    [isMobileViewport]
+  );
+
+  const isUnfilteredAllYearsMode =
+    showYearFilter &&
+    filters.year === '' &&
+    filters.name === '' &&
+    filters.club === '' &&
+    filters.category === '' &&
+    filters.raceId === '' &&
+    filters.raceTitle === '';
+
+  useEffect(() => {
+    if (!isUnfilteredAllYearsMode) return;
+    setVisibleLimit(capConfig.initial);
+  }, [
+    isUnfilteredAllYearsMode,
+    capConfig.initial,
+    filters.year,
+    filters.name,
+    filters.club,
+    filters.category,
+    filters.raceId,
+    filters.raceTitle,
+    sortColumn,
+    sortDirection,
+  ]);
+
+  const cappedMatchCount =
+    isUnfilteredAllYearsMode
+      ? Math.min(processedData.length, capConfig.hardCap)
+      : processedData.length;
+  const displayedMatchCount =
+    isUnfilteredAllYearsMode
+      ? Math.min(visibleLimit, cappedMatchCount)
+      : processedData.length;
+  const isCapActive = isUnfilteredAllYearsMode && processedData.length > displayedMatchCount;
+  const canShowMore = isUnfilteredAllYearsMode && displayedMatchCount < cappedMatchCount;
+  const displayData = useMemo(
+    () =>
+      isUnfilteredAllYearsMode && displayedMatchCount < processedData.length
+        ? processedData.slice(0, displayedMatchCount)
+        : processedData,
+    [isUnfilteredAllYearsMode, displayedMatchCount, processedData]
+  );
+
   const virtualItemList = useMemo((): YearVirtualItem[] => {
     if (effectiveSortColumn !== 'year') {
-      return processedData.map((data, dataIndex) => ({
+      return displayData.map((data, dataIndex) => ({
         type: 'row' as const,
         data,
         dataIndex,
       }));
     }
     const yearCounts: Record<string, number> = {};
-    for (const row of processedData) {
+    for (const row of displayData) {
       const y = row.year.substring(0, 4);
       yearCounts[y] = (yearCounts[y] ?? 0) + 1;
     }
     const items: YearVirtualItem[] = [];
     let lastYear: string | null = null;
-    for (let i = 0; i < processedData.length; i++) {
-      const row = processedData[i];
+    for (let i = 0; i < displayData.length; i++) {
+      const row = displayData[i];
       const year = row.year.substring(0, 4);
       if (year !== lastYear) {
         items.push({ type: 'year-header', year, count: yearCounts[year] });
@@ -260,7 +324,7 @@ export default function RaceResultsDataTable({
       items.push({ type: 'row', data: row, dataIndex: i });
     }
     return items;
-  }, [processedData, effectiveSortColumn]);
+  }, [displayData, effectiveSortColumn]);
 
   // Pre-compute the scroll offset of each year-header so the scroll listener
   // can determine which year is currently "behind" the sticky column header.
@@ -402,10 +466,8 @@ export default function RaceResultsDataTable({
 
   const selectedRow = useMemo(() => {
     if (!enableRowFocus || !selectedRowKey) return null;
-    return (
-      processedData.find((row) => getRowKey(row) === selectedRowKey) ?? null
-    );
-  }, [enableRowFocus, processedData, selectedRowKey]);
+    return displayData.find((row) => getRowKey(row) === selectedRowKey) ?? null;
+  }, [displayData, enableRowFocus, selectedRowKey]);
 
   const activeFocusContext = useMemo<ResultsFocusContext | null>(() => {
     if (!onFocusContextChange || !enableRowFocus) return null;
@@ -420,7 +482,7 @@ export default function RaceResultsDataTable({
       };
     }
 
-    const firstVisibleRow = processedData[0];
+    const firstVisibleRow = displayData[0];
     if (!firstVisibleRow) return null;
     const normalizedYear = normalizeResultYear(firstVisibleRow.year);
     if (!normalizedYear) return null;
@@ -430,10 +492,18 @@ export default function RaceResultsDataTable({
       year: normalizedYear,
       source: 'table-visible',
     };
-  }, [enableRowFocus, onFocusContextChange, processedData, selectedRow]);
+  }, [displayData, enableRowFocus, onFocusContextChange, selectedRow]);
 
   useEffect(() => {
     if (!onFocusContextChange) return;
+    const prev = lastFocusContextRef.current;
+    const next = activeFocusContext;
+    const changed =
+      prev?.raceId !== next?.raceId ||
+      prev?.year !== next?.year ||
+      prev?.source !== next?.source;
+    if (!changed) return;
+    lastFocusContextRef.current = next;
     onFocusContextChange(activeFocusContext);
   }, [activeFocusContext, onFocusContextChange]);
 
@@ -612,6 +682,34 @@ export default function RaceResultsDataTable({
         </div>
       </div>
 
+      {isCapActive && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          <p>
+            Showing {displayedMatchCount.toLocaleString()} of {processedData.length.toLocaleString()} matching results.
+          </p>
+          <div className="mt-3 flex items-center gap-3">
+            {canShowMore && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleLimit((prev) =>
+                    Math.min(prev + capConfig.step, capConfig.hardCap)
+                  )
+                }
+                className="rounded bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-900/70"
+              >
+                Show {capConfig.step.toLocaleString()} more
+              </button>
+            )}
+            {!canShowMore && processedData.length > capConfig.hardCap && (
+              <span className="text-xs text-amber-800 dark:text-amber-300">
+                Refine filters to see beyond {capConfig.hardCap.toLocaleString()} rows.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Data Table */}
       <div className="shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -729,7 +827,7 @@ export default function RaceResultsDataTable({
                 </tr>
               </thead>
               <tbody>
-                {processedData.length === 0 ? (
+                {displayData.length === 0 ? (
                   <tr>
                     <td
                       colSpan={showPointsColumn ? 7 : 6}
@@ -894,7 +992,9 @@ export default function RaceResultsDataTable({
 
       {/* Results Info */}
       <div className="text-sm text-gray-600 dark:text-slate-300">
-        Showing {processedData.length} of {data.length} results
+        {isCapActive
+          ? `Showing ${displayedMatchCount.toLocaleString()} of ${processedData.length.toLocaleString()} matching results (${data.length.toLocaleString()} total).`
+          : `Showing ${displayData.length.toLocaleString()} of ${data.length.toLocaleString()} results`}
       </div>
     </div>
   );

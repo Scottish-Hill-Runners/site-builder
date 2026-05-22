@@ -36,6 +36,7 @@ interface Filters {
 }
 
 const FILTER_VISIBILITY_STORAGE_KEY = 'teamResults.showFilters';
+const MOBILE_BREAKPOINT = 640;
 
 export default function TeamResultsDataTable({
   data,
@@ -61,6 +62,8 @@ export default function TeamResultsDataTable({
     year: initialYearFilter,
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(true);
+  const [visibleLimit, setVisibleLimit] = useState(300);
 
   const teamYears = useMemo(() => {
     const years = new Set<string>();
@@ -180,10 +183,59 @@ export default function TeamResultsDataTable({
     [data]
   );
 
+  useEffect(() => {
+    const updateViewport = () => {
+      setIsMobileViewport(window.innerWidth < MOBILE_BREAKPOINT);
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
+  const capConfig = useMemo(
+    () =>
+      isMobileViewport
+        ? { initial: 300, step: 150, hardCap: 1500 }
+        : { initial: 500, step: 250, hardCap: 3000 },
+    [isMobileViewport]
+  );
+
+  const isUnfilteredAllYearsMode =
+    showYearFilter && filters.year === '' && filters.raceId === '';
+
+  useEffect(() => {
+    if (!isUnfilteredAllYearsMode) return;
+    setVisibleLimit(capConfig.initial);
+  }, [
+    isUnfilteredAllYearsMode,
+    capConfig.initial,
+    filters.year,
+    filters.raceId,
+    sortColumn,
+    sortDirection,
+  ]);
+
+  const cappedMatchCount =
+    isUnfilteredAllYearsMode
+      ? Math.min(processedTeams.length, capConfig.hardCap)
+      : processedTeams.length;
+  const displayedMatchCount =
+    isUnfilteredAllYearsMode
+      ? Math.min(visibleLimit, cappedMatchCount)
+      : processedTeams.length;
+  const isCapActive =
+    isUnfilteredAllYearsMode && processedTeams.length > displayedMatchCount;
+  const canShowMore =
+    isUnfilteredAllYearsMode && displayedMatchCount < cappedMatchCount;
+  const displayTeams =
+    isUnfilteredAllYearsMode && displayedMatchCount < processedTeams.length
+      ? processedTeams.slice(0, displayedMatchCount)
+      : processedTeams;
+
   // Get all unique leg identifiers across teams for column headers
   const allLegs = useMemo(() => {
     const legSet = new Set<number | string>();
-    for (const team of processedTeams) {
+    for (const team of displayTeams) {
       for (const leg of team.sortedLegs) {
         legSet.add(leg);
       }
@@ -194,10 +246,10 @@ export default function TeamResultsDataTable({
       if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
       return String(a).localeCompare(String(b));
     });
-  }, [processedTeams]);
+  }, [displayTeams]);
 
   const rowVirtualizer = useVirtualizer({
-    count: processedTeams.length,
+    count: displayTeams.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 52,
     overscan: 5,
@@ -280,6 +332,34 @@ export default function TeamResultsDataTable({
         </div>
       </div>
 
+      {isCapActive && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          <p>
+            Showing {displayedMatchCount.toLocaleString()} of {processedTeams.length.toLocaleString()} matching teams.
+          </p>
+          <div className="mt-3 flex items-center gap-3">
+            {canShowMore && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleLimit((prev) =>
+                    Math.min(prev + capConfig.step, capConfig.hardCap)
+                  )
+                }
+                className="rounded bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-900/70"
+              >
+                Show {capConfig.step.toLocaleString()} more
+              </button>
+            )}
+            {!canShowMore && processedTeams.length > capConfig.hardCap && (
+              <span className="text-xs text-amber-800 dark:text-amber-300">
+                Refine filters to see beyond {capConfig.hardCap.toLocaleString()} teams.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Data Table */}
       <div className="shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -337,7 +417,7 @@ export default function TeamResultsDataTable({
                 </tr>
               </thead>
               <tbody>
-                {processedTeams.length === 0 ? (
+                {displayTeams.length === 0 ? (
                   <tr>
                     <td
                       colSpan={(hasLegData ? allLegs.length : 0) + (showRaceColumn ? 5 : 4)}
@@ -357,7 +437,7 @@ export default function TeamResultsDataTable({
                       </tr>
                     )}
                     {virtualItems.map((virtualRow) => {
-                      const team = processedTeams[virtualRow.index];
+                      const team = displayTeams[virtualRow.index];
                       const zebraTone =
                         virtualRow.index % 2 === 0
                           ? 'bg-white dark:bg-slate-900'
@@ -438,7 +518,9 @@ export default function TeamResultsDataTable({
 
       {/* Results Info */}
       <div className="text-sm text-gray-600 dark:text-slate-300">
-        Showing {processedTeams.length} teams
+        {isCapActive
+          ? `Showing ${displayedMatchCount.toLocaleString()} of ${processedTeams.length.toLocaleString()} matching teams`
+          : `Showing ${displayTeams.length.toLocaleString()} teams`}
       </div>
     </div>
   );
