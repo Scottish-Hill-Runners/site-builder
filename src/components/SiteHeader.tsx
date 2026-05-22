@@ -7,12 +7,16 @@ import UnitsToggle from '@/components/UnitsToggle';
 export default function SiteHeader() {
   return (
     <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/" aria-label="Scottish Hill Runners home">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+        <Link
+          href="/"
+          aria-label="Scottish Hill Runners home"
+          className="min-w-0 flex-1"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 500 58"
-            height="38"
+            className="h-7 w-auto max-w-full sm:h-9"
             aria-hidden="true"
           >
             <defs>
@@ -44,7 +48,7 @@ export default function SiteHeader() {
             />
           </svg>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <UnitsToggle />
           <ThemeToggle />
         </div>
