@@ -1,72 +1,29 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useUnits } from '@/components/UnitsProvider';
 import { kmToMiles, mToFeet } from '@/lib/units';
 import { niceInterval } from '@/lib/gpx-elevation';
+import type { ElevationChartData } from '@/types/datatable';
 
 interface ElevationProfileProps {
-  raceId: string;
   raceName: string;
-}
-
-interface ElevationChartData {
-  area: string;
-  line: string;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  minEle: number;
-  maxEle: number;
-  totalDistKm: number;
-  gain: number;
-  loss: number;
-  W: number;
-  H: number;
-  padTop: number;
-  padBottom: number;
-  padLeft: number;
-  padRight: number;
+  data?: ElevationChartData;
 }
 
 export default function ElevationProfile({
-  raceId,
   raceName,
+  data,
 }: ElevationProfileProps) {
   const { imperial } = useUnits();
-  const [data, setData] = useState<ElevationChartData | null | false>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/results/${encodeURIComponent(raceId)}-elevation.json`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: ElevationChartData) => {
-        if (!cancelled) setData(d);
-      })
-      .catch(() => {
-        if (!cancelled) setData(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [raceId]);
-
-  // No elevation data for this race — render nothing
-  if (data === false) return null;
+  if (!data) return null;
 
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">
         Elevation profile
       </h3>
-      {data === null ? (
-        <div className="flex h-[200px] items-center justify-center rounded-xl border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-800">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
-        </div>
-      ) : (
-        <LoadedChart data={data} raceName={raceName} imperial={imperial} />
-      )}
+      <LoadedChart data={data} raceName={raceName} imperial={imperial} />
     </div>
   );
 }

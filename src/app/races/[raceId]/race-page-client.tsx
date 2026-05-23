@@ -144,6 +144,8 @@ export default function RacePageClient({
               contents={data.contents}
               hasGpx={data.hasGpx}
               hasRaceMap={Boolean(data.hasRaceMap)}
+              routeGeojson={data.routeGeojson}
+              elevationChartData={data.elevationChartData}
               results={data.results}
               resultsError={null}
               heroImages={raceImages?.hero ?? []}

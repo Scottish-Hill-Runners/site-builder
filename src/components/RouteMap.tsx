@@ -5,8 +5,8 @@ import maplibregl from 'maplibre-gl';
 import type { GeoJSON } from 'geojson';
 
 interface RouteMapProps {
-  raceId: string;
   raceName: string;
+  geojson: GeoJSON;
 }
 
 interface LngLat {
@@ -168,7 +168,7 @@ function bearingDeg(a: [number, number], b: [number, number]): number {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
-export default function RouteMap({ raceId, raceName }: RouteMapProps) {
+export default function RouteMap({ raceName, geojson }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
@@ -188,14 +188,6 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
 
     async function init() {
       try {
-        // Fetch GeoJSON route
-        const geojsonUrl = `/results/${encodeURIComponent(raceId)}.geojson`;
-        const res = await fetch(geojsonUrl);
-        if (cancelled) return;
-        if (!res.ok) throw new Error(`Route file not found (${res.status})`);
-        const geojson = (await res.json()) as GeoJSON;
-        if (cancelled) return;
-
         const bounds = getBounds(geojson);
         const { start, end } = getEndpoints(geojson);
 
@@ -625,7 +617,7 @@ export default function RouteMap({ raceId, raceName }: RouteMapProps) {
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raceId]);
+  }, [geojson, raceName]);
 
   return (
     <div

@@ -95,11 +95,28 @@ RunnerPosition,Surname,Firstname,Club,RunnerCategory,FinishTime
 ...
 ```
 
+**Core columns (required):**
+
+- `RunnerPosition` (or `Position`, `FinishPosition`, `Pos`)
+- `Surname` + `Firstname` (or single `Name` column)
+- `RunnerCategory` (or `Category`, `Cat`) — optional but recommended
+- `FinishTime` (or `Time`)
+- `Club` — optional but recommended
+
+**Team and relay columns (optional):**
+
+- `Team` — team name (e.g., `Carnethy A`)
+- `Leg` — leg number or label (e.g., `1`, `2`, `prologue`)
+
+If either `Team` or `Leg` is present, both should ideally be populated for consistency.
+
 **Important:**
 
 - The CSV filename (without `.csv` extension) is used as the **year** field
-- Required: Include a header row
-- Columns: `RunnerPosition`, `Surname`, `Firstname`, `RunnerCategory`, `FinishTime`
+- Include a header row
+- Times can be in multiple formats: `hh:mm:ss`, `mm:ss`, or decimal minutes (e.g., `85:30` or `85.30`)
+- For team/relay events with missing times, leave the cell empty; incomplete legs will be marked in the UI
+- Prefer canonical club names (e.g., `Westerlands CCC` over `Westies`) to enable accurate club linking
 
 ## Build process
 

@@ -1,3 +1,5 @@
+import type { GeoJSON } from 'geojson';
+
 export interface RaceResult {
   raceId: string;
   year: string;
@@ -43,12 +45,34 @@ export interface RaceInfo {
   hasLegs?: boolean;
 }
 
+export interface ElevationChartData {
+  area: string;
+  line: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  minEle: number;
+  maxEle: number;
+  totalDistKm: number;
+  gain: number;
+  loss: number;
+  W: number;
+  H: number;
+  padTop: number;
+  padBottom: number;
+  padLeft: number;
+  padRight: number;
+}
+
 export interface RaceData {
   info: RaceInfo;
   contents: string;
   results: RaceResult[];
   hasGpx: boolean;
   hasRaceMap?: boolean;
+  routeGeojson?: GeoJSON;
+  elevationChartData?: ElevationChartData;
 }
 
 export interface AllRaceData {

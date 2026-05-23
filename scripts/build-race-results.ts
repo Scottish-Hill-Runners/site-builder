@@ -9,11 +9,14 @@ import { surnameHash } from '@/lib/runner-name';
 import {
   ChampionshipYearPayload,
   DistanceSlotsRule,
+  ElevationChartData,
   Era,
+  RaceData,
   RaceInfo,
   RaceResult,
   ScoringRules,
 } from '@/types/datatable';
+import type { GeoJSON } from 'geojson';
 
 type YearInfo = {
   year: string;
@@ -62,6 +65,8 @@ type RaceMeta = {
   longitude?: number;
   hasGpx: boolean;
   hasRaceMap: boolean;
+  routeGeojson?: GeoJSON;
+  elevationChartData?: ElevationChartData;
 };
 
 type RaceEntry = {
@@ -319,15 +324,26 @@ async function readRaceResults(raceId: string): Promise<RaceResult[]> {
   ).then((results) => results.flat());
 }
 
-function geojsonFirstPoint(geojsonStr: string): { latitude: number; longitude: number } | undefined {
+function parseGeojson(geojsonStr: string): GeoJSON | undefined {
   try {
-    const geojson = JSON.parse(geojsonStr);
-    for (const feature of geojson?.features ?? []) {
-      if (feature?.geometry?.type === 'LineString') {
-        const coords = feature.geometry.coordinates;
-        if (Array.isArray(coords) && coords.length > 0) {
-          const [lon, lat] = coords[0];
-          if (isFinite(lon) && isFinite(lat)) return { latitude: lat, longitude: lon };
+    return JSON.parse(geojsonStr) as GeoJSON;
+  } catch {}
+  return undefined;
+}
+
+function geojsonFirstPoint(
+  geojson: GeoJSON
+): { latitude: number; longitude: number } | undefined {
+  try {
+    if (geojson.type === 'FeatureCollection') {
+      for (const feature of geojson.features ?? []) {
+        if (feature?.geometry?.type === 'LineString') {
+          const coords = feature.geometry.coordinates;
+          if (Array.isArray(coords) && coords.length > 0) {
+            const [lon, lat] = coords[0];
+            if (isFinite(lon) && isFinite(lat))
+              return { latitude: lat, longitude: lon };
+          }
         }
       }
     }
@@ -367,7 +383,14 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
         };
         const geojsonPath = path.join(raceDir, 'route.geojson');
         const hasGpx = fs.existsSync(geojsonPath);
-        const gpxPoint = hasGpx ? geojsonFirstPoint(fs.readFileSync(geojsonPath, 'utf-8')) : undefined;
+        const geojsonStr = hasGpx ? fs.readFileSync(geojsonPath, 'utf-8') : '';
+        const routeGeojson = hasGpx ? parseGeojson(geojsonStr) : undefined;
+        const elevationChartData = hasGpx
+          ? buildElevationChartData(geojsonStr)
+          : null;
+        const gpxPoint = routeGeojson
+          ? geojsonFirstPoint(routeGeojson)
+          : undefined;
         const meta: RaceMeta = {
           info,
           content,
@@ -381,6 +404,8 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
               : undefined),
           hasGpx,
           hasRaceMap: fs.existsSync(path.join(raceDir, 'race-map.webp')),
+          routeGeojson,
+          elevationChartData: elevationChartData ?? undefined,
         };
         const results = await readRaceResults(raceDir);
 
@@ -503,36 +528,34 @@ function writeRaceData(raceMap: Map<string, RaceEntry>) {
   const raceInfo: { [raceId: string]: RaceInfo } = {};
   const racesDir = contentPath('races');
   for (const [raceId, { meta, results }] of raceMap) {
-    const { info, content, hasGpx, hasRaceMap } = meta;
+    const {
+      info,
+      content,
+      hasGpx,
+      hasRaceMap,
+      routeGeojson,
+      elevationChartData,
+    } = meta;
     raceInfo[raceId] = info;
     const raceDir = path.join(racesDir, raceId);
-    if (hasGpx) {
-      const geojsonSrc = path.join(raceDir, 'route.geojson');
-      fs.copyFileSync(geojsonSrc, `${outputDir}/${raceId}.geojson`);
-      const elevationData = buildElevationChartData(
-        fs.readFileSync(geojsonSrc, 'utf-8')
-      );
-      if (elevationData)
-        fs.writeFileSync(
-          `${outputDir}/${raceId}-elevation.json`,
-          JSON.stringify(elevationData)
-        );
-    }
     if (hasRaceMap)
       fs.copyFileSync(
         path.join(raceDir, 'race-map.webp'),
         `${outputDir}/${raceId}-map.webp`
       );
+    const raceData: RaceData = {
+      info,
+      contents: content,
+      results,
+      hasGpx,
+      hasRaceMap,
+      routeGeojson,
+      elevationChartData,
+    };
     writeGz(
       outputDir,
       `${raceId}.json`,
-      JSON.stringify({
-        info,
-        contents: content,
-        results,
-        hasGpx,
-        hasRaceMap,
-      })
+      JSON.stringify(raceData)
     );
   }
   writeGz(outputDir, 'races.json', JSON.stringify(raceInfo));

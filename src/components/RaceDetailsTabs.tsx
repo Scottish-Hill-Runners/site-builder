@@ -30,10 +30,12 @@ import {
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';
 import type {
+  ElevationChartData,
   RaceInfo,
   RaceResult,
   ResultsFocusContext,
 } from '@/types/datatable';
+import type { GeoJSON } from 'geojson';
 
 interface RaceImageProp {
   sourcePath: string;
@@ -49,6 +51,8 @@ interface RaceDetailsTabsProps {
   contents: string;
   hasGpx: boolean;
   hasRaceMap: boolean;
+  routeGeojson?: GeoJSON;
+  elevationChartData?: ElevationChartData;
   results: RaceResult[];
   resultsError: string | null;
   heroImages: RaceImageProp[];
@@ -73,6 +77,8 @@ export default function RaceDetailsTabs({
   contents,
   hasGpx,
   hasRaceMap,
+  routeGeojson,
+  elevationChartData,
   results,
   resultsError,
   heroImages,
@@ -521,8 +527,17 @@ export default function RaceDetailsTabs({
           >
             {hasGpx && (
               <>
-                <RouteMap raceId={raceId} raceName={race.title} />
-                <ElevationProfile raceId={raceId} raceName={race.title} />
+                {routeGeojson ? (
+                  <RouteMap raceName={race.title} geojson={routeGeojson} />
+                ) : (
+                  <p className="text-sm text-gray-600 dark:text-slate-300">
+                    Route map unavailable for this race.
+                  </p>
+                )}
+                <ElevationProfile
+                  raceName={race.title}
+                  data={elevationChartData}
+                />
               </>
             )}
             {hasRaceMap && (

@@ -3,6 +3,7 @@ import {
   calcElevationStats,
   type ElevationPoint,
 } from '@/lib/gpx-elevation';
+import type { ElevationChartData } from '@/types/datatable';
 
 // ---------------------------------------------------------------------------
 // Constants (match the visual design in ElevationProfile.tsx)
@@ -90,33 +91,6 @@ function buildPaths(
     endX: toX(totalDist),
     endY: toY(profile[profile.length - 1].ele),
   };
-}
-
-// ---------------------------------------------------------------------------
-// Output type — consumed by ElevationProfile.tsx at runtime
-// ---------------------------------------------------------------------------
-export interface ElevationChartData {
-  // Pre-computed SVG paths (expensive Catmull-Rom work done once at build)
-  area: string;
-  line: string;
-  // Start/finish marker positions in viewBox coords
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  // Raw bounds in metres — component converts to any unit at runtime
-  minEle: number;
-  maxEle: number;
-  totalDistKm: number;
-  gain: number;
-  loss: number;
-  // ViewBox dimensions so the component can reconstruct coordinate transforms
-  W: number;
-  H: number;
-  padTop: number;
-  padBottom: number;
-  padLeft: number;
-  padRight: number;
 }
 
 // ---------------------------------------------------------------------------
