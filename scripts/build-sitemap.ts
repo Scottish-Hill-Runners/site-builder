@@ -5,7 +5,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-const SITE_URL = 'https://scottishhillrunners.uk';
+const SITE_URL = 'https://beta.scottishhillrunners.uk';
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const RESULTS_DIR = path.join(PUBLIC_DIR, 'results');
 const SITEMAP_PATH = path.join(PUBLIC_DIR, 'sitemap.xml');
@@ -14,14 +14,13 @@ const ROBOTS_PATH = path.join(PUBLIC_DIR, 'robots.txt');
 // Main static routes (add more as needed)
 const staticRoutes = [
   '/',
-  '/races',
   '/calendar',
   '/championships',
-  '/news',
   '/clubs',
-  '/info',
   '/epics',
-  '/runner',
+  '/info',
+  '/news',
+  '/races',
 ];
 
 async function getRaceAndYearPages(): Promise<string[]> {
