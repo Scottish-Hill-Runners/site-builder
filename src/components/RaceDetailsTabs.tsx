@@ -36,6 +36,7 @@ import type {
   ResultsFocusContext,
 } from '@/types/datatable';
 import type { GeoJSON } from 'geojson';
+import Obfuscate from 'react-obfuscate';
 
 interface RaceImageProp {
   sourcePath: string;
@@ -186,6 +187,8 @@ export default function RaceDetailsTabs({
     { key: 'info', label: 'Race info' },
     { key: 'results', label: 'Results' },
   ];
+  const organiser = race.organiser ? Buffer.from(race.organiser, 'base64').toString('utf-8') : null;
+  const emailName = organiser && organiser.match(/^([^<@]*)[@<]/)?.[1]?.trim();
 
   if (hasGallery) {
     tabs.push({ key: 'gallery', label: 'Gallery' });
@@ -361,15 +364,12 @@ export default function RaceDetailsTabs({
                   Distance:
                 </span>{' '}
                 {formatDistance(race.distance, imperial)}
+                {'; '}
+                <span className="font-semibold text-gray-900 dark:text-slate-100">
+                  climb:
+                </span>{' '}
+                {formatClimb(race.climb, imperial)}
               </p>
-              {typeof race.climb === 'number' && (
-                <p>
-                  <span className="font-semibold text-gray-900 dark:text-slate-100">
-                    Climb:
-                  </span>{' '}
-                  {formatClimb(race.climb, imperial)}
-                </p>
-              )}
               {race.maleRecord && (
                 <p>
                   <span className="font-semibold text-gray-900 dark:text-slate-100">
@@ -395,7 +395,7 @@ export default function RaceDetailsTabs({
                 </p>
               )}
               {race.web && (
-                <p className="sm:col-span-2">
+                <p>
                   <span className="font-semibold text-gray-900 dark:text-slate-100">
                     Website:
                   </span>{' '}
@@ -407,6 +407,38 @@ export default function RaceDetailsTabs({
                   >
                     {race.web}
                   </a>
+                </p>
+              )}
+              {race.organiser && (
+                <p>
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
+                    Organiser:
+                  </span>{' '}
+                  {emailName ? (
+                  <span>
+                    {emailName}{' '}
+                    <Obfuscate style={{ display: 'inline-block' }} 
+                      email={organiser}
+                      headers={{ subject: `Inquiry about ${race.title}` }}>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          width="1em"
+                          height="1em"
+                          aria-hidden="true"
+                          focusable="false"
+                          style={{ verticalAlign: 'middle' }}
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M2 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4zm2 0v.217l6 4.5 6-4.5V4H4zm12 2.383l-5.447 4.085a1 1 0 0 1-1.106 0L4 6.383V16h12V6.383z"
+                          />
+                        </svg>
+                    </Obfuscate>
+                  </span>
+                  ) : (
+                    organiser
+                  )}
                 </p>
               )}
             </div>

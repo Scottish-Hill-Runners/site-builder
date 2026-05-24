@@ -377,9 +377,7 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           femaleRecord: data.femaleRecord,
           nonBinaryRecord: data.nonBinaryRecord,
           web: data.web,
-          organiser: data.organiser
-            ? Array.from(encoder.encode(data.organiser))
-            : undefined,
+          organiser: data.organiser ? Buffer.from(data.organiser).toString('base64') : undefined,
           eras: parseEras(data.eras as string | undefined),
         };
         const geojsonPath = path.join(raceDir, 'route.geojson');

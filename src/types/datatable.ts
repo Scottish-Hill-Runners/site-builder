@@ -37,7 +37,7 @@ export interface RaceInfo {
   femaleRecord?: string;
   nonBinaryRecord?: string;
   web?: string;
-  organiser?: number[];
+  organiser?: string;
   eras?: Era[];
   /** Whether this race has team entries (based on Team column in CSV). */
   hasTeams?: boolean;
