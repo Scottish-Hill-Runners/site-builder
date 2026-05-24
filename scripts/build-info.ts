@@ -3,6 +3,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import { writeGz, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
+import { updateSitemap } from './update-sitemap';
 
 interface InfoItem {
   slug: string;
@@ -30,49 +31,48 @@ function collectFiles(
   });
 }
 
-function buildInfo() {
+function buildInfo(): string[] {
   const infoDir = contentPath('info');
   const outputDir = path.join(process.cwd(), 'public');
+  const routes: string[] = [];
 
-  try {
-    if (!fs.existsSync(infoDir)) {
-      console.warn('Info directory not found, creating empty info.json.gz');
-      writeGz(outputDir, 'info.json', JSON.stringify([]));
-      return;
-    }
-
-    progress(`Reading info from ${infoDir} (CONTENT_ROOT=${contentRoot()})...`);
-
-    // Collect all .md files recursively
-    const entries = collectFiles(infoDir).sort((a, b) => {
-      // index at top level should come first
-      if (a.slug === 'index') return -1;
-      if (b.slug === 'index') return 1;
-      return a.slug.localeCompare(b.slug);
-    });
-
-    progress(`Found ${entries.length} info files`);
-
-    // Parse files
-    const infoItems: InfoItem[] = entries.map(({ slug, filePath }) => {
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
-      const { data, content } = matter(fileContent);
-
-      return {
-        slug,
-        title:
-          (data.title as string | undefined)?.trim() || extractTitle(content),
-        content: content.replace(/\u00a0/g, ' '),
-      };
-    });
-
-    // Write to compressed JSON file
-    writeGz(outputDir, 'info.json', JSON.stringify(infoItems));
-    progress(`✓ Built ${infoItems.length} info items`);
-  } catch (error) {
-    console.error('Error building info:', error);
-    process.exit(1);
+  if (!fs.existsSync(infoDir)) {
+    console.warn('Info directory not found, creating empty info.json.gz');
+    writeGz(outputDir, 'info.json', JSON.stringify([]));
+    return routes;
   }
+
+  progress(`Reading info from ${infoDir} (CONTENT_ROOT=${contentRoot()})...`);
+
+  // Collect all .md files recursively
+  const entries = collectFiles(infoDir).sort((a, b) => {
+    // index at top level should come first
+    if (a.slug === 'index') return -1;
+    if (b.slug === 'index') return 1;
+    return a.slug.localeCompare(b.slug);
+  });
+
+  progress(`Found ${entries.length} info files`);
+
+  // Parse files
+  const infoItems: InfoItem[] = entries.map(({ slug, filePath }) => {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const { data, content } = matter(fileContent);
+
+    routes.push(`/info/${slug}`);
+    return {
+      slug,
+      title:
+        (data.title as string | undefined)?.trim() || extractTitle(content),
+      content: content.replace(/\u00a0/g, ' '),
+    };
+  });
+
+  // Write to compressed JSON file
+  writeGz(outputDir, 'info.json', JSON.stringify(infoItems));
+  progress(`✓ Built ${infoItems.length} info items`);
+
+  return routes;
 }
 
-buildInfo();
+updateSitemap(buildInfo());

@@ -4,7 +4,7 @@ import { getRaceImagesBySlug } from '@/lib/imageCollections';
 import { loadAllRaces, loadCalendar, loadRaceResults } from '@/lib/results-data';
 import type { AllRaceData, RaceData, RaceInfo } from '@/types/datatable';
 
-const SITE_URL = 'https://scottishhillrunners.uk';
+const SITE_URL = 'https://beta.scottishhillrunners.uk';
 
 export async function generateStaticParams() {
   const allRaces = await loadAllRaces().catch(() => ({}) as AllRaceData);
@@ -18,9 +18,8 @@ function extractDescription(contents: string, race: RaceInfo): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (paragraph) {
+  if (paragraph)
     return paragraph;
-  }
 
   const distance = race.distance ? `${race.distance} km` : 'race';
   return `${race.title} is a ${distance} hill running event held at ${race.venue}.`;
@@ -29,45 +28,19 @@ function extractDescription(contents: string, race: RaceInfo): string {
 function buildAdditionalProperties(race: RaceInfo) {
   const properties: Array<{ '@type': 'PropertyValue'; name: string; value: string }> = [];
 
-  if (race.distance != null) {
+  if (race.distance != null)
     properties.push({
       '@type': 'PropertyValue',
       name: 'Distance',
       value: `${race.distance} km`,
     });
-  }
 
-  if (race.climb != null) {
+  if (race.climb != null)
     properties.push({
       '@type': 'PropertyValue',
       name: 'Climb',
       value: `${race.climb} m`,
     });
-  }
-
-  if (race.maleRecord) {
-    properties.push({
-      '@type': 'PropertyValue',
-      name: 'Male record',
-      value: race.maleRecord,
-    });
-  }
-
-  if (race.femaleRecord) {
-    properties.push({
-      '@type': 'PropertyValue',
-      name: 'Female record',
-      value: race.femaleRecord,
-    });
-  }
-
-  if (race.nonBinaryRecord) {
-    properties.push({
-      '@type': 'PropertyValue',
-      name: 'Non-binary record',
-      value: race.nonBinaryRecord,
-    });
-  }
 
   return properties;
 }
@@ -87,7 +60,7 @@ function buildRaceJsonLd(raceId: string, raceData: RaceData, eventDate?: string)
       '@type': 'Place',
       name: raceData.info.venue,
     },
-    organizer: {
+    sponsor: {
       '@type': 'Organization',
       name: 'Scottish Hill Runners',
     },
@@ -96,17 +69,12 @@ function buildRaceJsonLd(raceId: string, raceData: RaceData, eventDate?: string)
     eventStatus: 'https://schema.org/EventScheduled',
   };
 
-  if (eventDate) {
+  if (eventDate)
     jsonLd.startDate = eventDate;
-  }
-
-  if (raceData.info.web) {
+  if (raceData.info.web)
     jsonLd.sameAs = raceData.info.web;
-  }
-
-  if (additionalProperty.length > 0) {
+  if (additionalProperty.length > 0)
     jsonLd.additionalProperty = additionalProperty;
-  }
 
   return jsonLd;
 }

@@ -17,6 +17,7 @@ import {
   ScoringRules,
 } from '@/types/datatable';
 import type { GeoJSON } from 'geojson';
+import { updateSitemap, writeRobotsTxt } from './update-sitemap';
 
 type YearInfo = {
   year: string;
@@ -1078,6 +1079,16 @@ async function main() {
   writeChampionshipData(championships);
   await writeCalendarData(championships, raceMap);
 
+  const routes: string[] = ['/calendar'];
+  for (const race of raceMap.keys())
+    routes.push(`/races/${race}`);
+  for (const championship of championships)
+    routes.push(`/championships/${championship.slug}`);
+  for (const club of clubs)
+    if (club.info && club.info.trim().length > 0)
+      routes.push(`/clubs/${club.slug}`);
+  updateSitemap(routes);
+  writeRobotsTxt()
   progress('Done\n');
 }
 
