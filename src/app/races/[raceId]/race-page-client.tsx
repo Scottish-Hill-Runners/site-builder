@@ -5,12 +5,19 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import RaceDetailsTabs from '@/components/RaceDetailsTabs';
 import { fetchJsonWithApiFallback } from '@/lib/client-results-fetch';
-import type { RaceImagesBySlugEntry } from '@/lib/imageCollections';
+import type { RaceImageItem } from '@/lib/imageCollections';
 import type { RaceData } from '@/types/datatable';
+
+type RaceImageForRender = RaceImageItem & { imageUrl: string };
+
+interface RaceImagesForRender {
+  hero: RaceImageForRender[];
+  gallery: RaceImageForRender[];
+}
 
 interface RacePageClientProps {
   raceId: string;
-  raceImages: RaceImagesBySlugEntry | null;
+  raceImages: RaceImagesForRender | null;
 }
 
 export default function RacePageClient({
