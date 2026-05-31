@@ -6,6 +6,7 @@ import './globals.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import sharedStyles from './shared.module.css';
 import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 import UnitsProvider from '@/components/UnitsProvider';
 import PreferenceInitializer from '@/components/PreferenceInitializer';
 
@@ -48,6 +49,7 @@ export default function RootLayout({
           <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
             {children}
           </div>
+          <SiteFooter />
         </UnitsProvider>
         <Analytics />
         <SpeedInsights />
