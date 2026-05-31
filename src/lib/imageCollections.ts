@@ -5,17 +5,13 @@ import { gunzipSync } from 'node:zlib';
 // ── Runtime item types ─────────────────────────────────────────────────────
 
 export interface HomepageImageItem {
-  path: string;
   sourcePath: string;
-  imageUrl: string;
   tier?: string;
   tags?: string[];
 }
 
 export interface RaceImageItem {
-  path: string;
   sourcePath: string;
-  imageUrl: string;
   caption?: string;
   year?: number;
   tags?: string[];
@@ -27,22 +23,18 @@ export interface RaceImagesBySlugEntry {
 }
 
 export interface DocumentItem {
-  path: string;
   sourcePath: string;
-  imageUrl: string;
   title?: string;
   description?: string;
   tags?: string[];
 }
 
 export interface PortraitItem {
-  path: string;
   sourcePath: string;
-  imageUrl: string;
   tags?: string[];
 }
 
-// ── Payload shape (v3) ─────────────────────────────────────────────────────
+// ── Payload shape (v5) ─────────────────────────────────────────────────────
 
 interface ImageCollectionsPayload {
   version: number;
@@ -64,7 +56,7 @@ interface ImageCollectionsPayload {
 let cachedPayload: ImageCollectionsPayload | null = null;
 
 const emptyPayload: ImageCollectionsPayload = {
-  version: 3,
+  version: 5,
   homepageImages: [],
   raceImagesBySlug: {},
   documents: [],

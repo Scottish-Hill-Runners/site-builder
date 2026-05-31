@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import RacePageClient from '@/app/races/[raceId]/race-page-client';
 import { getRaceImagesBySlug } from '@/lib/imageCollections';
+import { cloudinaryUrlForPresetFromEnv } from '@/lib/cloudinary';
 import { loadAllRaces, loadCalendar, loadRaceResults } from '@/lib/results-data';
 import type { AllRaceData, RaceData, RaceInfo } from '@/types/datatable';
 
@@ -90,6 +91,18 @@ export default async function RacePage({
     loadRaceResults(raceId),
     loadCalendar().catch(() => []),
   ]);
+  const optimizedRaceImages = raceImages
+    ? {
+        hero: raceImages.hero.map((item) => ({
+          ...item,
+          imageUrl: cloudinaryUrlForPresetFromEnv(item.sourcePath, 'raceHero'),
+        })),
+        gallery: raceImages.gallery.map((item) => ({
+          ...item,
+          imageUrl: cloudinaryUrlForPresetFromEnv(item.sourcePath, 'gallery'),
+        })),
+      }
+    : null;
 
   const eventDate = calendarEntries.find((entry) => entry.raceId === raceId)?.Date;
   const jsonLd = buildRaceJsonLd(raceId, raceData, eventDate);
@@ -100,7 +113,7 @@ export default async function RacePage({
         {JSON.stringify(jsonLd)}
       </script>
       <Suspense fallback={null}>
-        <RacePageClient raceId={raceId} raceImages={raceImages} />
+        <RacePageClient raceId={raceId} raceImages={optimizedRaceImages} />
       </Suspense>
     </>
   );

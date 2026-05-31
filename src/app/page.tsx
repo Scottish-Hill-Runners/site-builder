@@ -3,6 +3,7 @@ import Image from 'next/image';
 import NewsList from '@/components/NewsList';
 import { getRecentNewsItems } from '@/lib/news';
 import { getHomepageImages } from '@/lib/imageCollections';
+import { cloudinaryUrlForPresetFromEnv } from '@/lib/cloudinary';
 
 function shuffled<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -24,15 +25,19 @@ export default async function Home() {
     getRecentNewsItems(10),
     getHomepageImages().then((imgs) => shuffled(imgs).slice(0, 6)),
   ]);
+  const optimizedHeroImages = heroImages.map((item) => ({
+    ...item,
+    imageUrl: cloudinaryUrlForPresetFromEnv(item.sourcePath, 'homepage'),
+  }));
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-slate-950">
       <main className="flex min-h-screen w-full max-w-3xl flex-col items-start justify-start bg-white px-4 py-12 dark:bg-slate-950 sm:px-6">
         <div className="flex flex-col items-start gap-6 w-full">
-          {heroImages.length > 0 && (
+          {optimizedHeroImages.length > 0 && (
             <section className="w-full mt-2">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {heroImages.map((item, index) => (
+                {optimizedHeroImages.map((item, index) => (
                   <figure
                     key={item.sourcePath}
                     className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-900"

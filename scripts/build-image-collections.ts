@@ -34,53 +34,6 @@ interface SourceCommitteeFile {
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
-function stripExtension(filePath: string): string {
-  const ext = path.extname(filePath);
-  if (!ext) return filePath;
-  return filePath.slice(0, -ext.length);
-}
-
-function extensionOf(filePath: string): string {
-  const ext = path.extname(filePath);
-  return ext.startsWith('.') ? ext.slice(1).toLowerCase() : ext.toLowerCase();
-}
-
-function isImagePath(filePath: string): boolean {
-  const ext = extensionOf(filePath);
-  return new Set([
-    'jpg',
-    'jpeg',
-    'png',
-    'gif',
-    'webp',
-    'avif',
-    'svg',
-    'bmp',
-    'tif',
-    'tiff',
-    'heic',
-    'heif',
-    'jxl',
-  ]).has(ext);
-}
-
-function encodePublicId(publicId: string): string {
-  return publicId
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
-}
-
-function cloudinaryDeliveryUrl(cloudName: string, repoPath: string): string {
-  const normalizedPath = repoPath.replace(/^\.\//, '');
-  const publicId = stripExtension(normalizedPath);
-  const ext = extensionOf(normalizedPath);
-  const resourceType = isImagePath(normalizedPath) ? 'image' : 'raw';
-  const encodedPublicId = encodePublicId(publicId);
-  const suffix = ext ? `.${encodeURIComponent(ext)}` : '';
-  return `https://res.cloudinary.com/${encodeURIComponent(cloudName)}/${resourceType}/upload/${encodedPublicId}${suffix}`;
-}
-
 function resolveRepo(repo: string): string {
   const trimmed = repo.trim();
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
@@ -116,13 +69,12 @@ function readYaml<T>(filePath: string): T | null {
 }
 
 function resolveItem<T extends { path: string }>(
-  item: T,
-  cloudName: string
-): T & { sourcePath: string; imageUrl: string } {
+  item: T
+): Omit<T, 'path'> & { sourcePath: string } {
+  const { path: sourcePath, ...rest } = item;
   return {
-    ...item,
-    sourcePath: item.path,
-    imageUrl: cloudinaryDeliveryUrl(cloudName, item.path),
+    ...rest,
+    sourcePath,
   };
 }
 
@@ -154,7 +106,7 @@ function buildImageCollections() {
     contentPath('homepage', 'images.yaml')
   );
   const homepageImages = (homepageSrc?.images ?? []).map((item) =>
-    resolveItem(item, cloudName)
+    resolveItem(item)
   );
 
   // 2. Per-race images — scan races/*/images.yaml
@@ -174,9 +126,11 @@ function buildImageCollections() {
       const src = readYaml<SourceRaceImagesFile>(imagesFile);
       if (!src) continue;
       raceImagesBySlug[entry.name] = {
-        hero: (src.hero ?? []).map((item) => resolveItem(item, cloudName)),
+        hero: (src.hero ?? []).map((item) =>
+          resolveItem(item)
+        ),
         gallery: (src.gallery ?? []).map((item) =>
-          resolveItem(item, cloudName)
+          resolveItem(item)
         ),
       };
     }
@@ -187,7 +141,7 @@ function buildImageCollections() {
     contentPath('documents', 'manifest.yaml')
   );
   const documents = (docsSrc?.documents ?? []).map((item) =>
-    resolveItem(item, cloudName)
+    resolveItem(item)
   );
 
   // 4. Committee portraits
@@ -195,11 +149,11 @@ function buildImageCollections() {
     contentPath('committee', 'portraits.yaml')
   );
   const committeePortraits = (committeeSrc?.portraits ?? []).map((item) =>
-    resolveItem(item, cloudName)
+    resolveItem(item)
   );
 
   const payload = {
-    version: 3,
+    version: 5,
     generatedAt: new Date().toISOString(),
     source: { provider: 'cloudinary', cloudName, repo, sha, baseUrl },
     homepageImages,
