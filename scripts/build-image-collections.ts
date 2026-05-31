@@ -34,12 +34,51 @@ interface SourceCommitteeFile {
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
-function encodeRepoPath(repoPath: string): string {
-  return repoPath
-    .replace(/^\.?\//, '')
+function stripExtension(filePath: string): string {
+  const ext = path.extname(filePath);
+  if (!ext) return filePath;
+  return filePath.slice(0, -ext.length);
+}
+
+function extensionOf(filePath: string): string {
+  const ext = path.extname(filePath);
+  return ext.startsWith('.') ? ext.slice(1).toLowerCase() : ext.toLowerCase();
+}
+
+function isImagePath(filePath: string): boolean {
+  const ext = extensionOf(filePath);
+  return new Set([
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'avif',
+    'svg',
+    'bmp',
+    'tif',
+    'tiff',
+    'heic',
+    'heif',
+    'jxl',
+  ]).has(ext);
+}
+
+function encodePublicId(publicId: string): string {
+  return publicId
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
+}
+
+function cloudinaryDeliveryUrl(cloudName: string, repoPath: string): string {
+  const normalizedPath = repoPath.replace(/^\.\//, '');
+  const publicId = stripExtension(normalizedPath);
+  const ext = extensionOf(normalizedPath);
+  const resourceType = isImagePath(normalizedPath) ? 'image' : 'raw';
+  const encodedPublicId = encodePublicId(publicId);
+  const suffix = ext ? `.${encodeURIComponent(ext)}` : '';
+  return `https://res.cloudinary.com/${encodeURIComponent(cloudName)}/${resourceType}/upload/${encodedPublicId}${suffix}`;
 }
 
 function resolveRepo(repo: string): string {
@@ -78,12 +117,12 @@ function readYaml<T>(filePath: string): T | null {
 
 function resolveItem<T extends { path: string }>(
   item: T,
-  baseUrl: string
+  cloudName: string
 ): T & { sourcePath: string; imageUrl: string } {
   return {
     ...item,
     sourcePath: item.path,
-    imageUrl: `${baseUrl}/${encodeRepoPath(item.path)}`,
+    imageUrl: cloudinaryDeliveryUrl(cloudName, item.path),
   };
 }
 
@@ -98,7 +137,13 @@ function buildImageCollections() {
     process.env.CONTENT_REPO || 'Scottish-Hill-Runners/contents'
   );
   const sha = getContentSha(root);
-  const baseUrl = `https://raw.githubusercontent.com/${repo}/${sha}`;
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  if (!cloudName) {
+    throw new Error(
+      'CLOUDINARY_CLOUD_NAME is required to build Cloudinary image collections'
+    );
+  }
+  const baseUrl = `https://res.cloudinary.com/${encodeURIComponent(cloudName)}`;
 
   progress(
     `Building image collections from distributed manifests (CONTENT_ROOT=${root})...`
@@ -109,7 +154,7 @@ function buildImageCollections() {
     contentPath('homepage', 'images.yaml')
   );
   const homepageImages = (homepageSrc?.images ?? []).map((item) =>
-    resolveItem(item, baseUrl)
+    resolveItem(item, cloudName)
   );
 
   // 2. Per-race images — scan races/*/images.yaml
@@ -129,8 +174,10 @@ function buildImageCollections() {
       const src = readYaml<SourceRaceImagesFile>(imagesFile);
       if (!src) continue;
       raceImagesBySlug[entry.name] = {
-        hero: (src.hero ?? []).map((item) => resolveItem(item, baseUrl)),
-        gallery: (src.gallery ?? []).map((item) => resolveItem(item, baseUrl)),
+        hero: (src.hero ?? []).map((item) => resolveItem(item, cloudName)),
+        gallery: (src.gallery ?? []).map((item) =>
+          resolveItem(item, cloudName)
+        ),
       };
     }
   }
@@ -140,7 +187,7 @@ function buildImageCollections() {
     contentPath('documents', 'manifest.yaml')
   );
   const documents = (docsSrc?.documents ?? []).map((item) =>
-    resolveItem(item, baseUrl)
+    resolveItem(item, cloudName)
   );
 
   // 4. Committee portraits
@@ -148,13 +195,13 @@ function buildImageCollections() {
     contentPath('committee', 'portraits.yaml')
   );
   const committeePortraits = (committeeSrc?.portraits ?? []).map((item) =>
-    resolveItem(item, baseUrl)
+    resolveItem(item, cloudName)
   );
 
   const payload = {
     version: 3,
     generatedAt: new Date().toISOString(),
-    source: { repo, sha, baseUrl },
+    source: { provider: 'cloudinary', cloudName, repo, sha, baseUrl },
     homepageImages,
     raceImagesBySlug,
     documents,

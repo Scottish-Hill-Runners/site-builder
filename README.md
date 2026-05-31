@@ -31,9 +31,30 @@ If `collections.yaml` exists at the synced content root, the build step now emit
 This payload preserves collection metadata and adds external image links for each item.
 
 - `sourcePath` keeps the original path from `collections.yaml`.
-- `imageUrl` points to `raw.githubusercontent.com` using the exact synced content commit SHA.
+- `imageUrl` points to Cloudinary using deterministic delivery URLs derived from each `blobs/...` path.
 
-The SHA-pinned URLs make output deterministic for a given content sync, instead of tracking a moving branch URL.
+Cloudinary upload/migration workflow:
+
+```sh
+# one-time migration (dry run first)
+npm run cloudinary:migrate:dry-run
+npm run cloudinary:migrate
+
+# verify migrated delivery URLs
+npm run cloudinary:verify
+```
+
+Required environment variables:
+
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+Optional but recommended when source content repo is private:
+
+- `GITHUB_TOKEN` (read access for `CONTENT_REPO` tree lookup)
+
+Migration uses `CONTENT_REPO`/`CONTENT_REF` for source blob discovery if local `content/blobs` is not present.
 
 ## Overview
 
