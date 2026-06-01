@@ -10,6 +10,8 @@ export interface RaceResult {
   categoryPos: { [cat: string]: number };
   time: string;
   points?: number;
+  /** Per-category points, pre-computed at build time for position-bonus championships only. */
+  categoryPoints?: { [cat: string]: number };
   /** Optional team name (ephemeral, scoped to race instance). E.g., "Carnethy A". */
   team?: string;
   /** Optional leg identifier (numeric or string). E.g., 1, 2, or "Prologue". */

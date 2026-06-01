@@ -23,6 +23,8 @@ type RunnerEvent = {
   raceId: string;
   points: number;
   bucket: DistanceBucket;
+  /** Populated for position-bonus championships; used for per-category point resolution. */
+  categoryPoints?: { [cat: string]: number };
 };
 
 type StandingRow = {
@@ -47,6 +49,30 @@ function parseCategoryAge(category: string): number | null {
 
   const age = Number.parseInt(match[1], 10);
   return Number.isNaN(age) ? null : age;
+}
+
+/**
+ * For a position-bonus runner, determine which category to score under
+ * when no explicit filter is active.
+ * Rules: most events first; tie-break to the "lowest" (most specific)
+ * category, i.e. highest numeric age (F50 > F40 > F).
+ */
+function pickEffectiveCategory(events: RunnerEvent[]): string | null {
+  const counts = new Map<string, number>();
+  for (const event of events) {
+    if (event.categoryPoints) {
+      for (const cat of Object.keys(event.categoryPoints)) {
+        counts.set(cat, (counts.get(cat) ?? 0) + 1);
+      }
+    }
+  }
+  if (counts.size === 0) return null;
+  return Array.from(counts.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1]; // more events = preferred
+    const ageA = parseCategoryAge(a[0]) ?? -1;
+    const ageB = parseCategoryAge(b[0]) ?? -1;
+    return ageB - ageA; // higher age number = more specific = preferred
+  })[0][0];
 }
 
 function isAgeExempt(categories: string[], ageExemption?: number): boolean {
@@ -265,6 +291,7 @@ function buildStandings(
         raceId: row.raceId,
         points: racePoints,
         bucket,
+        categoryPoints: row.categoryPoints,
       });
       existing.events.push({ raceId: row.raceId, points: racePoints });
       return;
@@ -277,16 +304,28 @@ function buildStandings(
       clubs: normalizedClub ? [normalizedClub] : [],
       categories: [row.category],
       points: 0,
-      runnerEvents: [{ raceId: row.raceId, points: racePoints, bucket }],
+      runnerEvents: [{ raceId: row.raceId, points: racePoints, bucket, categoryPoints: row.categoryPoints }],
       events: [{ raceId: row.raceId, points: racePoints }],
     });
   });
 
   const finalized = Array.from(grouped.values()).map((runner) => {
-    const sortedEvents = [...runner.events].sort((a, b) =>
+    let resolvedEvents = runner.runnerEvents;
+
+    if (rules.points === 'position-bonus') {
+      const effectiveCat = pickEffectiveCategory(runner.runnerEvents);
+      if (effectiveCat) {
+        resolvedEvents = runner.runnerEvents.map((e) => ({
+          ...e,
+          points: e.categoryPoints?.[effectiveCat] ?? e.points,
+        }));
+      }
+    }
+
+    const sortedEvents = [...resolvedEvents].sort((a, b) =>
       a.raceId.localeCompare(b.raceId)
     );
-    const scoring = scoreRunnerEvents(rules, runner.categories, runner.runnerEvents);
+    const scoring = scoreRunnerEvents(rules, runner.categories, resolvedEvents);
     return {
       key: runner.key,
       name: runner.name,
@@ -294,14 +333,14 @@ function buildStandings(
       clubs: runner.clubs,
       categories: runner.categories,
       points: scoring.points,
-      events: sortedEvents,
+      events: sortedEvents.map(({ raceId, points }) => ({ raceId, points })),
       countingEvents: scoring.counting,
       remainingEvents: scoring.remaining,
-      runnerEvents: runner.runnerEvents,
+      runnerEvents: resolvedEvents,
       isQualified: meetsMinimumRequirements(
         rules,
         runner.categories,
-        runner.runnerEvents
+        resolvedEvents
       ),
     };
   });
@@ -431,7 +470,10 @@ export default function ChampionshipYearPageClient({
           ? normalizedName.toLowerCase()
           : `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
 
-      const racePoints = row.points ?? 0;
+      const racePoints =
+        scoringRules?.points === 'position-bonus' && row.categoryPoints
+          ? (row.categoryPoints[selectedCategoryPos] ?? row.points ?? 0)
+          : (row.points ?? 0);
 
       const bucket = getDistanceBucket(raceMetadata[row.raceId]?.distance);
       const existing = grouped.get(groupKey);

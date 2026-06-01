@@ -354,7 +354,6 @@ function geojsonFirstPoint(
 
 async function readResults(): Promise<Map<string, RaceEntry>> {
   const racesDir = contentPath('races');
-  const encoder = new TextEncoder();
   const raceMap = new Map<string, RaceEntry>();
   await Promise.all(
     fs
@@ -672,7 +671,7 @@ function readChampionships(
         });
 
         const items = sortedRaceIds
-          .filter((id) => !id.startsWith('no-slug('))
+          .filter((id) => !id.startsWith('no-slug'))
           .map((raceId) => {
             const raceEntry = raceMap.get(raceId);
             let title = raceId;
@@ -953,6 +952,13 @@ function writeChampionshipResultsData(
         for (const row of championshipResults) {
           const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
           if (rules.points === 'position-bonus') {
+            // Pre-compute points for every category the runner appears in
+            const catPoints: { [cat: string]: number } = {};
+            for (const [cat, pos] of Object.entries(row.categoryPos)) {
+              catPoints[cat] = pointsWithWinnerBonus(pos, rules.topN ?? 40);
+            }
+            row.categoryPoints = catPoints;
+            // Keep row.points as the broad sex-based value for backward compatibility
             const pos = row.categoryPos[sex] ?? row.position;
             row.points = pointsWithWinnerBonus(pos, rules.topN ?? 40);
           } else {
