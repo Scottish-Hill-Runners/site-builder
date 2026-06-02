@@ -263,7 +263,7 @@ async function readRaceInstance(
           for (let a = 30; a <= age; a += catIncr) {
             const cat = sex + (a < 40 ? '' : a);
             catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
-            if (a == 60) catIncr = 5;
+            if (a == 50) catIncr = 5;
           }
         }
 
