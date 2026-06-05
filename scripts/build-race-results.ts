@@ -866,13 +866,16 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
     count: Math.min(merged.count ?? 5, merged.minimum ?? merged.count ?? 5),
     minimum: merged.minimum ?? merged.count ?? 5,
     distanceSlots,
+    teams: merged.teams,
+    teamCount: merged.teamCount,
   };
 }
 
 function writeChampionshipResultsData(
   allResults: RaceResult[],
   championships: ChampionshipData[],
-  raceMap: Map<string, RaceEntry>
+  raceMap: Map<string, RaceEntry>,
+  calendarDates: Map<string, string>
 ): void {
   for (const championship of championships) {
     championship.yearHasData = {};
@@ -968,9 +971,25 @@ function writeChampionshipResultsData(
         }
       }
 
+      // Build raceSchedule: all scheduled races sorted by calendar date.
+      const raceSchedule = [...raceIds]
+        .sort((a, b) => {
+          const dateA = calendarDates.get(`${year}/${a}`);
+          const dateB = calendarDates.get(`${year}/${b}`);
+          if (dateA && dateB) return dateA.localeCompare(dateB);
+          if (dateA) return -1;
+          if (dateB) return 1;
+          return a.localeCompare(b);
+        })
+        .map((raceId) => {
+          const date = calendarDates.get(`${year}/${raceId}`);
+          return date ? { raceId, date } : { raceId };
+        });
+
       const payload: ChampionshipYearPayload = {
         rules,
         results: championshipResults,
+        raceSchedule,
       };
       writeGz(
         outputDir,
@@ -1079,7 +1098,7 @@ async function main() {
   writeRaceData(raceMap);
   writeRunnerData(allResults);
   summariseCategories(allResults);
-  writeChampionshipResultsData(allResults, championships, raceMap);
+  writeChampionshipResultsData(allResults, championships, raceMap, calendarDates);
   writeChampionshipData(championships);
   await writeCalendarData(championships, raceMap);
 

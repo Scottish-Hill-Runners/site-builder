@@ -11,7 +11,7 @@ interface ChampionshipYearPageClientProps {
   year: string;
 }
 
-type ChampionshipTab = 'results' | 'standings';
+type ChampionshipTab = 'results' | 'standings' | 'teams';
 
 type RunnerGrouping = 'name' | 'name-and-club';
 
@@ -40,6 +40,15 @@ type StandingRow = {
   runnerEvents?: RunnerEvent[];
   isQualified?: boolean;
 };
+
+type TeamStandingRow = {
+  position: string;
+  club: string;
+  raceScores: Record<string, number | null>;
+  total: number;
+};
+
+type RaceScheduleEntry = { raceId: string; date?: string };
 
 function parseCategoryAge(category: string): number | null {
   const match = category.match(/(\d+)/);
@@ -239,6 +248,121 @@ function formatPoints(points: number): string {
   return String(Math.round(points));
 }
 
+/**
+ * Same formula as `pointsWithWinnerBonus` in the build script.
+ * pos 1 → topN+1 (winner bonus), pos 2 → topN-1, pos n → topN-n+1, pos > topN → 0.
+ */
+function teamPositionPoints(teamRank: number, topN: number): number {
+  if (teamRank === 1) return topN + 1;
+  if (teamRank <= topN) return topN - teamRank + 1;
+  return 0;
+}
+
+function buildTeamStandings(
+  rules: ScoringRules,
+  results: RaceResult[],
+  raceIds: string[],
+  selectedCategory: string,
+  knownClubs: Set<string>,
+): TeamStandingRow[] {
+  const teamsN = rules.teams ?? 0;
+  if (teamsN <= 0 || !selectedCategory) return [];
+
+  const ascending = rules.points === 'raw-position';
+  const topN = rules.topN ?? 40;
+
+  // Filter to results in the selected category
+  const catResults = results.filter((r) => selectedCategory in r.categoryPos);
+
+  // clubRaceScores stores the per-race TEAM points (not the runner aggregate)
+  const clubRaceScores = new Map<string, Record<string, number | null>>();
+
+  for (const raceId of raceIds) {
+    const raceRows = catResults.filter((r) => r.raceId === raceId);
+
+    // Group individual points by club, skipping unregistered/unattached runners
+    const byClub = new Map<string, number[]>();
+    for (const row of raceRows) {
+      const club = row.club.trim();
+      if (!club || !knownClubs.has(club)) continue;
+      const pts =
+        rules.points === 'position-bonus' && row.categoryPoints
+          ? (row.categoryPoints[selectedCategory] ?? row.points ?? 0)
+          : (row.points ?? 0);
+      const existing = byClub.get(club);
+      if (existing) existing.push(pts);
+      else byClub.set(club, [pts]);
+    }
+
+    // Compute aggregate (sum of top N runners) for clubs that fielded a full team.
+    // The aggregate is used only for ranking; the displayed value is team position points.
+    const clubAggregates: { club: string; aggregate: number }[] = [];
+    for (const [club, scores] of byClub) {
+      if (scores.length >= teamsN) {
+        const sorted = [...scores].sort((a, b) => ascending ? a - b : b - a);
+        const aggregate = sorted.slice(0, teamsN).reduce((s, v) => s + v, 0);
+        clubAggregates.push({ club, aggregate });
+      }
+    }
+
+    // Rank clubs by aggregate (best first)
+    clubAggregates.sort((a, b) =>
+      ascending ? a.aggregate - b.aggregate : b.aggregate - a.aggregate
+    );
+
+    // Assign team position points based on rank in this race
+    for (let i = 0; i < clubAggregates.length; i++) {
+      const { club } = clubAggregates[i];
+      const teamRank = i + 1;
+      const teamPoints =
+        ascending ? teamRank : teamPositionPoints(teamRank, topN);
+
+      if (!clubRaceScores.has(club)) clubRaceScores.set(club, {});
+      clubRaceScores.get(club)![raceId] = teamPoints;
+    }
+
+    // Clubs that appeared but didn't field a full team get null
+    for (const [club] of byClub) {
+      if (!clubRaceScores.has(club)) clubRaceScores.set(club, {});
+      const scores = clubRaceScores.get(club)!;
+      if (!(raceId in scores)) scores[raceId] = null;
+    }
+  }
+
+  const rows: Omit<TeamStandingRow, 'position'>[] = [];
+  for (const [club, raceScores] of clubRaceScores) {
+    const scored = Object.values(raceScores).filter((v): v is number => v !== null);
+    if (scored.length === 0) continue;
+
+    let counting = scored;
+    if (rules.teamCount && rules.teamCount > 0 && scored.length > rules.teamCount) {
+      counting = [...scored].sort((a, b) => ascending ? a - b : b - a).slice(0, rules.teamCount);
+    }
+    const total = counting.reduce((s, v) => s + v, 0);
+    rows.push({ club, raceScores, total });
+  }
+
+  rows.sort((a, b) => {
+    const diff = ascending ? a.total - b.total : b.total - a.total;
+    if (diff !== 0) return diff;
+    return a.club.localeCompare(b.club);
+  });
+
+  // Assign overall positions with "=" ties.
+  // pos holds the position of the first item in the current tied group and
+  // only advances when the group ends (when the next item has a different total).
+  const withPosition: TeamStandingRow[] = [];
+  let pos = 1;
+  for (let i = 0; i < rows.length; i++) {
+    const prevTied = i > 0 && rows[i].total === rows[i - 1].total;
+    const nextTied = i < rows.length - 1 && rows[i].total === rows[i + 1].total;
+    const inTie = prevTied || nextTied;
+    withPosition.push({ ...rows[i], position: inTie ? `${pos}=` : `${pos}` });
+    if (!nextTied) pos = i + 2;
+  }
+  return withPosition;
+}
+
 function estimateRawPositionTotal(
   runner: StandingRow,
   totalRaceCount: number
@@ -378,7 +502,7 @@ export default function ChampionshipYearPageClient({
   const [activeTab, setActiveTab] = useState<ChampionshipTab>(() => {
     try {
       const saved = window.localStorage.getItem(CHAMP_TAB_STORAGE_KEY);
-      if (saved === 'standings' || saved === 'results') return saved;
+      if (saved === 'standings' || saved === 'results' || saved === 'teams') return saved;
     } catch {}
     return 'standings';
   });
@@ -398,6 +522,8 @@ export default function ChampionshipYearPageClient({
   });
   const [selectedCategoryPos, setSelectedCategoryPos] = useState<string>('All');
   const [selectedClub, setSelectedClub] = useState<string>('All');
+  const [raceSchedule, setRaceSchedule] = useState<RaceScheduleEntry[]>([]);
+  const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
@@ -439,6 +565,13 @@ export default function ChampionshipYearPageClient({
     return Array.from(categories).sort();
   }, [results]);
 
+  // Guard: if a stale 'teams' tab is in localStorage but this championship has no teams, fall back.
+  useEffect(() => {
+    if (activeTab === 'teams' && scoringRules && !(scoringRules.teams ?? 0)) {
+      setActiveTab('standings');
+    }
+  }, [activeTab, scoringRules]);
+
   const availableClubs = useMemo(() => {
     const clubs = new Set<string>();
     results?.forEach((row) => {
@@ -448,6 +581,51 @@ export default function ChampionshipYearPageClient({
     });
     return Array.from(clubs).sort((a, b) => a.localeCompare(b));
   }, [results]);
+
+  const teamRaceIds = useMemo(
+    () => raceSchedule.map((e) => e.raceId),
+    [raceSchedule]
+  );
+
+  // Only show categories where at least one known club can field a full team
+  // (i.e. has >= teams runners) in at least one race.
+  const availableTeamCategories = useMemo(() => {
+    const teamsN = scoringRules?.teams ?? 0;
+    if (teamsN === 0 || !results) return [];
+    const knownClubs = new Set(Object.keys(clubNameToSlug));
+    return availableCategoryPos.filter((cat) =>
+      teamRaceIds.some((raceId) => {
+        const byClub = new Map<string, number>();
+        for (const row of results) {
+          if (row.raceId !== raceId || !(cat in row.categoryPos)) continue;
+          const club = row.club.trim();
+          if (!club || !knownClubs.has(club)) continue;
+          byClub.set(club, (byClub.get(club) ?? 0) + 1);
+        }
+        return [...byClub.values()].some((count) => count >= teamsN);
+      })
+    );
+  }, [scoringRules, results, teamRaceIds, availableCategoryPos, clubNameToSlug]);
+
+  // Default selectedTeamCategory to the first available team category.
+  useEffect(() => {
+    if (availableTeamCategories.length > 0 && !selectedTeamCategory) {
+      setSelectedTeamCategory(availableTeamCategories[0]);
+    }
+  }, [availableTeamCategories, selectedTeamCategory]);
+
+  const teamStandings = useMemo(() => {
+    if (!scoringRules || (scoringRules.teams ?? 0) === 0 || !selectedTeamCategory || !results) {
+      return [];
+    }
+    return buildTeamStandings(
+      scoringRules,
+      results,
+      teamRaceIds,
+      selectedTeamCategory,
+      new Set(Object.keys(clubNameToSlug)),
+    );
+  }, [scoringRules, results, teamRaceIds, selectedTeamCategory, clubNameToSlug]);
 
   const filteredStandings = useMemo(() => {
     if (selectedCategoryPos === 'All' || !results) {
@@ -657,10 +835,12 @@ export default function ChampionshipYearPageClient({
           if (result.status === 'ok') {
             setScoringRules(result.data.rules);
             setResults(result.data.results);
+            setRaceSchedule(result.data.raceSchedule ?? []);
           } else if (result.status === 'not-found') {
             setIsNotFound(true);
             setScoringRules(null);
             setResults(null);
+            setRaceSchedule([]);
           } else {
             throw result.error;
           }
@@ -802,6 +982,21 @@ export default function ChampionshipYearPageClient({
               >
                 Results
               </button>
+              {(scoringRules?.teams ?? 0) > 0 && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'teams'}
+                  onClick={() => setActiveTab('teams')}
+                  className={
+                    activeTab === 'teams'
+                      ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
+                      : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                  }
+                >
+                  Teams
+                </button>
+              )}
             </div>
 
             {activeTab === 'standings' ? (
@@ -1075,7 +1270,7 @@ export default function ChampionshipYearPageClient({
                     </div>
                   )}
               </div>
-            ) : (
+            ) : activeTab === 'results' ? (
               <RaceResultsDataTable
                 data={results}
                 races={raceMetadata}
@@ -1084,6 +1279,111 @@ export default function ChampionshipYearPageClient({
                 initialNameFilter={selectedRunnerName}
                 showPointsColumn
               />
+            ) : (
+              /* Teams tab */
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="team-category-select"
+                    className="text-sm font-semibold text-slate-700 dark:text-slate-200"
+                  >
+                    Category:
+                  </label>
+                  <select
+                    id="team-category-select"
+                    value={selectedTeamCategory}
+                    onChange={(e) => setSelectedTeamCategory(e.target.value)}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  >
+                    {availableTeamCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {teamStandings.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg bg-white shadow-md dark:bg-slate-900">
+                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                      <thead className="bg-slate-100 dark:bg-slate-800">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                            Pos
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                            Club
+                          </th>
+                          {raceSchedule.map((entry) => {
+                            const isFuture =
+                              !entry.date ||
+                              entry.date > new Date().toISOString().slice(0, 10);
+                            return (
+                              <th
+                                key={entry.raceId}
+                                className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300${isFuture ? ' hidden sm:table-cell' : ''}`}
+                              >
+                                {raceMetadata[entry.raceId]?.title ?? entry.raceId}
+                              </th>
+                            );
+                          })}
+                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {teamStandings.map((row) => (
+                          <tr
+                            key={row.club}
+                            className="bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/60"
+                          >
+                            <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {row.position}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                              {row.club && clubNameToSlug[row.club] ? (
+                                <Link
+                                  href={`/clubs/${encodeURIComponent(clubNameToSlug[row.club])}`}
+                                  className="text-blue-600 hover:underline dark:text-blue-400"
+                                >
+                                  {row.club}
+                                </Link>
+                              ) : (
+                                row.club
+                              )}
+                            </td>
+                            {raceSchedule.map((entry) => {
+                              const score = row.raceScores[entry.raceId];
+                              const isFuture =
+                                !entry.date ||
+                                entry.date > new Date().toISOString().slice(0, 10);
+                              return (
+                                <td
+                                  key={entry.raceId}
+                                  className={`whitespace-nowrap px-4 py-3 text-right text-sm text-slate-700 dark:text-slate-200${isFuture ? ' hidden sm:table-cell' : ''}`}
+                                >
+                                  {score !== null && score !== undefined
+                                    ? formatPoints(score)
+                                    : ''}
+                                </td>
+                              );
+                            })}
+                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {formatPoints(row.total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-slate-50 p-6 text-center dark:bg-slate-800">
+                    <p className="text-slate-600 dark:text-slate-400">
+                      No team standings data available for this category.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ) : (

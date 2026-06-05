@@ -118,9 +118,25 @@ export interface ScoringRules {
    * distance bucket, unless they qualify for the ageExemption.
    */
   distanceSlots?: DistanceSlotsRule;
+  /**
+   * Number of runners from the same club that constitute a team for a single race.
+   * When set, a "Teams" tab is shown in the championship standings.
+   */
+  teams?: number;
+  /**
+   * If set, only the best `teamCount` races (where a full team was fielded) count
+   * toward each club's total. If absent, all such races are summed.
+   */
+  teamCount?: number;
 }
 
 export interface ChampionshipYearPayload {
   rules: ScoringRules;
   results: RaceResult[];
+  /**
+   * All races in the championship for this year, sorted by calendar date.
+   * Used by the client to order columns and to determine which races are future
+   * (no date, or date > today).
+   */
+  raceSchedule?: { raceId: string; date?: string }[];
 }
