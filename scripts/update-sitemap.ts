@@ -15,7 +15,21 @@ export function writeRobotsTxt() {
   const robots =
     'User-agent: *\n' +
     'Allow: /\n' +
-    `Sitemap: ${SITE_URL}/sitemap.xml\n`;
+    `Sitemap: ${SITE_URL}/sitemap.xml\n\n` +
+    '# Chinese crawlers — blocked (site is Scottish-region specific)\n' +
+    'User-agent: Baiduspider\n' +
+    'Disallow: /\n\n' +
+    'User-agent: Bytespider\n' +
+    'Disallow: /\n\n' +
+    'User-agent: PetalBot\n' +
+    'Disallow: /\n\n' +
+    'User-agent: SogouSpider\n' +
+    'Disallow: /\n\n' +
+    'User-agent: 360Spider\n' +
+    'Disallow: /\n\n' +
+    'User-agent: YisouSpider\n' +
+    'Disallow: /\n\n';
+
   fs.writeFileSync(ROBOTS_PATH, robots, 'utf8');
 
   progress('Wrote robots.txt');
