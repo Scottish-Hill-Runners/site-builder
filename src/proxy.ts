@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Block requests originating from China (Vercel injects geo data at the edge).
-// request.geo is undefined in local dev — the guard makes this a no-op locally.
-export function middleware(request: NextRequest) {
-  const country = request.geo?.country;
+// Block requests originating from China (Vercel injects geo data as a header at the edge).
+// The header is absent in local dev — the guard makes this a no-op locally.
+export function proxy(request: NextRequest) {
+  const country = request.headers.get('x-vercel-ip-country');
   if (country === 'CN') {
     return new NextResponse('Access denied.', { status: 403 });
   }
