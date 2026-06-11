@@ -119,15 +119,12 @@ export interface ScoringRules {
    */
   distanceSlots?: DistanceSlotsRule;
   /**
-   * Number of runners from the same club that constitute a team for a single race.
+   * Per-category team size: number of runners a club must field to constitute a team.
+   * Keys are exact category strings (e.g. "M", "F", "MV40"); "default" is the fallback.
    * When set, a "Teams" tab is shown in the championship standings.
+   * Team totals use the same `count`, `minimum`, and `distanceSlots` rules as individuals.
    */
-  teams?: number;
-  /**
-   * If set, only the best `teamCount` races (where a full team was fielded) count
-   * toward each club's total. If absent, all such races are summed.
-   */
-  teamCount?: number;
+  teamSize?: Record<string, number | undefined> & { default?: number };
 }
 
 export interface ChampionshipYearPayload {

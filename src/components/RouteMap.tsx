@@ -405,8 +405,8 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
               })
                 .setLngLat([start.lng, start.lat])
                 .setPopup(
-                  new maplibregl.Popup({ offset: 20 }).setText(
-                    `${raceName} — Start`
+                  new maplibregl.Popup({ offset: 20 }).setHTML(
+                    `<span style="color:#1f2937">${raceName} \u2014 Start</span>`
                   )
                 )
                 .addTo(map);
@@ -418,8 +418,8 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
               })
                 .setLngLat([end.lng, end.lat])
                 .setPopup(
-                  new maplibregl.Popup({ offset: 20 }).setText(
-                    `${raceName} — Finish`
+                  new maplibregl.Popup({ offset: 20 }).setHTML(
+                    `<span style="color:#1f2937">${raceName} \u2014 Finish</span>`
                   )
                 )
                 .addTo(map);
@@ -436,9 +436,10 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
                   const props = feature.properties as CheckpointProperties;
                   const [lng, lat] = (feature.geometry as import('geojson').Point).coordinates;
                   const name = props.name ?? 'CP';
-                  let popupHtml = `<strong>${name}</strong>`;
+                  let popupHtml = `<div style="color:#1f2937;font-size:13px"><strong>${name}</strong>`;
                   if (props.cutoff) popupHtml += `<br>Cutoff: ${props.cutoff}`;
                   if (props.notes) popupHtml += `<br>${props.notes}`;
+                  popupHtml += '</div>';
                   new maplibregl.Marker({
                     element: createMarkerEl(name, '#f97316'),
                     anchor: 'center',

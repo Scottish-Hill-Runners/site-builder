@@ -858,6 +858,14 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
       ? Object.assign({}, ...withSlots.map((o) => o.distanceSlots))
       : undefined;
 
+  const withTeamSize = [defaultRules, ...matchingOverrides].filter(
+    (o) => o.teamSize
+  );
+  const teamSize: ScoringRules['teamSize'] =
+    withTeamSize.length > 0
+      ? Object.assign({}, ...withTeamSize.map((o) => o.teamSize))
+      : undefined;
+
   return {
     points: merged.points as ScoringRules['points'],
     referenceTime: merged.referenceTime as ScoringRules['referenceTime'],
@@ -866,8 +874,7 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
     count: Math.min(merged.count ?? 5, merged.minimum ?? merged.count ?? 5),
     minimum: merged.minimum ?? merged.count ?? 5,
     distanceSlots,
-    teams: merged.teams,
-    teamCount: merged.teamCount,
+    teamSize,
   };
 }
 
