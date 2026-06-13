@@ -34,6 +34,7 @@ type ClubInfo = {
   web?: string;
   contact?: string;
   info: string;
+  excludeFromChampionships?: string;
 };
 
 type ChampionshipData = {
@@ -205,6 +206,7 @@ function readClubs(dir: string): ClubInfo[] {
         aliases: (data.aka as string[]) ?? [],
         web: data.web as string,
         contact: data.contact as string,
+        excludeFromChampionships: data.excludeFromChampionships as string,    
         info: content,
       });
     }
@@ -722,12 +724,13 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
       })
       .map((r) => r.club)
   );
-  const output = clubs.map(({ slug, name, web, contact, info }) => ({
+  const output = clubs.map(({ slug, name, web, contact, excludeFromChampionships, info }) => ({
     slug,
     name,
     web,
     contact,
     content: info,
+    excludeFromChampionships,
     active: activeClubNames.has(name),
   }));
   writeGz(

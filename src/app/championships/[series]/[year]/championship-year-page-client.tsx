@@ -41,6 +41,12 @@ type StandingRow = {
   isQualified?: boolean;
 };
 
+type ClubInfo = {
+  name: string;
+  slug: string;
+  excludeFromChampionships: string;
+};
+
 type TeamStandingRow = {
   position: string;
   club: string;
@@ -307,7 +313,7 @@ function buildTeamStandings(
   results: RaceResult[],
   raceIds: string[],
   selectedCategory: string,
-  knownClubs: Set<string>,
+  clubNameToInfo: Record<string, ClubInfo>,
   raceMetadata: RaceMetadata,
 ): TeamStandingRow[] {
   const teamsN = getTeamSize(rules.teamSize, selectedCategory);
@@ -331,11 +337,12 @@ function buildTeamStandings(
     // Group individual points by club, skipping unregistered/unattached runners
     const byClub = new Map<string, RaceResult[]>();
     for (const row of raceRows) {
-      const club = row.club.trim();
-      if (!club || !knownClubs.has(club)) continue;
-      const existing = byClub.get(club);
+      const club = clubNameToInfo[row.club.trim()];
+      if (!club) continue;
+      if (club.excludeFromChampionships !== undefined) continue;
+      const existing = byClub.get(club.slug);
       if (existing) existing.push(row);
-      else byClub.set(club, [row]);
+      else byClub.set(club.slug, [row]);
     }
 
     // Compute aggregate (sum of top N runners) for clubs that fielded a full team.
@@ -611,7 +618,7 @@ export default function ChampionshipYearPageClient({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
-  const [clubNameToSlug, setClubNameToSlug] = useState<Record<string, string>>(
+  const [clubNameToInfo, setClubNameToInfo] = useState<Record<string, ClubInfo>>(
     {}
   );
 
@@ -622,12 +629,12 @@ export default function ChampionshipYearPageClient({
   }, [selectedGrouping]);
 
   useEffect(() => {
-    fetchGzipJson<Array<{ name: string; slug: string }>>('/clubs.json.gz')
+    fetchGzipJson<Array<ClubInfo>>('/clubs.json.gz')
       .then((result) => {
         if (result.status === 'ok') {
-          const map: Record<string, string> = {};
-          for (const c of result.data) map[c.name] = c.slug;
-          setClubNameToSlug(map);
+          const map: Record<string, ClubInfo> = {};
+          for (const c of result.data) map[c.name] = c;
+          setClubNameToInfo(map);
         }
       })
       .catch(() => {});
@@ -675,7 +682,6 @@ export default function ChampionshipYearPageClient({
   // (i.e. has >= teamSize runners for that category) in at least one race.
   const availableTeamCategories = useMemo(() => {
     if (!scoringRules?.teamSize || !results) return [];
-    const knownClubs = new Set(Object.keys(clubNameToSlug));
     return availableCategoryPos.filter((cat) => {
       const teamsN = getTeamSize(scoringRules.teamSize, cat);
       if (teamsN === 0) return false;
@@ -684,13 +690,13 @@ export default function ChampionshipYearPageClient({
         for (const row of results) {
           if (row.raceId !== raceId || !(cat in row.categoryPos)) continue;
           const club = row.club.trim();
-          if (!club || !knownClubs.has(club)) continue;
+          if (!club || !clubNameToInfo[club]) continue;
           byClub.set(club, (byClub.get(club) ?? 0) + 1);
         }
         return [...byClub.values()].some((count) => count >= teamsN);
       });
     });
-  }, [scoringRules, results, teamRaceIds, availableCategoryPos, clubNameToSlug]);
+  }, [scoringRules, results, teamRaceIds, availableCategoryPos, clubNameToInfo]);
 
   // Default selectedTeamCategory to the first available team category.
   useEffect(() => {
@@ -712,10 +718,10 @@ export default function ChampionshipYearPageClient({
       results,
       teamRaceIds,
       selectedTeamCategory,
-      new Set(Object.keys(clubNameToSlug)),
+      clubNameToInfo,
       raceMetadata,
     );
-  }, [scoringRules, results, teamRaceIds, selectedTeamCategory, clubNameToSlug, raceMetadata]);
+  }, [scoringRules, results, teamRaceIds, selectedTeamCategory, clubNameToInfo, raceMetadata]);
 
   const filteredStandings = useMemo(() => {
     if (selectedCategoryPos === 'All' || !results) {
@@ -1208,9 +1214,9 @@ export default function ChampionshipYearPageClient({
                                 </Link>
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                                {runner.club && clubNameToSlug[runner.club] ? (
+                                {runner.club && clubNameToInfo[runner.club]?.slug ? (
                                   <Link
-                                    href={`/clubs/${encodeURIComponent(clubNameToSlug[runner.club])}`}
+                                    href={`/clubs/${encodeURIComponent(clubNameToInfo[runner.club].slug)}`}
                                     className="text-blue-600 hover:underline dark:text-blue-400"
                                   >
                                     {runner.club}
@@ -1304,9 +1310,9 @@ export default function ChampionshipYearPageClient({
                                 {runner.name}
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                                {runner.club && clubNameToSlug[runner.club] ? (
+                                {runner.club && clubNameToInfo[runner.club]?.slug ? (
                                   <Link
-                                    href={`/clubs/${encodeURIComponent(clubNameToSlug[runner.club])}`}
+                                    href={`/clubs/${encodeURIComponent(clubNameToInfo[runner.club].slug)}`}
                                     className="text-blue-600 hover:underline dark:text-blue-400"
                                   >
                                     {runner.club}
@@ -1444,9 +1450,9 @@ export default function ChampionshipYearPageClient({
                                     >
                                       {isExpanded ? 'Hide' : 'Details'}
                                     </button>
-                                    {row.club && clubNameToSlug[row.club] ? (
+                                    {row.club && clubNameToInfo[row.club]?.slug ? (
                                       <Link
-                                        href={`/clubs/${encodeURIComponent(clubNameToSlug[row.club])}`}
+                                        href={`/clubs/${encodeURIComponent(clubNameToInfo[row.club].slug)}`}
                                         className="text-blue-600 hover:underline dark:text-blue-400"
                                       >
                                         {row.club}
