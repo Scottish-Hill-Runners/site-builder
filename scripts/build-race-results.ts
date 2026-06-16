@@ -15,6 +15,7 @@ import {
   RaceInfo,
   RaceResult,
   ScoringRules,
+  TeamResult,
 } from '@/types/datatable';
 import type { GeoJSON } from 'geojson';
 import { updateSitemap, writeRobotsTxt } from './update-sitemap';
@@ -996,10 +997,94 @@ function writeChampionshipResultsData(
           return date ? { raceId, date } : { raceId };
         });
 
+      let teams: TeamResult[] | undefined = undefined;
+      const teamSizeRules = rules.teamSize;
+
+      if (teamSizeRules) {
+        teams = [];
+        const includedClubs = new Set(
+          clubs.filter((c) => !c.excludeFromChampionships).map((c) => c.name)
+        );
+
+        const resultsByRace = groupBy(championshipResults, (r) => r.raceId);
+
+        resultsByRace.forEach((raceResults, raceId) => {
+          type TeamAccum = {
+            raceId: string;
+            club: string;
+            category: string;
+            runners: { name: string; time: string; position: number }[];
+          };
+          const teamAccums = new Map<string, TeamAccum>();
+
+          for (const row of raceResults) {
+            if (!includedClubs.has(row.club)) continue;
+
+            for (const [cat, pos] of Object.entries(row.categoryPos)) {
+              const size = teamSizeRules[cat] ?? teamSizeRules.default;
+              if (size === undefined) continue;
+
+              const key = `${row.club}|${cat}`;
+              let accum = teamAccums.get(key);
+              if (!accum) {
+                accum = { raceId, club: row.club, category: cat, runners: [] };
+                teamAccums.set(key, accum);
+              }
+              accum.runners.push({ name: row.name, time: row.time, position: pos });
+            }
+          }
+
+          const validTeamsByCategory = new Map<
+            string,
+            Array<{ club: string; score: number; tieBreaker: number; accum: TeamAccum }>
+          >();
+
+          for (const accum of teamAccums.values()) {
+            const size = teamSizeRules[accum.category] ?? teamSizeRules.default;
+            if (size !== undefined && accum.runners.length >= size) {
+              accum.runners.sort((a, b) => a.position - b.position);
+              const scorers = accum.runners.slice(0, size);
+              const score = scorers.reduce((sum, r) => sum + r.position, 0);
+              const tieBreaker = scorers[size - 1].position;
+
+              let catTeams = validTeamsByCategory.get(accum.category);
+              if (!catTeams) {
+                catTeams = [];
+                validTeamsByCategory.set(accum.category, catTeams);
+              }
+              catTeams.push({ club: accum.club, score, tieBreaker, accum });
+            }
+          }
+
+          validTeamsByCategory.forEach((catTeams, cat) => {
+            catTeams.sort((a, b) => {
+              if (a.score !== b.score) return a.score - b.score;
+              return a.tieBreaker - b.tieBreaker;
+            });
+
+            catTeams.forEach((ct, index) => {
+              const position = index + 1;
+              const points = pointsWithWinnerBonus(position, rules.topN ?? 40);
+              const size = teamSizeRules[cat] ?? teamSizeRules.default!;
+
+              teams!.push({
+                raceId,
+                club: ct.club,
+                category: cat,
+                runners: ct.accum.runners.slice(0, size),
+                position,
+                points,
+              });
+            });
+          });
+        });
+      }
+
       const payload: ChampionshipYearPayload = {
         rules,
         results: championshipResults,
         raceSchedule,
+        teams,
       };
       writeGz(
         outputDir,

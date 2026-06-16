@@ -127,6 +127,21 @@ export interface ScoringRules {
   teamSize?: Record<string, number | undefined> & { default?: number };
 }
 
+export interface TeamResultRunner {
+  name: string;
+  position: number;
+  time: string;
+}
+
+export interface TeamResult {
+  raceId: string;
+  club: string;
+  category: string;
+  runners: TeamResultRunner[];
+  position: number;
+  points: number;
+}
+
 export interface ChampionshipYearPayload {
   rules: ScoringRules;
   results: RaceResult[];
@@ -136,4 +151,5 @@ export interface ChampionshipYearPayload {
    * (no date, or date > today).
    */
   raceSchedule?: { raceId: string; date?: string }[];
+  teams?: TeamResult[];
 }
