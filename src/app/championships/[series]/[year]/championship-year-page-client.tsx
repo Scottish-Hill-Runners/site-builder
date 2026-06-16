@@ -615,6 +615,8 @@ export default function ChampionshipYearPageClient({
   const [raceSchedule, setRaceSchedule] = useState<RaceScheduleEntry[]>([]);
   const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>('');
   const [expandedTeamClub, setExpandedTeamClub] = useState<string | null>(null);
+  const [teamSortKey, setTeamSortKey] = useState<string>('position');
+  const [teamSortDir, setTeamSortDir] = useState<'asc' | 'desc'>('asc');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
@@ -722,6 +724,26 @@ export default function ChampionshipYearPageClient({
       raceMetadata,
     );
   }, [scoringRules, results, teamRaceIds, selectedTeamCategory, clubNameToInfo, raceMetadata]);
+
+  const sortedTeamStandings = useMemo(() => {
+    if (teamStandings.length === 0) return teamStandings;
+    const dir = teamSortDir === 'asc' ? 1 : -1;
+    return [...teamStandings].sort((a, b) => {
+      if (teamSortKey === 'position') {
+        return dir * (parseFloat(a.position) - parseFloat(b.position));
+      }
+      if (teamSortKey === 'club') {
+        return dir * a.club.localeCompare(b.club);
+      }
+      if (teamSortKey === 'total') {
+        return dir * (a.total - b.total);
+      }
+      // race column
+      const aScore = a.raceScores[teamSortKey] ?? -Infinity;
+      const bScore = b.raceScores[teamSortKey] ?? -Infinity;
+      return dir * (aScore - bScore);
+    });
+  }, [teamStandings, teamSortKey, teamSortDir]);
 
   const filteredStandings = useMemo(() => {
     if (selectedCategoryPos === 'All' || !results) {
@@ -1219,10 +1241,10 @@ export default function ChampionshipYearPageClient({
                                     href={`/clubs/${encodeURIComponent(clubNameToInfo[runner.club].slug)}`}
                                     className="text-blue-600 hover:underline dark:text-blue-400"
                                   >
-                                    {runner.club}
+                                    {clubNameToInfo[runner.club]?.name || runner.club}
                                   </Link>
                                 ) : (
-                                  runner.club
+                                  clubNameToInfo[runner.club]?.name || runner.club
                                 )}
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
@@ -1403,32 +1425,63 @@ export default function ChampionshipYearPageClient({
                     <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                       <thead className="bg-slate-100 dark:bg-slate-800">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                            Pos
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                            Club
-                          </th>
+                          {(['position', 'club'] as const).map((col) => (
+                            <th
+                              key={col}
+                              onClick={() => {
+                                if (teamSortKey === col) {
+                                  setTeamSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+                                } else {
+                                  setTeamSortKey(col);
+                                  setTeamSortDir('asc');
+                                }
+                              }}
+                              className={`cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100`}
+                            >
+                              {col === 'position' ? 'Pos' : 'Club'}
+                              {teamSortKey === col ? (teamSortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                            </th>
+                          ))}
                           {raceSchedule.map((entry) => {
                             const isFuture =
                               !entry.date ||
                               entry.date > new Date().toISOString().slice(0, 10);
+                            const isActive = teamSortKey === entry.raceId;
                             return (
                               <th
                                 key={entry.raceId}
-                                className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300${isFuture ? ' hidden sm:table-cell' : ''}`}
+                                onClick={() => {
+                                  if (isActive) {
+                                    setTeamSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+                                  } else {
+                                    setTeamSortKey(entry.raceId);
+                                    setTeamSortDir('desc');
+                                  }
+                                }}
+                                className={`cursor-pointer select-none px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100${isFuture ? ' hidden sm:table-cell' : ''}`}
                               >
                                 {raceMetadata[entry.raceId]?.title ?? entry.raceId}
+                                {isActive ? (teamSortDir === 'asc' ? ' ↑' : ' ↓') : ''}
                               </th>
                             );
                           })}
-                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                            Total
+                          <th
+                            onClick={() => {
+                              if (teamSortKey === 'total') {
+                                setTeamSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+                              } else {
+                                setTeamSortKey('total');
+                                setTeamSortDir('desc');
+                              }
+                            }}
+                            className="cursor-pointer select-none px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                          >
+                            Total{teamSortKey === 'total' ? (teamSortDir === 'asc' ? ' ↑' : ' ↓') : ''}
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {teamStandings.map((row) => {
+                        {sortedTeamStandings.map((row) => {
                           const isExpanded = expandedTeamClub === row.club;
                           const detailsId = `team-details-${row.club.replace(/\s+/g, '-').toLowerCase()}`;
                           return (
