@@ -39,6 +39,7 @@ type StandingRow = {
   remainingEvents?: Array<{ raceId: string; points: number }>;
   runnerEvents?: RunnerEvent[];
   isQualified?: boolean;
+  overallPosition?: number;
 };
 
 type ClubInfo = {
@@ -703,7 +704,7 @@ export default function ChampionshipYearPageClient({
       });
     });
 
-    const finalized = Array.from(grouped.values()).map((runner) => {
+    const finalized: StandingRow[] = Array.from(grouped.values()).map((runner) => {
       const sortedEvents = [...runner.events].sort((a, b) =>
         a.raceId.localeCompare(b.raceId)
       );
@@ -728,7 +729,7 @@ export default function ChampionshipYearPageClient({
     });
 
     const ascending = scoringRules!.points === 'raw-position';
-    return finalized.sort((a, b) => {
+    const sorted = finalized.sort((a, b) => {
       const pointsDiff =
         ascending ? a.points - b.points : b.points - a.points;
       if (pointsDiff !== 0) {
@@ -756,6 +757,11 @@ export default function ChampionshipYearPageClient({
       // Final tie-breaker: alphabetical by name
       return a.name.localeCompare(b.name);
     });
+    let pos = 1;
+    for (const runner of sorted)
+      if (runner.isQualified)
+        runner.overallPosition = pos++;
+    return sorted;
   }, [
     selectedCategoryPos,
     allStandings,
@@ -802,6 +808,8 @@ export default function ChampionshipYearPageClient({
     }
 
     return [...unqualified].sort((a, b) => {
+      const n = (b.runnerEvents?.length ?? 0) - (a.runnerEvents?.length ?? 0);
+      if (n !== 0) return n;
       const estimateA = estimateRawPositionTotal(a, totalRaceCountForSelection);
       const estimateB = estimateRawPositionTotal(b, totalRaceCountForSelection);
       if (estimateA !== estimateB) {
@@ -1096,6 +1104,9 @@ export default function ChampionshipYearPageClient({
                         <thead className="bg-slate-100 dark:bg-slate-800">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Pos
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                               Name
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
@@ -1129,6 +1140,9 @@ export default function ChampionshipYearPageClient({
                               }}
                               className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
                             >
+                              <td className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                {runner.overallPosition}
+                              </td>
                               <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
                                 <Link
                                   href={`/runner?name=${encodeURIComponent(runner.name)}`}
@@ -1272,6 +1286,9 @@ export default function ChampionshipYearPageClient({
                                       )
                                       .join(', ')})`
                                   : ''}
+                                  {scoringRules?.minimum && (runner.countingEvents?.length ?? 0) < scoringRules.minimum
+                                   ? `; ${scoringRules.minimum - (runner.countingEvents?.length ?? 0)} more needed`
+                                   : ''}
                               </td>
                             </tr>
                           ))}
