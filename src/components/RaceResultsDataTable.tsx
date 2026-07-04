@@ -26,6 +26,7 @@ interface DataTableProps {
   enableRowFocus?: boolean;
   onFocusContextChange?: (context: ResultsFocusContext | null) => void;
   showPointsColumn?: boolean;
+  initialCategoryFilter?: string;
 }
 
 type SortColumn =
@@ -73,6 +74,7 @@ export default function RaceResultsDataTable({
   initialNameFilter = '',
   initialRaceFilter = '',
   initialYearFilter = '',
+  initialCategoryFilter = '',
   enableRowFocus = false,
   onFocusContextChange,
   showPointsColumn = false,
@@ -113,7 +115,7 @@ export default function RaceResultsDataTable({
     raceId: initialRaceFilter,
     raceTitle: '',
     club: '',
-    category: '',
+    category: initialCategoryFilter,
   });
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);

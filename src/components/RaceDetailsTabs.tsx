@@ -60,6 +60,7 @@ interface RaceDetailsTabsProps {
   galleryImages: RaceImageProp[];
   initialTab?: TabKey;
   initialYearFilter?: string;
+  initialCategoryFilter?: string;
 }
 
 type TabKey = 'results' | 'info' | 'gpx' | 'gallery';
@@ -86,6 +87,7 @@ export default function RaceDetailsTabs({
   galleryImages,
   initialTab,
   initialYearFilter = '',
+  initialCategoryFilter = '',
 }: RaceDetailsTabsProps) {
   const { imperial } = useUnits();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
@@ -279,6 +281,7 @@ export default function RaceDetailsTabs({
                     eras={race.eras}
                     enableRowFocus
                     initialYearFilter={effectiveInitialYearFilter}
+                    initialCategoryFilter={initialCategoryFilter}
                     onFocusContextChange={setFocusedResultContext}
                   />
                 ) : (

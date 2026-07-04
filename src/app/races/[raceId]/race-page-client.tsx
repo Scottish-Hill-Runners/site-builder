@@ -25,8 +25,9 @@ export default function RacePageClient({
   raceImages,
 }: RacePageClientProps) {
   const searchParams = useSearchParams();
+  const initialCategoryFilter = searchParams.get('category') ?? '';
   const initialYearFilter = searchParams.get('year') ?? '';
-  const initialTab = initialYearFilter ? 'results' : undefined;
+  const initialTab = initialYearFilter || initialCategoryFilter ? 'results' : undefined;
   const [data, setData] = useState<RaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -159,6 +160,7 @@ export default function RacePageClient({
               galleryImages={raceImages?.gallery ?? []}
               initialTab={initialTab}
               initialYearFilter={initialYearFilter}
+              initialCategoryFilter={initialCategoryFilter}
             />
           </>
         ) : (
