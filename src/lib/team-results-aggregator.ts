@@ -257,7 +257,7 @@ export function aggregateTeamResults(
     const legTimes: string[] = [];
     let hasIncomplete = false;
 
-    for (const [leg, legResult] of Array.from(teamResult.legResults.entries()).sort(
+    for (const [, legResult] of Array.from(teamResult.legResults.entries()).sort(
       (a, b) => {
         // Sort legs numerically if both are numbers, otherwise alphabetically
         const aNum = typeof a[0] === 'number' ? a[0] : NaN;

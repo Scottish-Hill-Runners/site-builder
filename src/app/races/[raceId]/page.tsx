@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import RacePageClient from '@/app/races/[raceId]/race-page-client';
 import { getRaceImagesBySlug } from '@/lib/imageCollections';
 import { cloudinaryUrlForPresetFromEnv } from '@/lib/cloudinary';
@@ -10,6 +11,63 @@ const SITE_URL = 'https://beta.scottishhillrunners.uk';
 export async function generateStaticParams() {
   const allRaces = await loadAllRaces().catch(() => ({}) as AllRaceData);
   return Object.keys(allRaces).map((raceId) => ({ raceId }));
+}
+
+function buildOgDescription(race: RaceInfo): string | undefined {
+  const parts: string[] = [];
+
+  if (race.venue)
+    parts.push(`in ${race.venue}`);
+  if (race.distance != null)
+    parts.push(`over ${race.distance}km`);
+  if (race.climb != null)
+    parts.push(`with ${race.climb}m ascent`);
+
+  if (parts.length === 0)
+    return undefined;
+
+  return `A race ${parts.join(' ')}`;
+}
+
+function getOgHeroImageUrl(sourcePath: string | undefined): string | undefined {
+  if (!sourcePath)
+    return undefined;
+
+  try {
+    return cloudinaryUrlForPresetFromEnv(sourcePath, 'raceHero');
+  } catch {
+    return undefined;
+  }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ raceId: string }>;
+}): Promise<Metadata> {
+  const { raceId } = await params;
+  const raceUrl = `${SITE_URL}/races/${encodeURIComponent(raceId)}`;
+
+  const [raceData, raceImages] = await Promise.all([
+    loadRaceResults(raceId).catch(() => null),
+    getRaceImagesBySlug(raceId).catch(() => null),
+  ]);
+
+  const title = raceData?.info.title;
+  const description = raceData ? buildOgDescription(raceData.info) : undefined;
+  const heroImageUrl = getOgHeroImageUrl(raceImages?.hero[0]?.sourcePath);
+
+  return {
+    ...(title ? { title } : {}),
+    ...(description ? { description } : {}),
+    openGraph: {
+      type: 'website',
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
+      url: raceUrl,
+      ...(heroImageUrl ? { images: [heroImageUrl] } : {}),
+    },
+  };
 }
 
 function extractDescription(contents: string, race: RaceInfo): string {
