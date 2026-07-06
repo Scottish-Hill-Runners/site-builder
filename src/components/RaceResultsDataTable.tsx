@@ -115,7 +115,7 @@ export default function RaceResultsDataTable({
     raceId: initialRaceFilter,
     raceTitle: '',
     club: '',
-    category: '',
+    category: initialCategoryFilter,
   });
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
