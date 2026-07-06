@@ -115,7 +115,7 @@ export default function RaceResultsDataTable({
     raceId: initialRaceFilter,
     raceTitle: '',
     club: '',
-    category: initialCategoryFilter,
+    category: '',
   });
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -970,7 +970,7 @@ export default function RaceResultsDataTable({
                           </td>
                           {showPointsColumn && (
                             <td className="px-2 py-4 font-mono text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
-                              {row.points ?? '-'}
+                              {(filters.category == 'All' ? row.points : row.categoryPoints?.[filters.category]) ?? '-'}
                             </td>
                           )}
                         </tr>

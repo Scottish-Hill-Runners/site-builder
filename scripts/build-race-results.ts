@@ -19,6 +19,7 @@ import {
 } from '@/types/datatable';
 import type { GeoJSON } from 'geojson';
 import { updateSitemap, writeRobotsTxt } from './update-sitemap';
+import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
 
 type YearInfo = {
   year: string;
@@ -43,6 +44,12 @@ type ChampionshipData = {
   title: string;
   contents: string;
   years: { [year: string]: string[] };
+  yearScoring?: {
+    [year: string]: {
+      participationBonusByRace?: Record<string, number>;
+      tieBreakRaceId?: string;
+    };
+  };
   yearHasData?: { [year: string]: boolean };
   rules?: {
     default?: Partial<ScoringRules>;
@@ -229,18 +236,10 @@ function likelySex(category: string): string {
   return 'M';
 }
 
-function categoryAge(category: string): number | null {
-  const match = category.match(/(\d+)/);
-  if (match) return Number.parseInt(match[1], 10);
-  if (/(JNR|JUN(IOR)?|U(NDER)?)/i.test(category)) return 23;
-  if (/(V(VET)?)/i.test(category))
-    return /S(EN(IOR)?)?/i.test(category) ? 50 : 40;
-  return null;
-}
 
-function isUnder23Result(result: RaceResult): boolean {
+function isEligibleResult(result: RaceResult, ageCap: number): boolean {
   const age = categoryAge(result.category);
-  return age !== null && age <= 23;
+  return age !== null && age <= ageCap;
 }
 
 async function readRaceInstance(
@@ -258,16 +257,17 @@ async function readRaceInstance(
         const age = categoryAge(category) ?? 30; // Assume 30+ if no age info in category, to give a category position.
         const catPos = {} as PosByCategory;
         if (age <= 23) {
-          catPos[sex + 23] = posByCategory[sex + 23] =
-            (posByCategory?.[sex + 23] ?? 0) + 1;
-          catPos[sex] = posByCategory[sex] = (posByCategory?.[sex] ?? 0) + 1;
+          for (const a of [23, 20, 18, 16, 14, 12, 10])
+            if (age <= a) {
+              const cat = sex + a;
+              catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
+            }
         } else {
-          let catIncr = 10;
-          for (let a = 30; a <= age; a += catIncr) {
-            const cat = sex + (a < 40 ? '' : a);
-            catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
-            if (a == 50) catIncr = 5;
-          }
+          for (const a of [30, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
+            if (age >= a) {
+              const cat = sex + (a < 40 ? '' : a);
+              catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
+            }
         }
 
         return catPos;
@@ -506,23 +506,66 @@ function parseEras(raw: string | undefined): Era[] | undefined {
   return eras.length > 0 ? eras : undefined;
 }
 
-function parseChampionshipRaceIds(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw
-      .map((value) => String(value).trim())
-      .filter((value) => value.length > 0 && value !== 'n/a');
+type ChampionshipRaceEntry = {
+  raceId: string;
+  participationBonus?: number;
+  tieBreak?: boolean;
+};
+
+function parseChampionshipRaceEntry(raw: unknown): ChampionshipRaceEntry | null {
+  const entry = String(raw ?? '').trim();
+  if (!entry || entry === 'n/a') return null;
+
+  const match = entry.match(/^(.*?)(?:\s+\(([^)]*)\))?$/);
+  if (!match) {
+    throw new Error(`Invalid championship race entry: ${entry}`);
   }
 
-  if (typeof raw === 'string') {
-    return raw === 'n/a'
-      ? []
-      : raw
-          .split(';')
-          .map((id) => id.trim())
-          .filter((id) => id);
+  const raceId = match[1].trim();
+  if (!raceId) {
+    throw new Error(`Missing race ID in championship race entry: ${entry}`);
   }
 
-  return [];
+  const out: ChampionshipRaceEntry = { raceId };
+  const metadataRaw = match[2]?.trim();
+  if (!metadataRaw) return out;
+
+  for (const tokenRaw of metadataRaw.split(',')) {
+    const token = tokenRaw.trim();
+    if (!token) continue;
+
+    const bonusMatch = token.match(/^bonus\s+(-?\d+(?:\.\d+)?)$/i);
+    if (bonusMatch) {
+      const bonus = Number.parseFloat(bonusMatch[1]);
+      if (!Number.isFinite(bonus)) {
+        throw new Error(`Invalid race bonus in championship race entry: ${entry}`);
+      }
+      out.participationBonus = bonus;
+      continue;
+    }
+
+    if (/^tie[-\s]?break$/i.test(token)) {
+      out.tieBreak = true;
+      continue;
+    }
+
+    throw new Error(`Unknown championship race annotation "${token}" in: ${entry}`);
+  }
+
+  return out;
+}
+
+function parseChampionshipRaceEntries(raw: unknown): ChampionshipRaceEntry[] {
+  const values: string[] =
+    Array.isArray(raw)
+      ? raw.map((value) => String(value).trim())
+      : typeof raw === 'string'
+        ? raw.split(';').map((id) => id.trim())
+        : [];
+
+  return values
+    .map((value) => parseChampionshipRaceEntry(value))
+    .filter((value): value is ChampionshipRaceEntry => value !== null);
 }
 
 function writeRaceData(raceMap: Map<string, RaceEntry>) {
@@ -642,12 +685,39 @@ function readChampionships(
     const { data, content } = matter.read(path.join(champDir, file.name));
     const slug = path.basename(file.name, '.md');
     const years: { [year: string]: string[] } = {};
+    const yearScoring: NonNullable<ChampionshipData['yearScoring']> = {};
 
     // Extract year data from frontmatter
     for (const [key, value] of Object.entries(data)) {
       if (/^\d{4}$/.test(key)) {
-        const raceIds = parseChampionshipRaceIds(value);
-        years[key] = raceIds;
+        const raceEntries = parseChampionshipRaceEntries(value);
+        years[key] = raceEntries.map((entry) => entry.raceId);
+
+        const participationBonusByRace: Record<string, number> = {};
+        let tieBreakRaceId: string | undefined;
+        for (const entry of raceEntries) {
+          if (entry.participationBonus !== undefined) {
+            participationBonusByRace[entry.raceId] = entry.participationBonus;
+          }
+          if (entry.tieBreak) {
+            if (tieBreakRaceId && tieBreakRaceId !== entry.raceId) {
+              throw new Error(
+                `Multiple tie-break races in ${slug} ${key}: ${tieBreakRaceId}, ${entry.raceId}`
+              );
+            }
+            tieBreakRaceId = entry.raceId;
+          }
+        }
+
+        if (Object.keys(participationBonusByRace).length > 0 || tieBreakRaceId) {
+          yearScoring[key] = {
+            participationBonusByRace:
+              Object.keys(participationBonusByRace).length > 0
+                ? participationBonusByRace
+                : undefined,
+            tieBreakRaceId,
+          };
+        }
       }
     }
 
@@ -707,6 +777,7 @@ function readChampionships(
       title: data.title as string,
       contents,
       years,
+      yearScoring,
       rules: data.rules as ChampionshipData['rules'],
     });
   }
@@ -779,10 +850,66 @@ function parseTimeToSeconds(time: string): number | null {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function pointsWithWinnerBonus(position: number, topN = 40): number {
-  if (position < 1 || position > topN) return 0;
-  const base = topN + 1 - position;
-  return base + (position === 1 ? 1 : 0);
+type ParsedPointsPattern = {
+  pointsByPosition: Map<number, number>;
+  higherIsBetter: boolean;
+};
+
+function parsePointsPattern(pattern: string, maxPosition: number): ParsedPointsPattern {
+  if (maxPosition < 1) {
+    return { pointsByPosition: new Map<number, number>(), higherIsBetter: true };
+  }
+
+  const trimmed = pattern.trim();
+  const explicitMatch = trimmed.match(/^\d+(?:,\d+)*$/);
+  const rangeMatch = trimmed.match(/^((\d+(?:,\d+)*)?,)?(\d+)\.\.(\d*)$/);
+
+  const values: number[] = [];
+
+  if (explicitMatch) {
+    values.push(...trimmed.split(',').map((n) => parseInt(n, 10)));
+  } else if (rangeMatch) {
+    const headRaw = rangeMatch[2];
+    const start = parseInt(rangeMatch[3], 10);
+    const endRaw = rangeMatch[4];
+
+    if (headRaw) {
+      values.push(...headRaw.split(',').map((n) => parseInt(n, 10)));
+    }
+
+    if (endRaw.length > 0) {
+      const end = parseInt(endRaw, 10);
+      const step = start <= end ? 1 : -1;
+      for (let current = start; ; current += step) {
+        values.push(current);
+        if (current === end) break;
+      }
+    } else {
+      values.push(start);
+      const previous = values.length >= 2 ? values[values.length - 2] : undefined;
+      const step = previous !== undefined && start < previous ? -1 : 1;
+      let current = start;
+      while (values.length < maxPosition) {
+        current += step;
+        values.push(current);
+      }
+    }
+  } else {
+    throw new Error(`Invalid points pattern: ${pattern}`);
+  }
+
+  if (values.length === 0) {
+    throw new Error(`Invalid points pattern (no values): ${pattern}`);
+  }
+
+  const pointsByPosition = new Map<number, number>();
+  const limit = Math.min(values.length, maxPosition);
+  for (let i = 0; i < limit; i++) {
+    pointsByPosition.set(i + 1, values[i]);
+  }
+
+  const higherIsBetter = values.length < 2 ? true : values[1] <= values[0];
+  return { pointsByPosition, higherIsBetter };
 }
 
 /**
@@ -826,31 +953,32 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
 
   const merged = Object.assign({}, defaultRules, ...matchingOverrides);
 
-  // Validate required fields; fall back to legacy behaviour keyed by slug
-  if (!merged.points) {
-    // Legacy fallback: derive rules from slug so old championships without
-    // a rules block still work until their content files are updated.
-    switch (data.slug) {
-      case 'LongClassics':
-        return {
-          points: 'time-ratio',
-          referenceTime: 'mf-record',
-          scale: 1000,
-          count: 5,
-          minimum: 5,
-        };
-      case 'BogAndBurn':
-        return { points: 'raw-position', count: 6, minimum: 6 };
-      case 'Under23':
-        return { points: 'position-bonus', count: 3, minimum: 3 };
-      default:
-        return {
-          points: 'position-bonus',
-          count: 4,
-          minimum: 4,
-          distanceSlots: { short: 1, medium: 1, long: 1, ageExemption: 60 },
-        };
-    }
+  if (typeof merged.points !== 'string' || merged.points.trim().length === 0) {
+    throw new Error(`Missing rules.points for ${data.slug} ${year}`);
+  }
+
+  if (
+    merged.eligibility !== undefined &&
+    (typeof merged.eligibility !== 'string' ||
+      parseEligibilityAgeCap(merged.eligibility) === null)
+  ) {
+    throw new Error(
+      `Invalid rules.eligibility for ${data.slug} ${year}: ${String(merged.eligibility)}`
+    );
+  }
+
+  if (
+    merged.additionalRaceBonus !== undefined &&
+    (typeof merged.additionalRaceBonus !== 'number' ||
+      !Number.isFinite(merged.additionalRaceBonus))
+  ) {
+    throw new Error(
+      `Invalid rules.additionalRaceBonus for ${data.slug} ${year}: ${String(merged.additionalRaceBonus)}`
+    );
+  }
+
+  if (merged.points !== 'time-ratio') {
+    parsePointsPattern(merged.points, 1);
   }
 
   // Deep-merge distanceSlots across default and all matching overrides.
@@ -871,12 +999,15 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
       : undefined;
 
   return {
-    points: merged.points as ScoringRules['points'],
+    points: merged.points,
     referenceTime: merged.referenceTime as ScoringRules['referenceTime'],
     scale: merged.scale,
-    topN: merged.topN,
     count: Math.min(merged.count ?? 5, merged.minimum ?? merged.count ?? 5),
+    additionalRaceBonus: merged.additionalRaceBonus,
     minimum: merged.minimum ?? merged.count ?? 5,
+    eligibility: merged.eligibility,
+    tieBreakRaceId:
+      typeof merged.tieBreakRaceId === 'string' ? merged.tieBreakRaceId : undefined,
     distanceSlots,
     teamSize,
   };
@@ -893,19 +1024,34 @@ function writeChampionshipResultsData(
 
     for (const [year, raceIds] of Object.entries(championship.years)) {
       const raceSet = new Set(raceIds);
+      const yearScoring = championship.yearScoring?.[year];
+      const participationBonusByRace = yearScoring?.participationBonusByRace ?? {};
+      const resolvedRules = resolveRules(championship, year);
+      const rules = yearScoring?.tieBreakRaceId
+        ? { ...resolvedRules, tieBreakRaceId: yearScoring.tieBreakRaceId }
+        : resolvedRules;
+      const eligibilityAgeCap =
+        rules.eligibility !== undefined
+          ? parseEligibilityAgeCap(rules.eligibility)
+          : null;
+
       const results = allResults.filter(
-        (result) => result.year.startsWith(year) && raceSet.has(result.raceId)
+        (result) =>
+          result.year.startsWith(year) &&
+          raceSet.has(result.raceId) &&
+          (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
       );
 
-      const championshipResults =
-        championship.slug === 'Under23'
-          ? results.filter(isUnder23Result)
-          : results.map((r) => ({ ...r })); // clone to allow mutation if needed
+      const championshipResults = results.map((r) => ({ ...r }));
 
       championship.yearHasData[year] =
         raceIds.length > 0 || championshipResults.length > 0;
 
-      const rules = resolveRules(championship, year);
+      const maxPatternPosition = Math.max(championshipResults.length, 1);
+      const parsedPoints =
+        rules.points === 'time-ratio'
+          ? null
+          : parsePointsPattern(rules.points, maxPatternPosition);
 
       // Compute per-race points according to the resolved rules
       if (rules.points === 'time-ratio') {
@@ -938,9 +1084,7 @@ function writeChampionshipResultsData(
           const sex =
             refMode === 'overall-winner'
               ? 'M'
-              : likelySex(row.category) === 'F'
-                ? 'F'
-                : 'M';
+              : likelySex(row.category) === 'F' ? 'F' : 'M';
           const raceWinnerTimes = winnerTimesByRaceAndSex.get(row.raceId)!;
 
           const winnerKey = `${row.raceId}:${sex}`;
@@ -965,20 +1109,22 @@ function writeChampionshipResultsData(
       } else {
         for (const row of championshipResults) {
           const sex = likelySex(row.category) === 'F' ? 'F' : 'M';
-          if (rules.points === 'position-bonus') {
-            // Pre-compute points for every category the runner appears in
-            const catPoints: { [cat: string]: number } = {};
-            for (const [cat, pos] of Object.entries(row.categoryPos)) {
-              catPoints[cat] = pointsWithWinnerBonus(pos, rules.topN ?? 40);
-            }
-            row.categoryPoints = catPoints;
-            // Keep row.points as the broad sex-based value for backward compatibility
-            const pos = row.categoryPos[sex] ?? row.position;
-            row.points = pointsWithWinnerBonus(pos, rules.topN ?? 40);
-          } else {
-            // raw-position: store the finish position (lower = better)
-            row.points = row.categoryPos[sex] ?? row.position;
-          }
+          const participationBonus = participationBonusByRace[row.raceId] ?? 0;
+          const pointsByPosition = parsedPoints!.pointsByPosition;
+          const catPoints: { [cat: string]: number } = {};
+          for (const [cat, pos] of Object.entries(row.categoryPos))
+            if (eligibilityAgeCap === null || (categoryAge(cat) ?? 0) <= eligibilityAgeCap)
+              catPoints[cat] = (pointsByPosition.get(pos) ?? 0) + participationBonus;
+          row.categoryPoints = catPoints;
+          const pos = row.categoryPos[sex] ?? row.position;
+          row.points = (pointsByPosition.get(pos) ?? 0) + participationBonus;
+        }
+      }
+
+      if (rules.points === 'time-ratio') {
+        for (const row of championshipResults) {
+          const participationBonus = participationBonusByRace[row.raceId] ?? 0;
+          row.points = (row.points ?? 0) + participationBonus;
         }
       }
 
@@ -1064,7 +1210,9 @@ function writeChampionshipResultsData(
 
             catTeams.forEach((ct, index) => {
               const position = index + 1;
-              const points = pointsWithWinnerBonus(position, rules.topN ?? 40);
+              const points = parsedPoints
+                ? (parsedPoints.pointsByPosition.get(position) ?? 0)
+                : 0;
               const size = teamSizeRules[cat] ?? teamSizeRules.default!;
 
               teams!.push({
@@ -1081,8 +1229,13 @@ function writeChampionshipResultsData(
       }
 
       const payload: ChampionshipYearPayload = {
+        title: championship.title,
         rules,
         results: championshipResults,
+        participationBonusByRace:
+          Object.keys(participationBonusByRace).length > 0
+            ? participationBonusByRace
+            : undefined,
         raceSchedule,
         teams,
       };

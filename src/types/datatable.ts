@@ -10,7 +10,7 @@ export interface RaceResult {
   categoryPos: { [cat: string]: number };
   time: string;
   points?: number;
-  /** Per-category points, pre-computed at build time for position-bonus championships only. */
+  /** Per-category points, pre-computed at build time for position-pattern championships. */
   categoryPoints?: { [cat: string]: number };
   /** Optional team name (ephemeral, scoped to race instance). E.g., "Carnethy A". */
   team?: string;
@@ -95,8 +95,12 @@ export interface DistanceSlotsRule {
  * in the championship frontmatter.
  */
 export interface ScoringRules {
-  /** How per-race points are computed at build time. */
-  points: 'position-bonus' | 'raw-position' | 'time-ratio';
+  /**
+   * How per-race points are computed at build time.
+   * - "time-ratio": winner-time ratio mode
+   * - position pattern string: e.g. "41,39..1", "25,20,17,15,14..1", "1,2.."
+   */
+  points: string;
   /**
    * Reference time used when points === 'time-ratio'.
    * - 'overall-winner'    – this year's single fastest time across all runners (one value for everyone)
@@ -106,12 +110,16 @@ export interface ScoringRules {
   referenceTime?: 'overall-winner' | 'mf-winner' | 'mf-record';
   /** Multiplier for time-ratio points (default 1000). */
   scale?: number;
-  /** Positions that earn points for position-bonus mode (default 40). */
-  topN?: number;
   /** How many results count toward a runner's total. */
   count: number;
+  /** Bonus added per completed race above `count`. */
+  additionalRaceBonus?: number;
   /** Minimum races a runner must complete to appear in the qualified standings. */
   minimum: number;
+  /** Optional eligibility cap such as "U18" or "U23" (interpreted as age <= N). */
+  eligibility?: string;
+  /** Optional nominated race ID used as first tie-break when totals are equal. */
+  tieBreakRaceId?: string;
   /**
    * If present, enables bucket-based counting (SHR style):
    * the runner must contribute at least the specified number of results per
@@ -143,8 +151,11 @@ export interface TeamResult {
 }
 
 export interface ChampionshipYearPayload {
+  title: string;
   rules: ScoringRules;
   results: RaceResult[];
+  /** Optional race-level participation bonuses (raceId -> bonus points). */
+  participationBonusByRace?: Record<string, number>;
   /**
    * All races in the championship for this year, sorted by calendar date.
    * Used by the client to order columns and to determine which races are future

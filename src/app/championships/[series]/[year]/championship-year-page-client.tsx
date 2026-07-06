@@ -5,6 +5,7 @@ import Link from 'next/link';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import type { ChampionshipYearPayload, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
+import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
 
 interface ChampionshipYearPageClientProps {
   series: string;
@@ -23,7 +24,7 @@ type RunnerEvent = {
   raceId: string;
   points: number;
   bucket: DistanceBucket;
-  /** Populated for position-bonus championships; used for per-category point resolution. */
+  /** Populated for position-pattern championships; used for per-category point resolution. */
   categoryPoints?: { [cat: string]: number };
 };
 
@@ -66,6 +67,69 @@ type TeamRaceBreakdown = {
 
 type RaceScheduleEntry = { raceId: string; date?: string };
 
+type ParsedPointsPattern = {
+  pointsByPosition: Map<number, number>;
+  higherIsBetter: boolean;
+};
+
+function parsePointsPattern(pattern: string, maxPosition: number): ParsedPointsPattern {
+  if (maxPosition < 1) {
+    return { pointsByPosition: new Map<number, number>(), higherIsBetter: true };
+  }
+
+  const trimmed = pattern.trim();
+  const explicitMatch = trimmed.match(/^\d+(?:,\d+)*$/);
+  const rangeMatch = trimmed.match(/^((\d+(?:,\d+)*)?,)?(\d+)\.\.(\d*)$/);
+
+  const values: number[] = [];
+
+  if (explicitMatch) {
+    values.push(...trimmed.split(',').map((n) => Number.parseInt(n, 10)));
+  } else if (rangeMatch) {
+    const headRaw = rangeMatch[2];
+    const start = Number.parseInt(rangeMatch[3], 10);
+    const endRaw = rangeMatch[4];
+
+    if (headRaw) {
+      values.push(...headRaw.split(',').map((n) => Number.parseInt(n, 10)));
+    }
+
+    if (endRaw.length > 0) {
+      const end = Number.parseInt(endRaw, 10);
+      const step = start <= end ? 1 : -1;
+      for (let current = start; ; current += step) {
+        values.push(current);
+        if (current === end) break;
+      }
+    } else {
+      values.push(start);
+      const previous = values.length >= 2 ? values[values.length - 2] : undefined;
+      const step = previous !== undefined && start < previous ? -1 : 1;
+      let current = start;
+      while (values.length < maxPosition) {
+        current += step;
+        values.push(current);
+      }
+    }
+  } else {
+    throw new Error(`Invalid points pattern: ${pattern}`);
+  }
+
+  const pointsByPosition = new Map<number, number>();
+  const limit = Math.min(values.length, maxPosition);
+  for (let i = 0; i < limit; i++) {
+    pointsByPosition.set(i + 1, values[i]);
+  }
+
+  const higherIsBetter = values.length < 2 ? true : values[1] <= values[0];
+  return { pointsByPosition, higherIsBetter };
+}
+
+function isAscendingScoreOrder(rules: ScoringRules): boolean {
+  if (rules.points === 'time-ratio') return false;
+  return !parsePointsPattern(rules.points, 2).higherIsBetter;
+}
+
 function parseCategoryAge(category: string): number | null {
   const match = category.match(/(\d+)/);
   if (!match) {
@@ -77,7 +141,7 @@ function parseCategoryAge(category: string): number | null {
 }
 
 /**
- * For a position-bonus runner, determine which category to score under
+ * For a position-pattern runner, determine which category to score under
  * when no explicit filter is active.
  * Rules: most events first; tie-break to the "lowest" (most specific)
  * category, i.e. highest numeric age (F50 > F40 > F).
@@ -140,11 +204,19 @@ function meetsMinimumRequirements(
 function scoreRunnerEvents(
   rules: ScoringRules,
   categories: string[],
-  events: RunnerEvent[]
+  events: RunnerEvent[],
+  options?: { applyAdditionalRaceBonus?: boolean }
 ): { points: number; counting: RunnerEvent[]; remaining: RunnerEvent[] } {
-  const ascending = rules.points === 'raw-position';
+  const ascending = isAscendingScoreOrder(rules);
   const sortFn = (a: RunnerEvent, b: RunnerEvent) =>
     ascending ? a.points - b.points : b.points - a.points;
+  const applyAdditionalRaceBonus = options?.applyAdditionalRaceBonus ?? true;
+  const additionalRaceBonus = rules.additionalRaceBonus ?? 0;
+  const extraRaceCount = Math.max(0, events.length - rules.count);
+  const extraBonusPoints =
+    applyAdditionalRaceBonus && additionalRaceBonus > 0
+      ? extraRaceCount * additionalRaceBonus
+      : 0;
 
   if (!rules.distanceSlots || isAgeExempt(categories, rules.distanceSlots.ageExemption)) {
     // Plain best-N
@@ -152,7 +224,7 @@ function scoreRunnerEvents(
     const counting = sorted.slice(0, rules.count);
     const remaining = sorted.slice(rules.count);
     return {
-      points: counting.reduce((sum, e) => sum + e.points, 0),
+      points: counting.reduce((sum, e) => sum + e.points, 0) + extraBonusPoints,
       counting,
       remaining,
     };
@@ -166,7 +238,7 @@ function scoreRunnerEvents(
     events
       .map((e, i) => ({ e, i }))
       .filter(({ e }) => e.bucket === bucket)
-      .sort((a, b) => b.e.points - a.e.points)
+      .sort((a, b) => sortFn(a.e, b.e))
       .slice(0, needed)
       .forEach(({ i }) => selected.add(i));
   };
@@ -180,7 +252,7 @@ function scoreRunnerEvents(
     events
       .map((e, i) => ({ e, i }))
       .filter(({ i }) => !selected.has(i))
-      .sort((a, b) => b.e.points - a.e.points)
+      .sort((a, b) => sortFn(a.e, b.e))
       .slice(0, fillCount)
       .forEach(({ i }) => selected.add(i));
   }
@@ -195,7 +267,7 @@ function scoreRunnerEvents(
   remaining.sort(sortFn);
 
   return {
-    points: counting.reduce((sum, e) => sum + e.points, 0),
+    points: counting.reduce((sum, e) => sum + e.points, 0) + extraBonusPoints,
     counting,
     remaining,
   };
@@ -258,6 +330,42 @@ function countHeadToHeadWins(
   // Return number of wins; will be used in sort as tiebreaker
   // Negative means A is better (more wins)
   return totalShared > 0 ? aWins : 0;
+}
+
+function compareByTieBreakRace(
+  runnerA: StandingRow,
+  runnerB: StandingRow,
+  allResults: RaceResult[],
+  grouping: RunnerGrouping,
+  tieBreakRaceId?: string
+): number {
+  if (!tieBreakRaceId) return 0;
+
+  const resultsMapA = buildRunnerResultsMap(
+    allResults,
+    runnerA.name,
+    runnerA.club,
+    grouping
+  );
+  const resultsMapB = buildRunnerResultsMap(
+    allResults,
+    runnerB.name,
+    runnerB.club,
+    grouping
+  );
+
+  const resultA = resultsMapA.get(tieBreakRaceId);
+  const resultB = resultsMapB.get(tieBreakRaceId);
+
+  if (resultA && !resultB) return -1;
+  if (!resultA && resultB) return 1;
+  if (!resultA || !resultB) return 0;
+
+  if (resultA.position !== resultB.position) {
+    return resultA.position - resultB.position;
+  }
+
+  return 0;
 }
 
 function formatPoints(points: number): string {
@@ -328,7 +436,9 @@ function buildTeamStandings(
       }));
     if (teamRaceEvents.length === 0) continue;
 
-    const scoring = scoreRunnerEvents(rules, [], teamRaceEvents);
+    const scoring = scoreRunnerEvents(rules, [], teamRaceEvents, {
+      applyAdditionalRaceBonus: false,
+    });
     const isQualified = meetsMinimumRequirements(rules, [], teamRaceEvents);
     rows.push({
       club,
@@ -340,7 +450,8 @@ function buildTeamStandings(
   }
 
   rows.sort((a, b) => {
-    const diff = b.total - a.total;
+    const ascending = isAscendingScoreOrder(rules);
+    const diff = ascending ? a.total - b.total : b.total - a.total;
     if (diff !== 0) return diff;
     return a.club.localeCompare(b.club);
   });
@@ -363,7 +474,7 @@ function buildTeamStandings(
   return withPosition;
 }
 
-function estimateRawPositionTotal(
+function estimateAscendingTotal(
   runner: StandingRow,
   totalRaceCount: number
 ): number {
@@ -386,7 +497,7 @@ function buildStandings(
   raceMetadata: RaceMetadata,
   grouping: RunnerGrouping
 ): StandingRow[] {
-  const ascending = rules.points === 'raw-position';
+  const ascending = isAscendingScoreOrder(rules);
   const grouped = new Map<
     string,
     StandingRow & { runnerEvents: RunnerEvent[] }
@@ -436,7 +547,10 @@ function buildStandings(
   const finalized = Array.from(grouped.values()).map((runner) => {
     let resolvedEvents = runner.runnerEvents;
 
-    if (rules.points === 'position-bonus') {
+    const hasCategoryPoints = runner.runnerEvents.some(
+      (event) => event.categoryPoints && Object.keys(event.categoryPoints).length > 0
+    );
+    if (hasCategoryPoints) {
       const effectiveCat = pickEffectiveCategory(runner.runnerEvents);
       if (effectiveCat) {
         resolvedEvents = runner.runnerEvents.map((e) => ({
@@ -476,6 +590,17 @@ function buildStandings(
       return pointsDiff;
     }
 
+    const tieBreakRaceDiff = compareByTieBreakRace(
+      a,
+      b,
+      rows,
+      grouping,
+      rules.tieBreakRaceId
+    );
+    if (tieBreakRaceDiff !== 0) {
+      return tieBreakRaceDiff;
+    }
+
     // Tie-breaker: head-to-head comparison in shared races
     const aHeadToHeadWins = countHeadToHeadWins(a, b, rows, grouping);
     const bHeadToHeadWins = countHeadToHeadWins(b, a, rows, grouping);
@@ -499,6 +624,7 @@ export default function ChampionshipYearPageClient({
   const [results, setResults] = useState<RaceResult[] | null>(null);
   const [scoringRules, setScoringRules] = useState<ScoringRules | null>(null);
   const [raceMetadata, setRaceMetadata] = useState<RaceMetadata>({});
+  const [title, setTitle] = useState<string>(series);
   const [activeTab, setActiveTab] = useState<ChampionshipTab>(() => {
     try {
       const saved = window.localStorage.getItem(CHAMP_TAB_STORAGE_KEY);
@@ -563,11 +689,14 @@ export default function ChampionshipYearPageClient({
 
   const availableCategoryPos = useMemo(() => {
     const categories = new Set<string>();
+    const ageCap = parseEligibilityAgeCap(scoringRules?.eligibility ?? '');
     results?.forEach((row) => {
-      Object.keys(row.categoryPos).forEach((cat) => categories.add(cat));
+      for (const cat of Object.keys(row.categoryPos))
+        if (ageCap === null || (categoryAge(cat) ?? 0) <= ageCap)
+          categories.add(cat);
     });
     return Array.from(categories).sort();
-  }, [results]);
+  }, [results, scoringRules]);
 
   // Guard: if a stale 'teams' tab is in localStorage but this championship has no teams, fall back.
   useEffect(() => {
@@ -667,7 +796,7 @@ export default function ChampionshipYearPageClient({
           : `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
 
       const racePoints =
-        scoringRules?.points === 'position-bonus' && row.categoryPoints
+        row.categoryPoints
           ? (row.categoryPoints[selectedCategoryPos] ?? row.points ?? 0)
           : (row.points ?? 0);
 
@@ -728,12 +857,23 @@ export default function ChampionshipYearPageClient({
       };
     });
 
-    const ascending = scoringRules!.points === 'raw-position';
+    const ascending = isAscendingScoreOrder(scoringRules!);
     const sorted = finalized.sort((a, b) => {
       const pointsDiff =
         ascending ? a.points - b.points : b.points - a.points;
       if (pointsDiff !== 0) {
         return pointsDiff;
+      }
+
+      const tieBreakRaceDiff = compareByTieBreakRace(
+        a,
+        b,
+        filteredRows,
+        selectedGrouping,
+        scoringRules?.tieBreakRaceId
+      );
+      if (tieBreakRaceDiff !== 0) {
+        return tieBreakRaceDiff;
       }
 
       // Tie-breaker: head-to-head comparison in shared races
@@ -803,15 +943,15 @@ export default function ChampionshipYearPageClient({
   const unqualifiedStandings = useMemo(() => {
     const unqualified = clubFilteredStandings?.filter((r) => !r.isQualified) ?? [];
 
-    if (scoringRules?.points !== 'raw-position') {
+    if (!scoringRules || !isAscendingScoreOrder(scoringRules)) {
       return unqualified;
     }
 
     return [...unqualified].sort((a, b) => {
       const n = (b.runnerEvents?.length ?? 0) - (a.runnerEvents?.length ?? 0);
       if (n !== 0) return n;
-      const estimateA = estimateRawPositionTotal(a, totalRaceCountForSelection);
-      const estimateB = estimateRawPositionTotal(b, totalRaceCountForSelection);
+      const estimateA = estimateAscendingTotal(a, totalRaceCountForSelection);
+      const estimateB = estimateAscendingTotal(b, totalRaceCountForSelection);
       if (estimateA !== estimateB) {
         return estimateA - estimateB;
       }
@@ -831,7 +971,7 @@ export default function ChampionshipYearPageClient({
     });
   }, [
     clubFilteredStandings,
-    scoringRules?.points,
+    scoringRules,
     totalRaceCountForSelection,
   ]);
 
@@ -862,12 +1002,14 @@ export default function ChampionshipYearPageClient({
             setResults(result.data.results);
             setRaceSchedule(result.data.raceSchedule ?? []);
             setPrebuiltTeams(result.data.teams ?? null);
+            setTitle(result.data.title ?? series);
           } else if (result.status === 'not-found') {
             setIsNotFound(true);
             setScoringRules(null);
             setResults(null);
             setRaceSchedule([]);
             setPrebuiltTeams(null);
+            setTitle(series);
           } else {
             throw result.error;
           }
@@ -935,7 +1077,7 @@ export default function ChampionshipYearPageClient({
                 href={`/championships/${encodeURIComponent(series)}`}
                 className="text-blue-600 hover:text-blue-800"
               >
-                {series}
+                {title}
               </Link>
             </li>
             <li aria-hidden="true">/</li>
@@ -949,7 +1091,7 @@ export default function ChampionshipYearPageClient({
         </nav>
 
         <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
-          {series} {year}
+          {title} {year}
         </h1>
 
         {isLoading ? (
@@ -961,7 +1103,7 @@ export default function ChampionshipYearPageClient({
         ) : isNotFound ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
             <p className="mb-4 text-gray-600 dark:text-slate-300">
-              No championship results found for {series} {year}.
+              No championship results found for {title} {year}.
             </p>
             <Link
               href={`/championships/${encodeURIComponent(series)}`}
