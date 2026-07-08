@@ -1177,7 +1177,7 @@ export default function ChampionshipYearPageClient({
                       htmlFor="grouping-select"
                       className="text-sm font-semibold text-slate-700 dark:text-slate-200"
                     >
-                      Group runners:
+                      Group by:
                     </label>
                     <select
                       id="grouping-select"

@@ -119,13 +119,6 @@ export default function HighlightBar({
           </button>
         )}
       </div>
-
-      {hasActive && (
-        <p className="mt-2.5 text-xs text-slate-400 dark:text-slate-500">
-          Races not matching the active filters are hidden. Within each group OR
-          applies; across groups AND applies.
-        </p>
-      )}
     </section>
   );
 }

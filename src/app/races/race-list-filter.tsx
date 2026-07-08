@@ -184,7 +184,7 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
               : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          All races
+          List
         </button>
         <button
           onClick={() => handleSetView('map')}
@@ -194,7 +194,7 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
               : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          Calendar Map
+          Map
         </button>
       </div>
 

@@ -181,6 +181,23 @@ function matchesHighlights(
   return true;
 }
 
+function getDayMatchColor(
+  entries: CalendarEntry[],
+  day: number,
+  active: Set<string>,
+): 'amber' | 'green' | 'purple' | null {
+  const hasMatch = entries.some(
+    (e) =>
+      parseRaceDate(e.Date)?.getDate() === day &&
+      matchesHighlights(e, active),
+  );
+  if (!hasMatch) return null;
+  // Priority: championship > distance > ascent
+  if ([...active].some((k) => k.startsWith('champ:'))) return 'amber';
+  if ([...active].some((k) => k.startsWith('dist:'))) return 'green';
+  return 'purple';
+}
+
 export default function CalendarPageClient() {
   const { imperial } = useUnits();
   const [entries, setEntries] = useState<CalendarEntry[] | null>(null);
@@ -415,6 +432,17 @@ export default function CalendarPageClient() {
                   {monthGroups.map((group) => {
                     const isSelected = group.key === selectedMonthKey;
                     const extraDays = Math.max(group.raceDays.length - 10, 0);
+                    const overflowMatchColor =
+                      activeHighlights.size > 0 && extraDays > 0
+                        ? group.raceDays
+                            .slice(10)
+                            .reduce<'amber' | 'green' | 'purple' | null>(
+                              (acc, d) =>
+                                acc ??
+                                getDayMatchColor(group.entries, d, activeHighlights),
+                              null,
+                            )
+                        : null;
 
                     return (
                       <button
@@ -440,21 +468,45 @@ export default function CalendarPageClient() {
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-1.5">
-                          {group.raceDays.slice(0, 10).map((day) => (
+                          {group.raceDays.slice(0, 10).map((day) => {
+                            const matchColor =
+                              activeHighlights.size > 0
+                                ? getDayMatchColor(group.entries, day, activeHighlights)
+                                : null;
+                            const dayClass =
+                              matchColor === 'amber'
+                                ? 'bg-amber-400 text-white dark:bg-amber-500'
+                                : matchColor === 'green'
+                                  ? 'bg-green-700 text-white dark:bg-green-600'
+                                  : matchColor === 'purple'
+                                    ? 'bg-purple-600 text-white dark:bg-purple-500'
+                                    : activeHighlights.size > 0
+                                      ? 'bg-slate-100 text-slate-400 opacity-60 dark:bg-slate-800 dark:text-slate-600'
+                                      : group.hasUpcomingRace
+                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                                        : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                            return (
+                              <span
+                                key={`${group.key}-${day}`}
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${dayClass}`}
+                              >
+                                {day}
+                              </span>
+                            );
+                          })}
+                          {extraDays > 0 && (
                             <span
-                              key={`${group.key}-${day}`}
                               className={[
                                 'rounded-full px-2 py-0.5 text-xs font-medium',
-                                group.hasUpcomingRace
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                                  : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                                overflowMatchColor === 'amber'
+                                  ? 'bg-amber-400 text-white dark:bg-amber-500'
+                                  : overflowMatchColor === 'green'
+                                    ? 'bg-green-700 text-white dark:bg-green-600'
+                                    : overflowMatchColor === 'purple'
+                                      ? 'bg-purple-600 text-white dark:bg-purple-500'
+                                      : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
                               ].join(' ')}
                             >
-                              {day}
-                            </span>
-                          ))}
-                          {extraDays > 0 && (
-                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                               +{extraDays}
                             </span>
                           )}
