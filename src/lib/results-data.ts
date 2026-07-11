@@ -8,6 +8,12 @@ export type RunnerNameEntry = {
   count: number;
 };
 
+export type RecentRaceLinkTarget = {
+  raceId: string;
+  title: string;
+  year: string;
+};
+
 function resultsPath(fileName: string): string {
   return path.join(process.cwd(), 'public', 'results', fileName);
 }
@@ -78,4 +84,45 @@ export async function loadRunnerBatch(batch: number): Promise<RaceResult[]> {
 
 export async function loadRunnerNames(): Promise<RunnerNameEntry[]> {
   return await readJsonGzip<RunnerNameEntry[]>('runners.json.gz');
+}
+
+export async function loadRecentRaceLinkTargets(
+  now: Date = new Date()
+): Promise<RecentRaceLinkTarget[]> {
+  const currentYear = String(now.getFullYear());
+  const previousYear = String(now.getFullYear() - 1);
+
+  const [allRaces, currentYearResults, previousYearResults] = await Promise.all([
+    loadAllRaces(),
+    loadYearResults(currentYear).catch(() => [] as RaceResult[]),
+    loadYearResults(previousYear).catch(() => [] as RaceResult[]),
+  ]);
+
+  const currentRaceIds = new Set(currentYearResults.map((result) => result.raceId));
+  const previousRaceIds = new Set(
+    previousYearResults.map((result) => result.raceId)
+  );
+
+  return Object.entries(allRaces)
+    .map(([raceId, race]) => {
+      if (currentRaceIds.has(raceId)) {
+        return {
+          raceId,
+          title: race.title ?? raceId,
+          year: currentYear,
+        };
+      }
+
+      if (previousRaceIds.has(raceId)) {
+        return {
+          raceId,
+          title: race.title ?? raceId,
+          year: previousYear,
+        };
+      }
+
+      return null;
+    })
+    .filter((entry): entry is RecentRaceLinkTarget => entry !== null)
+    .sort((a, b) => a.title.localeCompare(b.title));
 }

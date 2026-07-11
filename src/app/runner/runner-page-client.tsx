@@ -282,7 +282,7 @@ export default function RunnerPageClient({
               No matching results found for {decodedName}.
             </p>
             <Link
-              href="/years/2024"
+              href="/years"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
               Browse Year Results
