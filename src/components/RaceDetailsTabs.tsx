@@ -355,9 +355,9 @@ export default function RaceDetailsTabs({
               </figure>
             )}
 
-            <div className="grid grid-cols-1 gap-2 text-sm text-gray-700 dark:text-slate-300 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 sm:grid-cols-2">
               <p>
-                <span className="font-semibold text-gray-900 dark:text-slate-100">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
                   Venue:
                 </span>{' '}
                 {race.venue}
