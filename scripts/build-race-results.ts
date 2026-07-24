@@ -257,9 +257,9 @@ async function readRaceInstance(
         const age = categoryAge(category) ?? 30; // Assume 30+ if no age info in category, to give a category position.
         const catPos = {} as PosByCategory;
         if (age <= 23) {
-          for (const a of [23, 20, 18, 16, 14, 12, 10])
+          for (const a of [30, 23, 20, 18, 16, 14, 12, 10])
             if (age <= a) {
-              const cat = sex + a;
+              const cat = sex + (a < 40 ? '' : a);
               catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
             }
         } else {
@@ -1035,14 +1035,53 @@ function writeChampionshipResultsData(
           ? parseEligibilityAgeCap(rules.eligibility)
           : null;
 
+      const excludedClubs = new Set(
+        clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name)
+      );
+
       const results = allResults.filter(
         (result) =>
           result.year.startsWith(year) &&
           raceSet.has(result.raceId) &&
+          !excludedClubs.has(result.club) &&
           (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
       );
 
       const championshipResults = results.map((r) => ({ ...r }));
+
+      // Recalculate positions after exclusions
+      const resultsByRaceId = groupBy(championshipResults, r => r.raceId);
+      resultsByRaceId.forEach(raceResults => {
+        // Assume results are already sorted by time/original position
+        type PosByCategory = { [cat: string]: number };
+        const posByCategory = {} as PosByCategory;
+        
+        raceResults.forEach((result, idx) => {
+          result.position = idx + 1;
+          
+          const updateCategoryPos = (category: string) => {
+            const sex = likelySex(category);
+            const age = categoryAge(category) ?? 30;
+            const catPos = {} as PosByCategory;
+            if (age <= 23) {
+              for (const a of [30, 23, 20, 18, 16, 14, 12, 10])
+                if (age <= a) {
+                  const cat = sex + (a < 40 ? '' : a);
+                  catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
+                }
+            } else {
+              for (const a of [30, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
+                if (age >= a) {
+                  const cat = sex + (a < 40 ? '' : a);
+                  catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
+                }
+            }
+            return catPos;
+          };
+          
+          result.categoryPos = updateCategoryPos(result.category);
+        });
+      });
 
       championship.yearHasData[year] =
         raceIds.length > 0 || championshipResults.length > 0;
