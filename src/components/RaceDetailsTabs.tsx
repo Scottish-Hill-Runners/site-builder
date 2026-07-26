@@ -38,7 +38,8 @@ import type {
 import type { GeoJSON } from 'geojson';
 import Obfuscate from 'react-obfuscate';
 import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
-import { CORRECTIONS_EMAIL } from '@/lib/site-config';
+import ResultsSubmitDialog from '@/components/ResultsSubmitDialog';
+import { CORRECTIONS_EMAIL, RESULTS_EMAIL } from '@/lib/site-config';
 
 interface RaceImageProp {
   sourcePath: string;
@@ -145,6 +146,7 @@ export default function RaceDetailsTabs({
   const [focusedResultContext, setFocusedResultContext] =
     useState<ResultsFocusContext | null>(null);
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [heroImage] = useState<RaceImageProp | null>(() =>
     heroImages.length > 0
       ? heroImages[Math.floor(Math.random() * heroImages.length)]
@@ -495,6 +497,19 @@ export default function RaceDetailsTabs({
                 </a>
                 .
               </p>
+              {RESULTS_EMAIL && (
+                <p className="mt-1">
+                  Results ready to submit?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setSubmitDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Submit results by email
+                  </button>
+                  .
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -624,6 +639,14 @@ export default function RaceDetailsTabs({
           raceTitle={race.title}
           year={correctionYear ?? ''}
           results={correctionFilteredResults}
+        />
+      )}
+      {RESULTS_EMAIL && (
+        <ResultsSubmitDialog
+          open={submitDialogOpen}
+          onClose={() => setSubmitDialogOpen(false)}
+          raceId={raceId}
+          raceTitle={race.title}
         />
       )}
     </section>

@@ -30,6 +30,32 @@ interface OriginalValues {
   club: string;
 }
 
+function toWhomItMayConcern(): string {
+  const titles = [
+    'Department of Competitive Integrity',
+    'Bureau of Athletic Standards',
+    'Commission for Racing Oversight',
+    'Secretariat of Sports Regulation',
+    'Authority for Event Governance',
+    'Ministry of Physical Performance',
+    'Council for Technical Compliance',
+    'Office of Competition Adjudication',
+    'Board of Racing Statistics',
+    'Department of Participant Accreditation',
+    'Agency for Sporting Verification',
+    'Commission on Race Operations',
+    'Bureau of Performance Monitoring',
+    'Secretariat for Competitive Fairness',
+    'Ministry of Athletic Records',
+    'Office of Event Sanctioning',
+    'Council for Regulatory Enforcement',
+    'Department of Race Logistics',
+    'Authority for Sports Integrity',
+    'Bureau of Official Results and Records',
+  ];
+  return titles[Math.floor(Math.random() * titles.length)];
+}
+
 function buildCorrectionText(
   original: OriginalValues | null,
   form: FormState
@@ -142,7 +168,7 @@ export default function ResultCorrectionDialog({
     const correctionText = buildCorrectionText(originalValues, form);
     const subject = `Correction for ${raceTitle} (${raceId}) ${year}`;
     const body =
-      `To the Office of the Minister of SHR Race Corrections:\n\n` +
+      `To ${toWhomItMayConcern()}:\n\n` +
       `I would like to submit the following correction to the ${year} results for ${raceTitle}.\n\n` +
       `- raceId: ${raceId}\n` +
       `- year: ${year}\n` +
