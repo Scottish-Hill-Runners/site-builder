@@ -37,6 +37,8 @@ import type {
 } from '@/types/datatable';
 import type { GeoJSON } from 'geojson';
 import Obfuscate from 'react-obfuscate';
+import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
+import { CORRECTIONS_EMAIL } from '@/lib/site-config';
 
 interface RaceImageProp {
   sourcePath: string;
@@ -142,6 +144,7 @@ export default function RaceDetailsTabs({
   }, [viewMode, raceId]);
   const [focusedResultContext, setFocusedResultContext] =
     useState<ResultsFocusContext | null>(null);
+  const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
   const [heroImage] = useState<RaceImageProp | null>(() =>
     heroImages.length > 0
       ? heroImages[Math.floor(Math.random() * heroImages.length)]
@@ -185,6 +188,15 @@ export default function RaceDetailsTabs({
     correctionRaceId && correctionYear
       ? buildResultsEditUrl(correctionRaceId, correctionYear)
       : null;
+  const correctionFilteredResults = useMemo(
+    () =>
+      correctionYear
+        ? results.filter(
+            (r) => r.raceId === correctionRaceId && r.year === correctionYear
+          )
+        : [],
+    [results, correctionRaceId, correctionYear]
+  );
   const tabs: Array<{ key: TabKey; label: string }> = [
     { key: 'info', label: 'Race info' },
     { key: 'results', label: 'Results' },
@@ -294,7 +306,16 @@ export default function RaceDetailsTabs({
 
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
                   <p className="font-semibold">
-                    Spot an error in these results?
+                    Spot an error in these results?{' '}
+                    {CORRECTIONS_EMAIL && (
+                      <button
+                        type="button"
+                        onClick={() => setCorrectionDialogOpen(true)}
+                        className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                      >
+                        Email the results editor
+                      </button>
+                    )}
                   </p>
                   <p className="mt-1">
                     {correctionLink ? (
@@ -594,6 +615,17 @@ export default function RaceDetailsTabs({
           </div>
         )}
       </div>
+
+      {CORRECTIONS_EMAIL && (
+        <ResultCorrectionDialog
+          open={correctionDialogOpen}
+          onClose={() => setCorrectionDialogOpen(false)}
+          raceId={correctionRaceId}
+          raceTitle={race.title}
+          year={correctionYear ?? ''}
+          results={correctionFilteredResults}
+        />
+      )}
     </section>
   );
 }
