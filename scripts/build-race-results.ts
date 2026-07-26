@@ -84,6 +84,8 @@ type RaceEntry = {
   results: RaceResult[];
 };
 
+const openAge = 30; // Age threshold for open category. Used for category position calculations.
+
 function formatTime(time: string): string {
   const match = time.match(/(\d{1,3})[:\.h](\d{1,3})(?:[:\.m](\d\d))?/i);
   if (match) {
@@ -254,18 +256,18 @@ async function readRaceInstance(
       // TODO: handle dead heats
       const updateCategoryPos = (category: string) => {
         const sex = likelySex(category);
-        const age = categoryAge(category) ?? 30; // Assume 30+ if no age info in category, to give a category position.
+        const age = categoryAge(category) ?? openAge; // Assume 30+ if no age info in category, to give a category position.
         const catPos = {} as PosByCategory;
         if (age <= 23) {
-          for (const a of [30, 23, 20, 18, 16, 14, 12, 10])
+          for (const a of [openAge, 23, 20, 18, 16, 14, 12, 10])
             if (age <= a) {
-              const cat = sex + (a < 40 ? '' : a);
+              const cat = sex + (a == openAge ? '' : a);
               catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
             }
         } else {
-          for (const a of [30, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
+          for (const a of [openAge, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
             if (age >= a) {
-              const cat = sex + (a < 40 ? '' : a);
+              const cat = sex + (a == openAge ? '' : a);
               catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
             }
         }
@@ -1061,18 +1063,18 @@ function writeChampionshipResultsData(
           
           const updateCategoryPos = (category: string) => {
             const sex = likelySex(category);
-            const age = categoryAge(category) ?? 30;
+            const age = categoryAge(category) ?? openAge;
             const catPos = {} as PosByCategory;
-            if (age <= 23) {
-              for (const a of [30, 23, 20, 18, 16, 14, 12, 10])
+            if (age < openAge) {
+              for (const a of [openAge, 23, 20, 18, 16, 14, 12, 10])
                 if (age <= a) {
-                  const cat = sex + (a < 40 ? '' : a);
+                  const cat = sex + (a == openAge ? '' : a);
                   catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
                 }
             } else {
-              for (const a of [30, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
+              for (const a of [openAge, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
                 if (age >= a) {
-                  const cat = sex + (a < 40 ? '' : a);
+                  const cat = sex + (a == openAge ? '' : a);
                   catPos[cat] = posByCategory[cat] = (posByCategory?.[cat] ?? 0) + 1;
                 }
             }
