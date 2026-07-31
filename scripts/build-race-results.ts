@@ -809,7 +809,7 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
   const output = clubs.map(({ slug, name, web, contact, excludeFromChampionships, info }) => ({
     slug,
     name,
-    web,
+    web: normaliseWebUrl(web),
     contact,
     content: info,
     excludeFromChampionships,
