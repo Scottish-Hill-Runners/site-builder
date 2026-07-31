@@ -337,6 +337,14 @@ function parseGeojson(geojsonStr: string): GeoJSON | undefined {
   return undefined;
 }
 
+function normaliseWebUrl(rawUrl: unknown): string | undefined {
+  if (typeof rawUrl !== 'string') return undefined;
+  const url = rawUrl.trim();
+  if (!url) return undefined;
+  if (/^[a-z][a-z\d+.-]*:/i.test(url)) return url;
+  return `http://${url}`;
+}
+
 function geojsonFirstPoint(
   geojson: GeoJSON
 ): { latitude: number; longitude: number } | undefined {
@@ -380,7 +388,7 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           maleRecord: data.maleRecord ?? data.record,
           femaleRecord: data.femaleRecord,
           nonBinaryRecord: data.nonBinaryRecord,
-          web: data.web,
+          web: normaliseWebUrl(data.web),
           organiser: data.organiser ? Buffer.from(data.organiser).toString('base64') : undefined,
           eras: parseEras(data.eras as string | undefined),
         };
