@@ -12,6 +12,8 @@ import {
   buildResultsEditUrl,
   normalizeResultYear,
 } from '@/lib/results-correction-link';
+import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
+import { CORRECTIONS_EMAIL } from '@/lib/site-config';
 import type { RaceInfo, RaceResult } from '@/types/datatable';
 import type { ResultsFocusContext } from '@/types/datatable';
 
@@ -29,6 +31,7 @@ export default function YearPageClient({ year }: YearPageClientProps) {
   const [isNotFound, setIsNotFound] = useState(false);
   const [focusedResultContext, setFocusedResultContext] =
     useState<ResultsFocusContext | null>(null);
+  const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
   const fallbackRaceId = results?.[0]?.raceId ?? null;
   const fallbackYear = normalizeResultYear(year);
   const correctionRaceId = focusedResultContext?.raceId ?? fallbackRaceId;
@@ -37,6 +40,12 @@ export default function YearPageClient({ year }: YearPageClientProps) {
     correctionRaceId && correctionYear
       ? buildResultsEditUrl(correctionRaceId, correctionYear)
       : null;
+  const correctionFilteredResults =
+    results && correctionRaceId && correctionYear
+      ? results.filter(
+          (r) => r.raceId === correctionRaceId && r.year === correctionYear
+        )
+      : [];
 
   useEffect(() => {
     let isCancelled = false;
@@ -89,6 +98,7 @@ export default function YearPageClient({ year }: YearPageClientProps) {
   }, [year]);
 
   return (
+    <>
     <main
       id="main-content"
       className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-6 lg:px-8"
@@ -156,7 +166,18 @@ export default function YearPageClient({ year }: YearPageClientProps) {
               onFocusContextChange={setFocusedResultContext}
             />
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-              <p className="font-semibold">Spot an error in these results?</p>
+              <p className="font-semibold">
+                Spot an error in these results?{' '}
+                {CORRECTIONS_EMAIL && correctionRaceId && correctionYear && (
+                  <button
+                    type="button"
+                    onClick={() => setCorrectionDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Email the results editor
+                  </button>
+                )}
+              </p>
               {correctionLink ? (
                 <>
                   <p className="mt-1">
@@ -195,5 +216,16 @@ export default function YearPageClient({ year }: YearPageClientProps) {
         )}
       </div>
     </main>
+    {CORRECTIONS_EMAIL && (
+      <ResultCorrectionDialog
+        open={correctionDialogOpen}
+        onClose={() => setCorrectionDialogOpen(false)}
+        raceId={correctionRaceId ?? ''}
+        raceTitle={correctionRaceId ? (races[correctionRaceId]?.title ?? correctionRaceId) : ''}
+        year={correctionYear ?? ''}
+        results={correctionFilteredResults}
+      />
+    )}
+    </>
   );
 }
