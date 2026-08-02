@@ -170,7 +170,10 @@ function normaliseRunnerName(rawName: unknown): string | null {
 
   const titleCaseSegment = (segment: string): string => {
     if (!segment) return segment;
-    return segment[0].toUpperCase() + segment.slice(1).toLowerCase();
+    const tc = segment[0].toUpperCase() + segment.slice(1).toLowerCase();
+    return tc
+      .replace(/^Mac([a-z])/, (_, c) => 'Mac' + c.toUpperCase())
+      .replace(/^Mc([a-z])/, (_, c) => 'Mc' + c.toUpperCase());
   };
 
   const titleCaseName = (value: string): string =>
