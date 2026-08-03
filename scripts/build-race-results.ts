@@ -68,9 +68,33 @@ type CalendarEntry = {
   championships?: { [slug: string]: string };
 };
 
+type CalendarSourceRow = {
+  Date: string;
+  Race: string;
+};
+
+type ParsedRaceDateRule =
+  | {
+      kind: 'ordinal-weekday-in-month';
+      ordinal: number;
+      weekday: number;
+      month: number;
+    }
+  | {
+      kind: 'last-weekday-in-month';
+      weekday: number;
+      month: number;
+    }
+  | {
+      kind: 'day-after';
+      raceId: string;
+    };
+
 type RaceMeta = {
   info: RaceInfo;
   content: string;
+  raceDate?: string;
+  active: boolean;
   latitude?: number;
   longitude?: number;
   hasGpx: boolean;
@@ -85,6 +109,31 @@ type RaceEntry = {
 };
 
 const openAge = 30; // Age threshold for open category. Used for category position calculations.
+
+const LONDON_TIMEZONE = 'Europe/London';
+const WEEKDAY_TO_INDEX: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+const MONTH_TO_INDEX: Record<string, number> = {
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11,
+};
 
 function formatTime(time: string): string {
   const match = time.match(/(\d{1,3})[:\.h](\d{1,3})(?:[:\.m](\d\d))?/i);
@@ -408,6 +457,11 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
         const meta: RaceMeta = {
           info,
           content,
+          raceDate:
+            typeof data.raceDate === 'string' && data.raceDate.trim().length > 0
+              ? data.raceDate.trim()
+              : undefined,
+          active: data.active !== false,
           latitude:
             gpxPoint?.latitude ??
             (data.latitude !== undefined ? parseFloat(data.latitude) : undefined),
@@ -652,18 +706,288 @@ function summariseCategories(allResults: RaceResult[]): void {
   progress(`Clean categories: ${Array.from(cleanCats.values()).join(', ')}\n`);
 }
 
-function buildCalendarDateLookup(): Map<string, string> {
-  const calendarPath = contentPath('calendar.csv');
-  const lookup = new Map<string, string>();
-  for (const line of fs.readFileSync(calendarPath, 'utf-8').split('\n')) {
-    const commaIdx = line.indexOf(',');
-    if (commaIdx === -1) continue;
-    const date = line.slice(0, commaIdx).trim();
-    const raceId = line.slice(commaIdx + 1).trim();
-    if (!date || !raceId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    lookup.set(`${date.slice(0, 4)}/${raceId}`, date);
+function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function londonTodayIso(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: LONDON_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  if (!year || !month || !day) {
+    throw new Error('Could not determine current date in Europe/London');
   }
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeRule(input: string): string {
+  return input.replace(/\s+/g, ' ').trim();
+}
+
+function parseRaceDateRule(raw: string): ParsedRaceDateRule | null {
+  const rule = normalizeRule(raw);
+  if (!rule) return null;
+
+  const ordinalMatch = rule.match(
+    /^(\d+)(st|nd|rd|th)\s+(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\s+in\s+(January|February|March|April|May|June|July|August|September|October|November|December)$/i
+  );
+  if (ordinalMatch) {
+    const ordinal = Number.parseInt(ordinalMatch[1], 10);
+    const weekday = WEEKDAY_TO_INDEX[ordinalMatch[3].toLowerCase()];
+    const month = MONTH_TO_INDEX[ordinalMatch[4].toLowerCase()];
+    if (
+      Number.isInteger(ordinal) &&
+      ordinal >= 1 &&
+      ordinal <= 5 &&
+      weekday !== undefined &&
+      month !== undefined
+    ) {
+      return { kind: 'ordinal-weekday-in-month', ordinal, weekday, month };
+    }
+    return null;
+  }
+
+  const lastMatch = rule.match(
+    /^Last\s+(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\s+in\s+(January|February|March|April|May|June|July|August|September|October|November|December)$/i
+  );
+  if (lastMatch) {
+    const weekday = WEEKDAY_TO_INDEX[lastMatch[1].toLowerCase()];
+    const month = MONTH_TO_INDEX[lastMatch[2].toLowerCase()];
+    if (weekday !== undefined && month !== undefined) {
+      return { kind: 'last-weekday-in-month', weekday, month };
+    }
+    return null;
+  }
+
+  const dayAfterMatch = rule.match(/^Day after \{([A-Za-z0-9_-]+)\}$/);
+  if (dayAfterMatch) {
+    return { kind: 'day-after', raceId: dayAfterMatch[1] };
+  }
+
+  return null;
+}
+
+function formatIsoDateUtc(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getUTCDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function nthWeekdayOfMonthIso(
+  year: number,
+  month: number,
+  weekday: number,
+  ordinal: number
+): string | null {
+  const first = new Date(Date.UTC(year, month, 1));
+  const firstWeekday = first.getUTCDay();
+  const offset = (weekday - firstWeekday + 7) % 7;
+  const day = 1 + offset + (ordinal - 1) * 7;
+  const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  if (day > lastDayOfMonth) return null;
+  return formatIsoDateUtc(new Date(Date.UTC(year, month, day)));
+}
+
+function lastWeekdayOfMonthIso(
+  year: number,
+  month: number,
+  weekday: number
+): string {
+  const last = new Date(Date.UTC(year, month + 1, 0));
+  const lastWeekday = last.getUTCDay();
+  const offset = (lastWeekday - weekday + 7) % 7;
+  last.setUTCDate(last.getUTCDate() - offset);
+  return formatIsoDateUtc(last);
+}
+
+function addDaysIso(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate
+    .split('-')
+    .map((part) => Number.parseInt(part, 10));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatIsoDateUtc(date);
+}
+
+function parseCalendarCsvRows(rows: Array<{ Date?: string; Race?: string }>): CalendarSourceRow[] {
+  return rows
+    .filter((row, index) => {
+      const date = String(row.Date ?? '').trim();
+      const race = String(row.Race ?? '').trim();
+      if (!date && !race) {
+        return false;
+      }
+
+      if (index === 0) {
+        const looksLikeHeader =
+          date.toLowerCase() === 'date' &&
+          (race.toLowerCase() === 'race' || race.toLowerCase() === 'raceid');
+        if (looksLikeHeader) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+    .map((row) => ({
+      Date: String(row.Date ?? '').trim(),
+      Race: String(row.Race ?? '').trim(),
+    }));
+}
+
+async function readCalendarCsvRows(): Promise<CalendarSourceRow[]> {
+  const rows = await csv({
+    noheader: true,
+    headers: ['Date', 'Race'],
+    trim: true,
+  }).fromFile(contentPath('calendar.csv'));
+  return parseCalendarCsvRows(rows as Array<{ Date?: string; Race?: string }>);
+}
+
+function resolveComputedRaceDatesForYear(
+  year: number,
+  parsedRules: Map<string, ParsedRaceDateRule>
+): Map<string, string> {
+  const lookup = new Map<string, string>();
+  const relativeRules = new Map<string, string>();
+
+  for (const [raceId, rule] of parsedRules.entries()) {
+    if (rule.kind === 'ordinal-weekday-in-month') {
+      const isoDate = nthWeekdayOfMonthIso(
+        year,
+        rule.month,
+        rule.weekday,
+        rule.ordinal
+      );
+      if (!isoDate) {
+        progress(
+          `Warning: Could not compute raceDate for ${raceId} in ${year} from ordinal rule`
+        );
+        continue;
+      }
+      lookup.set(raceId, isoDate);
+      continue;
+    }
+
+    if (rule.kind === 'last-weekday-in-month') {
+      const isoDate = lastWeekdayOfMonthIso(year, rule.month, rule.weekday);
+      lookup.set(raceId, isoDate);
+      continue;
+    }
+
+    relativeRules.set(raceId, rule.raceId);
+  }
+
+  const unresolved = new Set(relativeRules.keys());
+  let didProgress = true;
+  while (unresolved.size > 0 && didProgress) {
+    didProgress = false;
+    for (const raceId of [...unresolved]) {
+      const targetRaceId = relativeRules.get(raceId);
+      if (!targetRaceId) {
+        unresolved.delete(raceId);
+        continue;
+      }
+
+      const targetDate = lookup.get(targetRaceId);
+      if (!targetDate) continue;
+
+      lookup.set(raceId, addDaysIso(targetDate, 1));
+      unresolved.delete(raceId);
+      didProgress = true;
+    }
+  }
+
+  for (const raceId of unresolved) {
+    const targetRaceId = relativeRules.get(raceId);
+    if (!targetRaceId) continue;
+    if (!parsedRules.has(targetRaceId)) {
+      progress(
+        `Warning: raceDate for ${raceId} references unknown/inactive race ${targetRaceId}; skipping derived date`
+      );
+      continue;
+    }
+    progress(
+      `Warning: Could not resolve raceDate dependency for ${raceId} in ${year}; possible cycle. Skipping derived date`
+    );
+  }
+
   return lookup;
+}
+
+async function buildMergedCalendarData(
+  raceMap: Map<string, RaceEntry>
+): Promise<{ rows: CalendarSourceRow[]; lookup: Map<string, string> }> {
+  const rows = await readCalendarCsvRows();
+  const lookup = new Map<string, string>();
+
+  for (const row of rows) {
+    if (!row.Race || !isIsoDate(row.Date)) continue;
+    lookup.set(`${row.Date.slice(0, 4)}/${row.Race}`, row.Date);
+  }
+
+  const parsedRules = new Map<string, ParsedRaceDateRule>();
+  for (const [raceId, raceEntry] of raceMap.entries()) {
+    const { active, raceDate } = raceEntry.meta;
+    if (!active || !raceDate) continue;
+
+    const parsed = parseRaceDateRule(raceDate);
+    if (!parsed) {
+      progress(
+        `Warning: Unrecognised raceDate rule for ${raceId}: "${raceDate}". Skipping derived date`
+      );
+      continue;
+    }
+    parsedRules.set(raceId, parsed);
+  }
+
+  if (parsedRules.size === 0) {
+    return { rows, lookup };
+  }
+
+  const todayIso = londonTodayIso();
+  const currentYear = Number.parseInt(todayIso.slice(0, 4), 10);
+  const nextYear = currentYear + 1;
+  const currentYearResolved = resolveComputedRaceDatesForYear(currentYear, parsedRules);
+  const nextYearResolved = resolveComputedRaceDatesForYear(nextYear, parsedRules);
+
+  let addedRows = 0;
+  for (const raceId of parsedRules.keys()) {
+    const currentYearDate = currentYearResolved.get(raceId);
+    if (!currentYearDate) continue;
+
+    const yearsToAdd =
+      currentYearDate < todayIso ? [currentYear, nextYear] : [currentYear];
+
+    for (const year of yearsToAdd) {
+      const date =
+        year === currentYear
+          ? currentYearResolved.get(raceId)
+          : nextYearResolved.get(raceId);
+      if (!date) continue;
+
+      const key = `${year}/${raceId}`;
+      if (lookup.has(key)) continue;
+
+      lookup.set(key, date);
+      rows.push({ Date: date, Race: raceId });
+      addedRows += 1;
+    }
+  }
+
+  if (addedRows > 0) {
+    progress(`Added ${addedRows} derived calendar row(s) from raceDate rules`);
+  }
+
+  return { rows, lookup };
 }
 
 function formatCalendarDate(isoDate: string): string {
@@ -1304,7 +1628,8 @@ function writeChampionshipResultsData(
 
 async function writeCalendarData(
   championships: ChampionshipData[],
-  raceMap: Map<string, RaceEntry>
+  raceMap: Map<string, RaceEntry>,
+  calendarRows: CalendarSourceRow[]
 ): Promise<void> {
   // Build championship lookup: "year/raceId" -> { [slug]: title }
   const champLookup = new Map<string, { [slug: string]: string }>();
@@ -1320,44 +1645,20 @@ async function writeCalendarData(
     }
   }
 
-  const rows = await csv({
-    noheader: true,
-    headers: ['Date', 'Race'],
-    trim: true,
-  }).fromFile(contentPath('calendar.csv'));
-
-  const entries: CalendarEntry[] = rows
-    .filter((row, index) => {
-      const date = String(row.Date ?? '').trim();
-      const race = String(row.Race ?? '').trim();
-      if (!date && !race) {
-        return false;
-      }
-
-      if (index === 0) {
-        const looksLikeHeader =
-          date.toLowerCase() === 'date' &&
-          (race.toLowerCase() === 'race' || race.toLowerCase() === 'raceid');
-        if (looksLikeHeader) {
-          return false;
-        }
-      }
-
-      return true;
-    })
+  const entries: CalendarEntry[] = calendarRows
     .map((row) => {
-      const raceId = String(row.Race ?? '').trim();
+      const raceId = row.Race;
       const raceEntry = raceMap.get(raceId);
       if (!raceId || !raceEntry) {
         return {
-          Date: String(row.Date ?? '').trim(),
+          Date: row.Date,
           raceName: raceId,
         };
       }
 
       const { info, latitude, longitude } = raceEntry.meta;
       const entry: CalendarEntry = {
-        Date: String(row.Date ?? '').trim(),
+        Date: row.Date,
         raceName: String(info.title ?? raceId),
         raceId,
       };
@@ -1379,6 +1680,23 @@ async function writeCalendarData(
       return entry;
     });
 
+  entries.sort((a, b) => {
+    const aIsIso = isIsoDate(a.Date);
+    const bIsIso = isIsoDate(b.Date);
+    if (aIsIso && bIsIso) {
+      const byDate = a.Date.localeCompare(b.Date);
+      if (byDate !== 0) return byDate;
+    } else if (aIsIso) {
+      return -1;
+    } else if (bIsIso) {
+      return 1;
+    }
+
+    const aKey = a.raceId ?? a.raceName;
+    const bKey = b.raceId ?? b.raceName;
+    return aKey.localeCompare(bKey);
+  });
+
   writeGz(
     path.join(process.cwd(), 'public'),
     'calendar.json',
@@ -1390,8 +1708,9 @@ async function writeCalendarData(
 async function main() {
   progress(`Using content root: ${contentRoot()}`);
   const raceMap = await readResults();
+  const { rows: calendarRows, lookup: calendarDates } =
+    await buildMergedCalendarData(raceMap);
   const allResults = [...raceMap.values()].flatMap((e) => e.results);
-  const calendarDates = buildCalendarDateLookup();
   const championships = readChampionships(calendarDates, raceMap);
   writeClubData(clubs, allResults);
   writeYearData(allResults);
@@ -1400,7 +1719,7 @@ async function main() {
   summariseCategories(allResults);
   writeChampionshipResultsData(allResults, championships, raceMap, calendarDates);
   writeChampionshipData(championships);
-  await writeCalendarData(championships, raceMap);
+  await writeCalendarData(championships, raceMap, calendarRows);
 
   const routes: string[] = ['/calendar'];
   for (const race of raceMap.keys())
