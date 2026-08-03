@@ -766,7 +766,7 @@ function parseRaceDateRule(raw: string): ParsedRaceDateRule | null {
     return null;
   }
 
-  const dayAfterMatch = rule.match(/^Day after \{([A-Za-z0-9_-]+)\}$/);
+  const dayAfterMatch = rule.match(/^Day after ([A-Za-z0-9_-]+)$/);
   if (dayAfterMatch) {
     return { kind: 'day-after', raceId: dayAfterMatch[1] };
   }
