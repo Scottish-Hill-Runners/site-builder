@@ -102,7 +102,7 @@ export default async function Home() {
                   Runners
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Runner
+                  View all your race results (or your rival&apos;s!)
                 </p>
               </Link>
               <Link
@@ -147,6 +147,15 @@ export default async function Home() {
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
                   Member clubs
+                </p>
+              </Link>
+              <Link
+                href="https://www.sientries.co.uk/event_series.php?series_id=601"
+                className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Join now!</h3>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Become a member of SHR
                 </p>
               </Link>
             </div>
