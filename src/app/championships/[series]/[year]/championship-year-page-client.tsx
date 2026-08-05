@@ -646,7 +646,7 @@ export default function ChampionshipYearPageClient({
     } catch {}
     return 'name-and-club';
   });
-  const [selectedCategoryPos, setSelectedCategoryPos] = useState<string>('All');
+  const [selectedCategoryPos, setSelectedCategoryPos] = useState<string>('');
   const [selectedClub, setSelectedClub] = useState<string>('All');
   const [raceSchedule, setRaceSchedule] = useState<RaceScheduleEntry[]>([]);
   const [prebuiltTeams, setPrebuiltTeams] = useState<TeamResult[] | null>(null);
@@ -697,6 +697,13 @@ export default function ChampionshipYearPageClient({
     });
     return Array.from(categories).sort();
   }, [results, scoringRules]);
+
+  // Default selectedCategoryPos to the first available category.
+  useEffect(() => {
+    if (availableCategoryPos.length > 0 && !selectedCategoryPos) {
+      setSelectedCategoryPos(availableCategoryPos[0]);
+    }
+  }, [availableCategoryPos, selectedCategoryPos]);
 
   // Guard: if a stale 'teams' tab is in localStorage but this championship has no teams, fall back.
   useEffect(() => {
@@ -775,7 +782,7 @@ export default function ChampionshipYearPageClient({
   );
 
   const filteredStandings = useMemo(() => {
-    if (selectedCategoryPos === 'All' || !results) {
+    if (!selectedCategoryPos || !results) {
       return allStandings;
     }
 
@@ -929,13 +936,9 @@ export default function ChampionshipYearPageClient({
     if (!results) return 0;
 
     const raceIds = new Set<string>();
-    if (selectedCategoryPos === 'All') {
-      results.forEach((row) => raceIds.add(row.raceId));
-    } else {
-      results
-        .filter((row) => selectedCategoryPos in row.categoryPos)
-        .forEach((row) => raceIds.add(row.raceId));
-    }
+    results
+      .filter((row) => !selectedCategoryPos || selectedCategoryPos in row.categoryPos)
+      .forEach((row) => raceIds.add(row.raceId));
 
     return raceIds.size;
   }, [results, selectedCategoryPos]);
@@ -1205,7 +1208,6 @@ export default function ChampionshipYearPageClient({
                       onChange={(e) => setSelectedCategoryPos(e.target.value)}
                       className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                     >
-                      <option value="All">All</option>
                       {availableCategoryPos.map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
