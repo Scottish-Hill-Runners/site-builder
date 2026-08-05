@@ -102,7 +102,7 @@ export default async function Home() {
                   Runners
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  View all your race results (or your rival&apos;s!)
+                  View all your race results (or your rivals!)
                 </p>
               </Link>
               <Link
