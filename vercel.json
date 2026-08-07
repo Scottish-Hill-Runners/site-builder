@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)\\.[aA][sS][pP][xX]",
+      "destination": "/welcome",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*\\.json\\.gz)",

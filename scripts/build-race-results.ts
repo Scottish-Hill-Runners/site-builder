@@ -1721,7 +1721,7 @@ async function main() {
   writeChampionshipData(championships);
   await writeCalendarData(championships, raceMap, calendarRows);
 
-  const routes: string[] = ['/calendar'];
+  const routes: string[] = ['/calendar', '/welcome'];
   for (const race of raceMap.keys())
     routes.push(`/races/${race}`);
   for (const championship of championships)

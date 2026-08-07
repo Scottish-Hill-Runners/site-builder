@@ -59,6 +59,16 @@ export default async function Home() {
             </section>
           )}
 
+          <section className="w-full mt-4">
+            <Link
+              href="/welcome"
+              className="block rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100 dark:hover:bg-blue-950/50"
+            >
+              <span className="font-semibold">New here from the old site?</span>{' '}
+              Start with Welcome.
+            </Link>
+          </section>
+
           <section className="w-full mt-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <Link

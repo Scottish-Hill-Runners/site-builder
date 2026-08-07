@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RaceResult } from '@/types/datatable';
 import { CORRECTIONS_EMAIL } from '@/lib/site-config';
+import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 
 export interface ResultCorrectionDialogProps {
   open: boolean;
@@ -28,32 +29,6 @@ interface OriginalValues {
   name: string;
   category: string;
   club: string;
-}
-
-function toWhomItMayConcern(): string {
-  const titles = [
-    'Department of Competitive Integrity',
-    'Bureau of Athletic Standards',
-    'Commission for Racing Oversight',
-    'Secretariat of Sports Regulation',
-    'Authority for Event Governance',
-    'Ministry of Physical Performance',
-    'Council for Technical Compliance',
-    'Office of Competition Adjudication',
-    'Board of Racing Statistics',
-    'Department of Participant Accreditation',
-    'Agency for Sporting Verification',
-    'Commission on Race Operations',
-    'Bureau of Performance Monitoring',
-    'Secretariat for Competitive Fairness',
-    'Ministry of Athletic Records',
-    'Office of Event Sanctioning',
-    'Council for Regulatory Enforcement',
-    'Department of Race Logistics',
-    'Authority for Sports Integrity',
-    'Bureau of Official Results and Records',
-  ];
-  return titles[Math.floor(Math.random() * titles.length)];
 }
 
 function buildCorrectionText(
