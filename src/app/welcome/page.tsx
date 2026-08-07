@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import WelcomeRecipientName from '@/components/WelcomeRecipientName';
+import ToWhomItMayConcern from '@/components/ToWhomItMayConcern';
 
 export const metadata: Metadata = {
   title: 'Welcome',
   description:
-    'Welcome to the new Scottish Hill Runners site. Explore Calendar, Runner, Championships, Results, and Races.',
+    'Welcome to the new Scottish Hill Runners site. ' +
+    'Explore Calendar, Runner, Championships, Results, and Races.',
 };
 
 const featureLinks = [
@@ -67,14 +68,14 @@ const featureLinks = [
         ),
   },
   {title: 'Fixing mistakes',
-    href: '/',
+    href: 'https://admin.scottishhillrunners.uk',
     description: (
         <>
             A key feature of the new site is it gives you the ability to correct mistakes.
             If you see a result with your name misspelt, wrong club or category,
-            you can submit a correction either by sending an email to the <WelcomeRecipientName />
+            you can submit a correction either by sending an email to the <ToWhomItMayConcern />
             &nbsp; (the link will guide you in composing the email), or through the companion
-            &nbsp;<a href="https://admin.scottishhillrunners.uk/" className="text-blue-600 hover:text-blue-800">admin site</a>.
+            admin site.
             In either case, an admin will review and apply your correction with the click of a button!
         </>
     ),
