@@ -13,71 +13,71 @@ const featureLinks = [
     title: 'Calendar',
     href: '/calendar',
     description: (
-        <p className="max-w-3xl text-base text-slate-700 dark:text-slate-300">
+        <>
             Find out what&apos;s happening when in Scottish hill running with the new calendar.
             Whether you&apos;re looking for the next Bog&apos;nBurn,
             planning your running year around the Scottish Hill Running Championships,
             or just after a short quick link to some recent results -
             the calendar is a great place to explore!
-        </p>
+        </>
       ),
   },
   {
     title: 'Runner',
     href: '/runner',
     description: (
-        <p className="max-w-3xl text-base text-slate-700 dark:text-slate-300">
+        <>
             The Runner page brings all your race results together in one place.
             Check out your own results, or search for a rival runner to
             see how they&apos;ve been doing.
-        </p>
+        </>
       ),
   },
   {
     title: 'Championships',
     href: '/championships',
     description: (
-        <p className="max-w-3xl text-base text-slate-700 dark:text-slate-300">
+        <>
             Current standings, results, and information about all the ongoing championship series.
             We have results going back decades, so you can explore the history of the
             sport and its legendary champions. This is a centrepiece of our long term
             goal of providing a comprehensive archive of Scottish hill running results.
             Help fill in the gaps by submitting corrections for any results you know to be wrong!
-        </p>
+        </>
       ),
   },
   {
     title: 'Results',
     href: '/years',
     description: (
-        <p className="max-w-3xl text-base text-slate-700 dark:text-slate-300">
+        <>
             Find the latest results for all current races,
             or explore the archive of historic results across the years.
-        </p>
+        </>
       ),
   },
   {
     title: 'Races',
     href: '/races',
     description: (
-        <p className="max-w-3xl text-base text-slate-700 dark:text-slate-300">
+        <>
             An exhaustive list of all the races that have ever been.
             Features a map view so you can quickly find a race near you.
-        </p>
-      ),
+        </>
+        ),
   },
   {title: 'Fixing mistakes',
     href: '/',
     description: (
-        <p className="max-w-3xl text-base text-slate-700 dark:text-slate-300">
+        <>
             A key feature of the new site is it gives you the ability to correct mistakes.
             If you see a result with your name misspelt, wrong club or category,
             you can submit a correction either by sending an email to the <WelcomeRecipientName />
             &nbsp; (the link will guide you in composing the email), or through the companion
             &nbsp;<a href="https://admin.scottishhillrunners.uk/" className="text-blue-600 hover:text-blue-800">admin site</a>.
             In either case, an admin will review and apply your correction with the click of a button!
-        </p>
-      )
+        </>
+    ),
   }
 ];
 
