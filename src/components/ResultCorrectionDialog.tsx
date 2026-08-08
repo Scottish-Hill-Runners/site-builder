@@ -174,6 +174,11 @@ export default function ResultCorrectionDialog({
           the change below.
         </p>
 
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/60">
+          <div className="font-medium text-gray-900 dark:text-white">{raceTitle}</div>
+          <div className="text-gray-600 dark:text-slate-300">Race ID: {raceId}</div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-1">
             <label className={labelClass} htmlFor="cd-position">
