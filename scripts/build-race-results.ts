@@ -88,6 +88,11 @@ type ParsedRaceDateRule =
   | {
       kind: 'day-after';
       raceId: string;
+    }
+  | {
+      kind: 'absolute';
+      ordinal: number;
+      month: number;
     };
 
 type RaceMeta = {
@@ -771,6 +776,20 @@ function parseRaceDateRule(raw: string): ParsedRaceDateRule | null {
     return { kind: 'day-after', raceId: dayAfterMatch[1] };
   }
 
+  const absoluteMatch = rule.match(/^(\d+)(st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December)$/);
+  if (absoluteMatch) {
+    const ordinal = Number.parseInt(absoluteMatch[1], 10);
+    const month = MONTH_TO_INDEX[absoluteMatch[3].toLowerCase()];
+    if (Number.isInteger(ordinal) &&
+      ordinal >= 1 &&
+      ordinal <= 5 &&
+      month !== undefined
+    ) {
+      return { kind: 'absolute', ordinal, month };
+    }
+    return null;
+  }
+
   return null;
 }
 
@@ -868,8 +887,8 @@ function resolveComputedRaceDatesForYear(
         rule.ordinal
       );
       if (!isoDate) {
-        progress(
-          `Warning: Could not compute raceDate for ${raceId} in ${year} from ordinal rule`
+        process.stdout.write(
+          `Warning: Could not compute raceDate for ${raceId} in ${year} from ordinal rule\n`
         );
         continue;
       }
@@ -879,6 +898,18 @@ function resolveComputedRaceDatesForYear(
 
     if (rule.kind === 'last-weekday-in-month') {
       const isoDate = lastWeekdayOfMonthIso(year, rule.month, rule.weekday);
+      lookup.set(raceId, isoDate);
+      continue;
+    }
+
+    if (rule.kind === 'absolute') {
+      const isoDate = formatIsoDateUtc(new Date(Date.UTC(year, rule.month, rule.ordinal)));
+      if (!isoDate) {
+        process.stdout.write(
+          `Warning: Could not compute raceDate for ${raceId} in ${year} from absolute rule\n`
+        );
+        continue;
+      }
       lookup.set(raceId, isoDate);
       continue;
     }
@@ -934,11 +965,18 @@ async function buildMergedCalendarData(
     lookup.set(`${row.Date.slice(0, 4)}/${row.Race}`, row.Date);
   }
 
+  const todayIso = londonTodayIso();
+  const currentYear = Number.parseInt(todayIso.slice(0, 4), 10);
+  const previousYear = currentYear - 1;
+  const nextYear = currentYear + 1;
   const parsedRules = new Map<string, ParsedRaceDateRule>();
   for (const [raceId, raceEntry] of raceMap.entries()) {
     const { active, raceDate } = raceEntry.meta;
     if (!active || !raceDate) continue;
-
+    const haveRecentResults =
+      raceEntry.results.find(
+        (r) => r.year.startsWith(`${currentYear}`) || r.year.startsWith(`${previousYear}`));
+    if (!haveRecentResults) continue;
     const parsed = parseRaceDateRule(raceDate);
     if (!parsed) {
       progress(
@@ -953,9 +991,6 @@ async function buildMergedCalendarData(
     return { rows, lookup };
   }
 
-  const todayIso = londonTodayIso();
-  const currentYear = Number.parseInt(todayIso.slice(0, 4), 10);
-  const nextYear = currentYear + 1;
   const currentYearResolved = resolveComputedRaceDatesForYear(currentYear, parsedRules);
   const nextYearResolved = resolveComputedRaceDatesForYear(nextYear, parsedRules);
 

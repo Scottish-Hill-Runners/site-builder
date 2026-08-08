@@ -9,7 +9,6 @@ import {
   Era,
   ResultsFocusContext,
 } from '@/types/datatable';
-import { normalizeResultYear } from '@/lib/results-correction-link';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 
 interface DataTableProps {
@@ -475,24 +474,18 @@ export default function RaceResultsDataTable({
     if (!onFocusContextChange || !enableRowFocus) return null;
 
     if (selectedRow) {
-      const normalizedYear = normalizeResultYear(selectedRow.year);
-      if (!normalizedYear) return null;
       return {
         raceId: selectedRow.raceId,
-        year: normalizedYear,
-        source: 'selected-row',
+        year: selectedRow.year,
       };
     }
 
     const firstVisibleRow = displayData[0];
     if (!firstVisibleRow) return null;
-    const normalizedYear = normalizeResultYear(firstVisibleRow.year);
-    if (!normalizedYear) return null;
 
     return {
       raceId: firstVisibleRow.raceId,
-      year: normalizedYear,
-      source: 'table-visible',
+      year: firstVisibleRow.year,
     };
   }, [displayData, enableRowFocus, onFocusContextChange, selectedRow]);
 
@@ -502,8 +495,7 @@ export default function RaceResultsDataTable({
     const next = activeFocusContext;
     const changed =
       prev?.raceId !== next?.raceId ||
-      prev?.year !== next?.year ||
-      prev?.source !== next?.source;
+      prev?.year !== next?.year;
     if (!changed) return;
     lastFocusContextRef.current = next;
     onFocusContextChange(activeFocusContext);

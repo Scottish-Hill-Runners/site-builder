@@ -186,10 +186,6 @@ export default function RaceDetailsTabs({
   const effectiveInitialYearFilter = initialYearFilter || pageDefaultYear || '';
   const correctionRaceId = focusedResultContext?.raceId ?? raceId;
   const correctionYear = focusedResultContext?.year ?? pageDefaultYear;
-  const correctionLink =
-    correctionRaceId && correctionYear
-      ? buildResultsEditUrl(correctionRaceId, correctionYear)
-      : null;
   const correctionFilteredResults = useMemo(
     () =>
       correctionYear
@@ -305,47 +301,32 @@ export default function RaceDetailsTabs({
                     initialYearFilter={effectiveInitialYearFilter}
                   />
                 )}
-
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                  <p className="font-semibold">
-                    Spot an error in these results?{' '}
-                    {CORRECTIONS_EMAIL && (
+                {CORRECTIONS_EMAIL && 
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                    <p className="font-semibold">
+                      Spot an error in these results?
+                    </p>
+                    {focusedResultContext?.raceId && focusedResultContext?.year ? (
+                      <p className="mt-1">
                       <button
-                        type="button"
-                        onClick={() => setCorrectionDialogOpen(true)}
-                        className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
-                      >
-                        Email the results editor
-                      </button>
-                    )}
-                  </p>
-                  <p className="mt-1">
-                    {correctionLink ? (
-                      <>
-                        Submit a correction via{' '}
-                        <a
-                          href={correctionLink}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
+                          onClick={() => setCorrectionDialogOpen(true)}
                           className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
                         >
-                          the results editor
-                        </a>
-                        .
-                      </>
+                          Email the results editor
+                        </button>
+                        <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                          {' '}with your correction for {focusedResultContext.raceId}{' '}
+                          ({focusedResultContext.year}).
+                        </span>
+                      </p>
                     ) : (
-                      'Select a result row to generate an edit link for the correct race and year.'
-                    )}
-                  </p>
-                  {focusedResultContext?.source === 'selected-row' &&
-                    correctionLink && (
-                      <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                        Using selected row context:{' '}
-                        {focusedResultContext.raceId} (
-                        {focusedResultContext.year}).
+                      <p className="mt-1">
+                        Select the row with the error so we know which race and year.
                       </p>
                     )}
-                </div>
+                  </div>
+                }
               </div>
             ) : (
               <p className="text-sm text-gray-600 dark:text-slate-300">

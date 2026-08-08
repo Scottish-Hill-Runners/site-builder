@@ -30,7 +30,8 @@ const featureLinks = [
         <>
             The Runner page brings all your race results together in one place.
             Check out your own results, or search for a rival runner to
-            see how they&apos;ve been doing.
+            see how they&apos;ve been doing. And if you see a mistake,
+            you can submit a correction request by email!
         </>
       ),
   },
@@ -52,8 +53,12 @@ const featureLinks = [
     href: '/years',
     description: (
         <>
-            Find the latest results for all current races,
+            Find the latest results,
             or explore the archive of historic results across the years.
+            Did you know you can view <span className="italic">all </span>
+            the results for a given race, or even a given year?
+            Use the filters to find runners in your club, or in your age category,
+            and see how you stack up against the competition.
         </>
       ),
   },
@@ -64,19 +69,21 @@ const featureLinks = [
         <>
             An exhaustive list of all the races that have ever been.
             Features a map view so you can quickly find a race near you.
+            The map only shows races when it knows the location,
+            so as more races get GPX files, the more comprehensive it will get.
+            Remind your race organiser to add one today!
         </>
         ),
   },
-  {title: 'Fixing mistakes',
+  {title: 'Correcting mistakes',
     href: 'https://admin.scottishhillrunners.uk',
     description: (
         <>
-            A key feature of the new site is it gives you the ability to correct mistakes.
+            A key feature of the new site is it gives <strong>you </strong> the ability to correct mistakes.
             If you see a result with your name misspelt, wrong club or category,
-            you can submit a correction either by sending an email to the <ToWhomItMayConcern />
-            &nbsp; (the link will guide you in composing the email), or through the companion
-            admin site.
-            In either case, an admin will review and apply your correction with the click of a button!
+            you can submit a correction by sending an email to the <ToWhomItMayConcern />
+            &nbsp; (the link will guide you in composing the email).
+            An admin will review and apply your correction with the click of a button!
         </>
     ),
   }

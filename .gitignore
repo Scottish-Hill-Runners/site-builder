@@ -48,3 +48,4 @@ public/
 .gitignore
 .env*
 graphify-out/
+notes/

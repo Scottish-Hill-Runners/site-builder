@@ -1,16 +1,6 @@
 {
   "redirects": [
     {
-      "source": "/home.aspx",
-      "destination": "/welcome",
-      "permanent": true
-    },
-    {
-      "source": "/Home.aspx",
-      "destination": "/welcome",
-      "permanent": true
-    },
-    {
       "source": "/(.*)\\.[aA][sS][pP][xX]",
       "destination": "/welcome",
       "permanent": true

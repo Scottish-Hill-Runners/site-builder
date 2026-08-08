@@ -8,10 +8,6 @@ import {
   fetchJsonWithApiFallback,
   fetchGzipJson,
 } from '@/lib/client-results-fetch';
-import {
-  buildResultsEditUrl,
-  normalizeResultYear,
-} from '@/lib/results-correction-link';
 import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
 import { CORRECTIONS_EMAIL } from '@/lib/site-config';
 import type { RaceInfo, RaceResult } from '@/types/datatable';
@@ -33,13 +29,8 @@ export default function YearPageClient({ year }: YearPageClientProps) {
     useState<ResultsFocusContext | null>(null);
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
   const fallbackRaceId = results?.[0]?.raceId ?? null;
-  const fallbackYear = normalizeResultYear(year);
   const correctionRaceId = focusedResultContext?.raceId ?? fallbackRaceId;
-  const correctionYear = focusedResultContext?.year ?? fallbackYear;
-  const correctionLink =
-    correctionRaceId && correctionYear
-      ? buildResultsEditUrl(correctionRaceId, correctionYear)
-      : null;
+  const correctionYear = focusedResultContext?.year ?? year;
   const correctionFilteredResults =
     results && correctionRaceId && correctionYear
       ? results.filter(
@@ -165,47 +156,32 @@ export default function YearPageClient({ year }: YearPageClientProps) {
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-              <p className="font-semibold">
-                Spot an error in these results?{' '}
-                {CORRECTIONS_EMAIL && correctionRaceId && correctionYear && (
-                  <button
-                    type="button"
-                    onClick={() => setCorrectionDialogOpen(true)}
-                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
-                  >
-                    Email the results editor
-                  </button>
-                )}
-              </p>
-              {correctionLink ? (
-                <>
+            {CORRECTIONS_EMAIL && 
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                <p className="font-semibold">
+                  Spot an error in these results?
+                </p>
+                {focusedResultContext?.raceId && focusedResultContext?.year ? (
                   <p className="mt-1">
-                    Submit a correction via{' '}
-                    <a
-                      href={correctionLink}
-                      target="_blank"
-                      rel="noreferrer"
+                  <button
+                      type="button"
+                      onClick={() => setCorrectionDialogOpen(true)}
                       className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
                     >
-                      the results editor
-                    </a>
-                    .
-                  </p>
-                  {focusedResultContext?.source === 'selected-row' && (
-                    <p className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                      Using selected row context: {focusedResultContext.raceId}{' '}
+                      Email the results editor
+                    </button>
+                    <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                      {' '}with your correction for {focusedResultContext.raceId}{' '}
                       ({focusedResultContext.year}).
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="mt-1">
-                  Select a result row to generate an edit link for the correct
-                  race and year.
-                </p>
-              )}
-            </div>
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-1">
+                    Select the row with the error so we know which race and year.
+                  </p>
+                )}
+              </div>
+            }
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">

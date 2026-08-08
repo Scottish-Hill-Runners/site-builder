@@ -21,7 +21,6 @@ export interface RaceResult {
 export interface ResultsFocusContext {
   raceId: string;
   year: string;
-  source: 'selected-row' | 'table-visible';
 }
 
 export interface Era {

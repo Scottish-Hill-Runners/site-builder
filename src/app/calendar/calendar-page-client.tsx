@@ -335,6 +335,9 @@ export default function CalendarPageClient() {
         <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
           Race Calendar
         </h1>
+        <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+          Race dates are our best understanding; please confirm with race organisers.
+        </p>
 
         {isLoading ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
