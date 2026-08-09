@@ -336,7 +336,7 @@ export default function CalendarPageClient() {
           Race Calendar
         </h1>
         <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-          Race dates are our best understanding; please confirm with race organisers.
+          Race dates are to our best understanding, but you should not rely on them; always confirm with the race organiser.
         </p>
 
         {isLoading ? (
