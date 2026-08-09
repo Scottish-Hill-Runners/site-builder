@@ -99,6 +99,7 @@ type RaceMeta = {
   info: RaceInfo;
   content: string;
   raceDate?: string;
+  raceDates?: string[];
   active: boolean;
   latitude?: number;
   longitude?: number;
@@ -449,6 +450,7 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           organiser: data.organiser ? Buffer.from(data.organiser).toString('base64') : undefined,
           eras: parseEras(data.eras as string | undefined),
         };
+
         const geojsonPath = path.join(raceDir, 'route.geojson');
         const hasGpx = fs.existsSync(geojsonPath);
         const geojsonStr = hasGpx ? fs.readFileSync(geojsonPath, 'utf-8') : '';
@@ -466,6 +468,10 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
             typeof data.raceDate === 'string' && data.raceDate.trim().length > 0
               ? data.raceDate.trim()
               : undefined,
+          raceDates:
+            Array.isArray(data.raceDates) && data.raceDates.length > 0
+              ? data.raceDates.map((d: string) => d.trim()).filter((d: string) => d.length > 0)
+              : undefined,
           active: data.active !== false,
           latitude:
             gpxPoint?.latitude ??
@@ -480,6 +486,7 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           routeGeojson,
           elevationChartData: elevationChartData ?? undefined,
         };
+
         const results = await readRaceResults(raceDir);
 
         // Detect if race has team/leg data
@@ -873,49 +880,40 @@ async function readCalendarCsvRows(): Promise<CalendarSourceRow[]> {
 
 function resolveComputedRaceDatesForYear(
   year: number,
-  parsedRules: Map<string, ParsedRaceDateRule>
-): Map<string, string> {
-  const lookup = new Map<string, string>();
+  parsedRules: Map<string, ParsedRaceDateRule[]>
+): Map<string, string[]> {
+  const lookup = new Map<string, string[]>();
   const relativeRules = new Map<string, string>();
 
-  for (const [raceId, rule] of parsedRules.entries()) {
-    if (rule.kind === 'ordinal-weekday-in-month') {
-      const isoDate = nthWeekdayOfMonthIso(
-        year,
-        rule.month,
-        rule.weekday,
-        rule.ordinal
-      );
+  for (const [raceId, rules] of parsedRules.entries())
+    for (const rule of rules) {
+      let isoDate: string | null = null;
+      switch (rule.kind) {
+        case 'ordinal-weekday-in-month':
+          isoDate = nthWeekdayOfMonthIso(year, rule.month,rule.weekday, rule.ordinal);
+          break;
+        case 'last-weekday-in-month':
+          isoDate = lastWeekdayOfMonthIso(year, rule.month, rule.weekday);
+          break;
+        case 'absolute':
+          isoDate = formatIsoDateUtc(new Date(Date.UTC(year, rule.month, rule.ordinal)));
+          break;
+        case 'day-after':
+          relativeRules.set(raceId, rule.raceId);
+          continue;
+      }
+
       if (!isoDate) {
         process.stdout.write(
-          `Warning: Could not compute raceDate for ${raceId} in ${year} from ordinal rule\n`
+          `Warning: Unrecognised raceDate rule for ${raceId}: "${JSON.stringify(rule)}". Skipping derived date\n`
         );
         continue;
       }
-      lookup.set(raceId, isoDate);
-      continue;
+      
+      if (!lookup.has(raceId))
+        lookup.set(raceId, []);
+      lookup.get(raceId)!.push(isoDate);
     }
-
-    if (rule.kind === 'last-weekday-in-month') {
-      const isoDate = lastWeekdayOfMonthIso(year, rule.month, rule.weekday);
-      lookup.set(raceId, isoDate);
-      continue;
-    }
-
-    if (rule.kind === 'absolute') {
-      const isoDate = formatIsoDateUtc(new Date(Date.UTC(year, rule.month, rule.ordinal)));
-      if (!isoDate) {
-        process.stdout.write(
-          `Warning: Could not compute raceDate for ${raceId} in ${year} from absolute rule\n`
-        );
-        continue;
-      }
-      lookup.set(raceId, isoDate);
-      continue;
-    }
-
-    relativeRules.set(raceId, rule.raceId);
-  }
 
   const unresolved = new Set(relativeRules.keys());
   let didProgress = true;
@@ -931,7 +929,7 @@ function resolveComputedRaceDatesForYear(
       const targetDate = lookup.get(targetRaceId);
       if (!targetDate) continue;
 
-      lookup.set(raceId, addDaysIso(targetDate, 1));
+      lookup.set(raceId, [addDaysIso(targetDate[0], 1)]);
       unresolved.delete(raceId);
       didProgress = true;
     }
@@ -956,71 +954,84 @@ function resolveComputedRaceDatesForYear(
 
 async function buildMergedCalendarData(
   raceMap: Map<string, RaceEntry>
-): Promise<{ rows: CalendarSourceRow[]; lookup: Map<string, string> }> {
+): Promise<{ rows: CalendarSourceRow[]; lookup: Map<string, string[]> }> {
   const rows = await readCalendarCsvRows();
-  const lookup = new Map<string, string>();
+  const lookup = new Map<string, string[]>();
 
   for (const row of rows) {
     if (!row.Race || !isIsoDate(row.Date)) continue;
-    lookup.set(`${row.Date.slice(0, 4)}/${row.Race}`, row.Date);
+    const key = `${row.Date.slice(0, 4)}/${row.Race}`;
+    if (!lookup.has(key))
+      lookup.set(key, []);
+    lookup.get(key)!.push(row.Date);
   }
 
   const todayIso = londonTodayIso();
   const currentYear = Number.parseInt(todayIso.slice(0, 4), 10);
   const previousYear = currentYear - 1;
   const nextYear = currentYear + 1;
-  const parsedRules = new Map<string, ParsedRaceDateRule>();
+  const parsedRules = new Map<string, ParsedRaceDateRule[]>();
   for (const [raceId, raceEntry] of raceMap.entries()) {
-    const { active, raceDate } = raceEntry.meta;
-    if (!active || !raceDate) continue;
+    const { active, raceDate, raceDates } = raceEntry.meta;
+    if (!active) continue;
+    if (!raceDate && !raceDates) continue;
     const haveRecentResults =
+      raceId == 'Krunce' ||
       raceEntry.results.find(
         (r) => r.year.startsWith(`${currentYear}`) || r.year.startsWith(`${previousYear}`));
     if (!haveRecentResults) continue;
-    const parsed = parseRaceDateRule(raceDate);
-    if (!parsed) {
-      progress(
-        `Warning: Unrecognised raceDate rule for ${raceId}: "${raceDate}". Skipping derived date`
-      );
-      continue;
+    const allRaceDates = raceDates ?? (raceDate ? [raceDate] : []);
+    for (const raceDate of allRaceDates) {
+      const parsed = parseRaceDateRule(raceDate);
+      if (!parsed) {
+        progress(
+          `Warning: Unrecognised raceDate rule for ${raceId}: "${raceDate}". Skipping derived date`
+        );
+        continue;
+      }
+      if (!parsedRules.has(raceId))
+        parsedRules.set(raceId, []);
+      parsedRules.get(raceId)!.push(parsed);
     }
-    parsedRules.set(raceId, parsed);
   }
 
-  if (parsedRules.size === 0) {
+  if (parsedRules.size === 0)
     return { rows, lookup };
-  }
 
   const currentYearResolved = resolveComputedRaceDatesForYear(currentYear, parsedRules);
   const nextYearResolved = resolveComputedRaceDatesForYear(nextYear, parsedRules);
 
   let addedRows = 0;
   for (const raceId of parsedRules.keys()) {
-    const currentYearDate = currentYearResolved.get(raceId);
-    if (!currentYearDate) continue;
+    const currentYearDates = currentYearResolved.get(raceId);
+    if (!currentYearDates) continue;
+    for (const currentYearDate of currentYearDates) {
+      const yearsToAdd =
+        currentYearDate < todayIso ? [currentYear, nextYear] : [currentYear];
 
-    const yearsToAdd =
-      currentYearDate < todayIso ? [currentYear, nextYear] : [currentYear];
+      for (const year of yearsToAdd) {
+          const dates =
+          year === currentYear
+            ? [currentYearDate]
+            : nextYearResolved.get(raceId);
+          if (!dates) continue;
 
-    for (const year of yearsToAdd) {
-      const date =
-        year === currentYear
-          ? currentYearResolved.get(raceId)
-          : nextYearResolved.get(raceId);
-      if (!date) continue;
+          const key = `${year}/${raceId}`;
+          const existingDates = lookup.get(key) ?? [];
+          const seenDates = new Set(existingDates);
+          const newDates = dates.filter((date) => !seenDates.has(date));
+          if (newDates.length === 0) continue;
 
-      const key = `${year}/${raceId}`;
-      if (lookup.has(key)) continue;
-
-      lookup.set(key, date);
-      rows.push({ Date: date, Race: raceId });
-      addedRows += 1;
+          lookup.set(key, [...existingDates, ...newDates]);
+          for (const date of newDates)
+            rows.push({ Date: date, Race: raceId });
+          addedRows += newDates.length;
+      }
     }
   }
 
-  if (addedRows > 0) {
+  if (addedRows > 0)
     progress(`Added ${addedRows} derived calendar row(s) from raceDate rules`);
-  }
 
   return { rows, lookup };
 }
@@ -1045,7 +1056,7 @@ function formatCalendarDate(isoDate: string): string {
 }
 
 function readChampionships(
-  calendarDates: Map<string, string>,
+  calendarDates: Map<string, string[]>,
   raceMap: Map<string, RaceEntry>
 ): ChampionshipData[] {
   const champDir = contentPath('championships');
@@ -1104,12 +1115,11 @@ function readChampionships(
       if (latestYear) {
         const raceIds = years[latestYear];
         const sortedRaceIds = [...raceIds].sort((a, b) => {
-          const dateA = calendarDates.get(`${latestYear}/${a}`);
-          const dateB = calendarDates.get(`${latestYear}/${b}`);
+          const dateA = calendarDates.get(`${latestYear}/${a}`)?.[0];
+          const dateB = calendarDates.get(`${latestYear}/${b}`)?.[0];
 
-          if (dateA && dateB) {
+          if (dateA && dateB)
             return dateA.localeCompare(dateB);
-          }
           if (dateA) return -1;
           if (dateB) return 1;
           return a.localeCompare(b);
@@ -1133,7 +1143,7 @@ function readChampionships(
                 }
               }
             }
-            const isoDate = calendarDates.get(`${latestYear}/${raceId}`);
+            const isoDate = calendarDates.get(`${latestYear}/${raceId}`)?.[0];
             const datePart = isoDate ? ` - ${formatCalendarDate(isoDate)}` : '';
             const titlePart = hasPage ? `[${title}](/races/${raceId})` : title;
             return `* ${titlePart}${distancePart}${datePart}`;
@@ -1389,7 +1399,7 @@ function writeChampionshipResultsData(
   allResults: RaceResult[],
   championships: ChampionshipData[],
   raceMap: Map<string, RaceEntry>,
-  calendarDates: Map<string, string>
+  calendarDates: Map<string, string[]>
 ): void {
   for (const championship of championships) {
     championship.yearHasData = {};
@@ -1542,15 +1552,15 @@ function writeChampionshipResultsData(
       // Build raceSchedule: all scheduled races sorted by calendar date.
       const raceSchedule = [...raceIds]
         .sort((a, b) => {
-          const dateA = calendarDates.get(`${year}/${a}`);
-          const dateB = calendarDates.get(`${year}/${b}`);
+          const dateA = calendarDates.get(`${year}/${a}`)?.[0];
+          const dateB = calendarDates.get(`${year}/${b}`)?.[0];
           if (dateA && dateB) return dateA.localeCompare(dateB);
           if (dateA) return -1;
           if (dateB) return 1;
           return a.localeCompare(b);
         })
         .map((raceId) => {
-          const date = calendarDates.get(`${year}/${raceId}`);
+          const date = calendarDates.get(`${year}/${raceId}`)?.[0];
           return date ? { raceId, date } : { raceId };
         });
 

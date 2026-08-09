@@ -1,9 +1,9 @@
 {
   "redirects": [
     {
-      "source": "/(.*)\\.[aA][sS][pP][xX]",
+      "source": "/*.aspx",
       "destination": "/welcome",
-      "permanent": true
+      "statusCode": 301
     }
   ],
   "headers": [
