@@ -1,7 +1,7 @@
 {
   "redirects": [
     {
-      "source": "/*.aspx",
+      "source": "/(.*)\\.aspx",
       "destination": "/welcome",
       "statusCode": 301
     }
