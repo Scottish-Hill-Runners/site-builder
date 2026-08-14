@@ -39,6 +39,14 @@ type ClubInfo = {
   excludeFromChampionships?: string;
 };
 
+type NameChangeRule = {
+  from: string;
+  to: string;
+  club?: string;
+  fromYear?: number;
+  toYear?: number;
+};
+
 type ChampionshipData = {
   slug: string;
   title: string;
@@ -290,6 +298,56 @@ for (const club of clubs) {
     clubAliases.set(aka.trim().toUpperCase(), club.name);
 }
 
+function readNameChanges(): NameChangeRule[] {
+  const nameChangePath = contentPath('name-change.json');
+  if (!fs.existsSync(nameChangePath)) return [];
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(nameChangePath, 'utf-8')) as unknown;
+    if (!Array.isArray(raw)) {
+      progress(`Warning: ${nameChangePath} did not contain a JSON array; ignoring it.\n`);
+      return [];
+    }
+
+    return raw.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const record = item as Record<string, unknown>;
+      const from = typeof record.from === 'string' ? record.from.trim() : '';
+      const to = typeof record.to === 'string' ? record.to.trim() : '';
+      if (!from || !to) return [];
+      const club = typeof record.club === 'string' ? record.club.trim() : undefined;
+      const fromYear = Number.isFinite(record.fromYear) ? Number(record.fromYear) : undefined;
+      const toYear = Number.isFinite(record.toYear) ? Number(record.toYear) : undefined;
+      return [{ from, to, club: clubAliases.get(club?.toUpperCase() as string) ?? club, fromYear, toYear }];
+    });
+  } catch (error) {
+    progress(
+      `Warning: unable to read ${nameChangePath}: ${error instanceof Error ? error.message : String(error)}\n`
+    );
+    return [];
+  }
+}
+
+const nameChangeRules = readNameChanges();
+
+function nameChangeRuleMatches(
+  rule: NameChangeRule,
+  name: string,
+  club: string | undefined,
+  year: number
+): boolean {
+  if (name !== rule.from) return false;
+  if (rule.club && club && rule.club !== club) return false;
+  return (!rule.fromYear || rule.fromYear <= year) && (!rule.toYear || rule.toYear >= year);
+}
+
+function applyNameChange(name: string, club: string, year: string): string {
+  const yearMatch = year.match(/(\d{4})/);
+  const resultYear = yearMatch ? Number.parseInt(yearMatch[1], 10) : NaN;
+  const rule = nameChangeRules.find((r) => nameChangeRuleMatches(r, name, club, resultYear));
+  return rule ? rule.to : name;
+}
+
 function likelySex(category: string): string {
   if (/W(OM[EA]N)?|F(EMALE)?|L(ADY)?|G(IRL)?/i.test(category)) return 'F';
   if (/(A|NB?|NON[-\s]?BINARY)/i.test(category)) return 'NB';
@@ -306,6 +364,7 @@ async function readRaceInstance(
   raceId: string,
   raceInstancePath: string
 ): Promise<RaceResult[]> {
+  const rawYear = path.basename(raceInstancePath, '.csv');
   return await csv()
     .fromFile(raceInstancePath)
     .then((jsonArray) => {
@@ -341,6 +400,7 @@ async function readRaceInstance(
         );
         if (!name) return [];
 
+        const club = clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club
         const category = (
           (json.RunnerCategory ?? json.Category ?? json.Cat ?? '') as string
         )
@@ -358,9 +418,8 @@ async function readRaceInstance(
               json.Position ??
               json.Pos
           ),
-          name,
-          club:
-            clubAliases.get(json.Club?.toUpperCase() as string) ?? json.Club,
+          name: applyNameChange(name, club, rawYear),
+          club,
           category: category == '' ? 'M' : category,
           categoryPos: updateCategoryPos(category),
           time: formatTime((json.FinishTime ?? json.Time) as string),
@@ -976,7 +1035,6 @@ async function buildMergedCalendarData(
     if (!active) continue;
     if (!raceDate && !raceDates) continue;
     const haveRecentResults =
-      raceId == 'Krunce' ||
       raceEntry.results.find(
         (r) => r.year.startsWith(`${currentYear}`) || r.year.startsWith(`${previousYear}`));
     if (!haveRecentResults) continue;
