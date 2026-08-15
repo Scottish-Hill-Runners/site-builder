@@ -698,19 +698,21 @@ export default function ChampionshipYearPageClient({
     return Array.from(categories).sort();
   }, [results, scoringRules]);
 
-  // Default selectedCategoryPos to the first available category.
-  useEffect(() => {
-    if (availableCategoryPos.length > 0 && !selectedCategoryPos) {
-      setSelectedCategoryPos(availableCategoryPos[0]);
+  // Derive the active category during render; falls back to the first available
+  // category when there's no valid explicit selection (avoids setState-in-effect).
+  const effectiveCategoryPos = useMemo(() => {
+    if (selectedCategoryPos && availableCategoryPos.includes(selectedCategoryPos)) {
+      return selectedCategoryPos;
     }
+    return availableCategoryPos[0] ?? '';
   }, [availableCategoryPos, selectedCategoryPos]);
 
-  // Guard: if a stale 'teams' tab is in localStorage but this championship has no teams, fall back.
-  useEffect(() => {
-    if (activeTab === 'teams' && scoringRules && !scoringRules.teamSize) {
-      setActiveTab('standings');
-    }
-  }, [activeTab, scoringRules]);
+  // Derived display tab: falls back to 'standings' when a stale 'teams' tab
+  // is stored but this championship has no teams (avoids setState-in-effect).
+  const effectiveActiveTab =
+    activeTab === 'teams' && scoringRules && !scoringRules.teamSize
+      ? 'standings'
+      : activeTab;
 
   const availableClubs = useMemo(() => {
     const clubs = new Set<string>();
@@ -729,28 +731,38 @@ export default function ChampionshipYearPageClient({
     return Array.from(cats).sort();
   }, [scoringRules, prebuiltTeams]);
 
-  // Default selectedTeamCategory to the first available team category.
-  useEffect(() => {
-    if (availableTeamCategories.length > 0 && !selectedTeamCategory) {
-      setSelectedTeamCategory(availableTeamCategories[0]);
+  // Derive the active team category during render; falls back to the first
+  // available category when there's no valid explicit selection.
+  const effectiveTeamCategory = useMemo(() => {
+    if (
+      selectedTeamCategory &&
+      availableTeamCategories.includes(selectedTeamCategory)
+    ) {
+      return selectedTeamCategory;
     }
+    return availableTeamCategories[0] ?? '';
   }, [availableTeamCategories, selectedTeamCategory]);
 
-  useEffect(() => {
+  // Reset the expanded team-club panel when its identity changes. Adjusting
+  // state during render (rather than in an effect) avoids an extra render pass.
+  const teamPanelKey = `${effectiveTeamCategory}|${effectiveActiveTab}|${series}|${year}`;
+  const [prevTeamPanelKey, setPrevTeamPanelKey] = useState(teamPanelKey);
+  if (teamPanelKey !== prevTeamPanelKey) {
+    setPrevTeamPanelKey(teamPanelKey);
     setExpandedTeamClub(null);
-  }, [selectedTeamCategory, activeTab, series, year]);
+  }
 
   const teamStandings = useMemo(() => {
-    if (!scoringRules?.teamSize || !selectedTeamCategory || !prebuiltTeams) {
+    if (!scoringRules?.teamSize || !effectiveTeamCategory || !prebuiltTeams) {
       return [];
     }
     return buildTeamStandings(
       scoringRules,
       prebuiltTeams,
-      selectedTeamCategory,
+      effectiveTeamCategory,
       raceMetadata,
     );
-  }, [scoringRules, prebuiltTeams, selectedTeamCategory, raceMetadata]);
+  }, [scoringRules, prebuiltTeams, effectiveTeamCategory, raceMetadata]);
 
   const sortedTeamStandings = useMemo(() => {
     if (teamStandings.length === 0) return teamStandings;
@@ -782,12 +794,12 @@ export default function ChampionshipYearPageClient({
   );
 
   const filteredStandings = useMemo(() => {
-    if (!selectedCategoryPos || !results) {
+    if (!effectiveCategoryPos || !results) {
       return allStandings;
     }
 
     const filteredRows = results.filter(
-      (row) => selectedCategoryPos in row.categoryPos
+      (row) => effectiveCategoryPos in row.categoryPos
     );
     const grouped = new Map<
       string,
@@ -804,7 +816,7 @@ export default function ChampionshipYearPageClient({
 
       const racePoints =
         row.categoryPoints
-          ? (row.categoryPoints[selectedCategoryPos] ?? row.points ?? 0)
+          ? (row.categoryPoints[effectiveCategoryPos] ?? row.points ?? 0)
           : (row.points ?? 0);
 
       const bucket = getDistanceBucket(raceMetadata[row.raceId]?.distance);
@@ -815,8 +827,8 @@ export default function ChampionshipYearPageClient({
           existing.clubs.push(normalizedClub);
           existing.clubs.sort((a, b) => a.localeCompare(b));
         }
-        if (!existing.categories.includes(selectedCategoryPos)) {
-          existing.categories.push(selectedCategoryPos);
+        if (!existing.categories.includes(effectiveCategoryPos)) {
+          existing.categories.push(effectiveCategoryPos);
         }
         existing.runnerEvents.push({
           raceId: row.raceId,
@@ -832,7 +844,7 @@ export default function ChampionshipYearPageClient({
         name: normalizedName,
         club: normalizedClub,
         clubs: normalizedClub ? [normalizedClub] : [],
-        categories: [selectedCategoryPos],
+        categories: [effectiveCategoryPos],
         points: 0,
         runnerEvents: [{ raceId: row.raceId, points: racePoints, bucket }],
         events: [{ raceId: row.raceId, points: racePoints }],
@@ -910,7 +922,7 @@ export default function ChampionshipYearPageClient({
         runner.overallPosition = pos++;
     return sorted;
   }, [
-    selectedCategoryPos,
+    effectiveCategoryPos,
     allStandings,
     results,
     scoringRules,
@@ -937,11 +949,11 @@ export default function ChampionshipYearPageClient({
 
     const raceIds = new Set<string>();
     results
-      .filter((row) => !selectedCategoryPos || selectedCategoryPos in row.categoryPos)
+      .filter((row) => !effectiveCategoryPos || effectiveCategoryPos in row.categoryPos)
       .forEach((row) => raceIds.add(row.raceId));
 
     return raceIds.size;
-  }, [results, selectedCategoryPos]);
+  }, [results, effectiveCategoryPos]);
 
   const unqualifiedStandings = useMemo(() => {
     const unqualified = clubFilteredStandings?.filter((r) => !r.isQualified) ?? [];
@@ -1132,10 +1144,10 @@ export default function ChampionshipYearPageClient({
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeTab === 'standings'}
+                aria-selected={effectiveActiveTab === 'standings'}
                 onClick={() => setActiveTab('standings')}
                 className={
-                  activeTab === 'standings'
+                  effectiveActiveTab === 'standings'
                     ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
                     : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                 }
@@ -1145,10 +1157,10 @@ export default function ChampionshipYearPageClient({
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeTab === 'results'}
+                aria-selected={effectiveActiveTab === 'results'}
                 onClick={() => setActiveTab('results')}
                 className={
-                  activeTab === 'results'
+                  effectiveActiveTab === 'results'
                     ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
                     : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                 }
@@ -1159,10 +1171,10 @@ export default function ChampionshipYearPageClient({
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={activeTab === 'teams'}
+                  aria-selected={effectiveActiveTab === 'teams'}
                   onClick={() => setActiveTab('teams')}
                   className={
-                    activeTab === 'teams'
+                    effectiveActiveTab === 'teams'
                       ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
                       : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                   }
@@ -1172,7 +1184,7 @@ export default function ChampionshipYearPageClient({
               )}
             </div>
 
-            {activeTab === 'standings' ? (
+            {effectiveActiveTab === 'standings' ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
@@ -1204,7 +1216,7 @@ export default function ChampionshipYearPageClient({
                     </label>
                     <select
                       id="categorypos-select"
-                      value={selectedCategoryPos}
+                      value={effectiveCategoryPos}
                       onChange={(e) => setSelectedCategoryPos(e.target.value)}
                       className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                     >
@@ -1451,7 +1463,7 @@ export default function ChampionshipYearPageClient({
                     </div>
                   )}
               </div>
-            ) : activeTab === 'results' ? (
+            ) : effectiveActiveTab === 'results' ? (
               <RaceResultsDataTable
                 data={results}
                 races={raceMetadata}
@@ -1472,7 +1484,7 @@ export default function ChampionshipYearPageClient({
                   </label>
                   <select
                     id="team-category-select"
-                    value={selectedTeamCategory}
+                    value={effectiveTeamCategory}
                     onChange={(e) => setSelectedTeamCategory(e.target.value)}
                     className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   >
@@ -1607,7 +1619,7 @@ export default function ChampionshipYearPageClient({
                                   >
                                     <div className="space-y-3">
                                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                        Counting runners for {selectedTeamCategory}
+                                        Counting runners for {effectiveTeamCategory}
                                       </p>
                                       <div className="grid gap-3 md:grid-cols-2">
                                         {raceSchedule.map((entry) => {
@@ -1737,7 +1749,7 @@ export default function ChampionshipYearPageClient({
                                       >
                                         <div className="space-y-3">
                                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                            Counting runners for {selectedTeamCategory}
+                                            Counting runners for {effectiveTeamCategory}
                                           </p>
                                           <div className="grid gap-3 md:grid-cols-2">
                                             {raceSchedule.map((entry) => {

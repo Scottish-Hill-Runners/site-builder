@@ -1,6 +1,11 @@
 import path from 'node:path';
 
-export type CloudinaryPreset = 'homepage' | 'raceHero' | 'gallery' | 'portrait';
+export type CloudinaryPreset =
+  | 'homepage'
+  | 'raceHero'
+  | 'gallery'
+  | 'portrait'
+  | 'document';
 
 const IMAGE_EXTENSIONS = new Set([
   'jpg',
@@ -23,6 +28,7 @@ const PRESET_TRANSFORMS: Record<CloudinaryPreset, string[]> = {
   raceHero: ['f_auto', 'q_auto', 'c_fill', 'g_auto', 'w_1600'],
   gallery: ['f_auto', 'q_auto', 'c_fill', 'g_auto', 'w_800'],
   portrait: ['f_auto', 'q_auto', 'c_fill', 'g_auto', 'w_400'],
+  document: [],
 };
 
 function stripExtension(filePath: string): string {

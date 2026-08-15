@@ -235,24 +235,18 @@ export default function CalendarPageClient() {
     return entries ? buildMonthGroups(entries) : [];
   }, [entries]);
 
-  const selectedMonth = useMemo(() => {
-    if (selectedMonthKey === null) {
-      return null;
-    }
-    return monthGroups.find((group) => group.key === selectedMonthKey) ?? null;
-  }, [monthGroups, selectedMonthKey]);
-
-  useEffect(() => {
+  // Derive the active month during render instead of syncing via an effect;
+  // falls back to today's month / next upcoming month when there's no valid explicit selection.
+  const effectiveMonthKey = useMemo(() => {
     if (monthGroups.length === 0) {
-      setSelectedMonthKey(null);
-      return;
+      return null;
     }
 
     if (
       selectedMonthKey &&
       monthGroups.some((group) => group.key === selectedMonthKey)
     ) {
-      return;
+      return selectedMonthKey;
     }
 
     const currentMonthKey = getMonthKey(startOfToday());
@@ -261,8 +255,17 @@ export default function CalendarPageClient() {
     );
     const nextUpcoming = monthGroups.find((group) => group.hasUpcomingRace);
     const defaultMonth = currentMonth ?? nextUpcoming ?? monthGroups[0];
-    setSelectedMonthKey(defaultMonth.key);
+    return defaultMonth.key;
   }, [monthGroups, selectedMonthKey]);
+
+  const selectedMonth = useMemo(() => {
+    if (effectiveMonthKey === null) {
+      return null;
+    }
+    return (
+      monthGroups.find((group) => group.key === effectiveMonthKey) ?? null
+    );
+  }, [monthGroups, effectiveMonthKey]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -376,7 +379,7 @@ export default function CalendarPageClient() {
                       type="button"
                       onClick={() => {
                         const currentIndex = monthGroups.findIndex(
-                          (g) => g.key === selectedMonthKey
+                          (g) => g.key === effectiveMonthKey
                         );
                         if (currentIndex > 0) {
                           setSelectedMonthKey(
@@ -387,7 +390,7 @@ export default function CalendarPageClient() {
                       aria-label="Previous month"
                       disabled={
                         monthGroups.findIndex(
-                          (g) => g.key === selectedMonthKey
+                          (g) => g.key === effectiveMonthKey
                         ) === 0
                       }
                       className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-slate-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -406,7 +409,7 @@ export default function CalendarPageClient() {
                       type="button"
                       onClick={() => {
                         const currentIndex = monthGroups.findIndex(
-                          (g) => g.key === selectedMonthKey
+                          (g) => g.key === effectiveMonthKey
                         );
                         if (currentIndex < monthGroups.length - 1) {
                           setSelectedMonthKey(
@@ -417,7 +420,7 @@ export default function CalendarPageClient() {
                       aria-label="Next month"
                       disabled={
                         monthGroups.findIndex(
-                          (g) => g.key === selectedMonthKey
+                          (g) => g.key === effectiveMonthKey
                         ) ===
                         monthGroups.length - 1
                       }
@@ -433,7 +436,7 @@ export default function CalendarPageClient() {
               <div className="hidden lg:block">
                 <div className="grid gap-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                   {monthGroups.map((group) => {
-                    const isSelected = group.key === selectedMonthKey;
+                    const isSelected = group.key === effectiveMonthKey;
                     const extraDays = Math.max(group.raceDays.length - 10, 0);
                     const overflowMatchColor =
                       activeHighlights.size > 0 && extraDays > 0
