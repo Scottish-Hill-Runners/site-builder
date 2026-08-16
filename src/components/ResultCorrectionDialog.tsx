@@ -7,7 +7,7 @@ import {
   type ChallengeQuestion,
   getRandomChallengeQuestion,
 } from '@/lib/challenge-questions';
-import { CONTENT_WEBHOOK_URL } from '@/lib/site-config';
+import { NEXT_PUBLIC_MINOR_CORRECTION_URL } from '@/lib/site-config';
 
 export interface ResultCorrectionDialogProps {
   open: boolean;
@@ -93,11 +93,11 @@ function buildMinorCorrectionPayload(
 }
 
 async function submitMinorCorrection(payload: MinorCorrectionPayload): Promise<void> {
-  if (!CONTENT_WEBHOOK_URL) {
-    throw new Error('Content webhook URL is not configured.');
+  if (!NEXT_PUBLIC_MINOR_CORRECTION_URL) {
+    throw new Error('Correction submission endpoint is not configured.');
   }
 
-  const response = await fetch(CONTENT_WEBHOOK_URL, {
+  const response = await fetch(NEXT_PUBLIC_MINOR_CORRECTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
