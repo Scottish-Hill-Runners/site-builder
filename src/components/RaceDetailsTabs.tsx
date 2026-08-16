@@ -24,7 +24,6 @@ import remarkGfm from 'remark-gfm';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import TeamResultsDataTable from '@/components/TeamResultsDataTable';
 import {
-  buildResultsEditUrl,
   getLatestResultYear,
 } from '@/lib/results-correction-link';
 import { useUnits } from '@/components/UnitsProvider';
@@ -39,7 +38,7 @@ import type { GeoJSON } from 'geojson';
 import Obfuscate from 'react-obfuscate';
 import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
 import ResultsSubmitDialog from '@/components/ResultsSubmitDialog';
-import { CORRECTIONS_EMAIL, RESULTS_EMAIL } from '@/lib/site-config';
+import { RESULTS_EMAIL } from '@/lib/site-config';
 
 interface RaceImageProp {
   sourcePath: string;
@@ -301,32 +300,30 @@ export default function RaceDetailsTabs({
                     initialYearFilter={effectiveInitialYearFilter}
                   />
                 )}
-                {CORRECTIONS_EMAIL && 
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                    <p className="font-semibold">
-                      Spot an error in these results?
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                  <p className="font-semibold">
+                    Spot an error in these results?
+                  </p>
+                  {focusedResultContext?.raceId && focusedResultContext?.year ? (
+                    <p className="mt-1">
+                    <button
+                        type="button"
+                        onClick={() => setCorrectionDialogOpen(true)}
+                        className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                      >
+                        Send a correction to the results editor
+                      </button>
+                      <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                        {' '}with your correction for {focusedResultContext.raceId}{' '}
+                        ({focusedResultContext.year}).
+                      </span>
                     </p>
-                    {focusedResultContext?.raceId && focusedResultContext?.year ? (
-                      <p className="mt-1">
-                      <button
-                          type="button"
-                          onClick={() => setCorrectionDialogOpen(true)}
-                          className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
-                        >
-                          Email the results editor
-                        </button>
-                        <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                          {' '}with your correction for {focusedResultContext.raceId}{' '}
-                          ({focusedResultContext.year}).
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="mt-1">
-                        Select the row with the error so we know which race and year.
-                      </p>
-                    )}
-                  </div>
-                }
+                  ) : (
+                    <p className="mt-1">
+                      Select the row with the error so we know which race and year.
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-gray-600 dark:text-slate-300">
@@ -611,17 +608,14 @@ export default function RaceDetailsTabs({
           </div>
         )}
       </div>
-
-      {CORRECTIONS_EMAIL && (
-        <ResultCorrectionDialog
-          open={correctionDialogOpen}
-          onClose={() => setCorrectionDialogOpen(false)}
-          raceId={correctionRaceId}
-          raceTitle={race.title}
-          year={correctionYear ?? ''}
-          results={correctionFilteredResults}
-        />
-      )}
+      <ResultCorrectionDialog
+        open={correctionDialogOpen}
+        onClose={() => setCorrectionDialogOpen(false)}
+        raceId={correctionRaceId}
+        raceTitle={race.title}
+        year={correctionYear ?? ''}
+        results={correctionFilteredResults}
+      />
       {RESULTS_EMAIL && (
         <ResultsSubmitDialog
           open={submitDialogOpen}

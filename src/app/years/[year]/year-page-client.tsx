@@ -9,7 +9,6 @@ import {
   fetchGzipJson,
 } from '@/lib/client-results-fetch';
 import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
-import { CORRECTIONS_EMAIL } from '@/lib/site-config';
 import type { RaceInfo, RaceResult } from '@/types/datatable';
 import type { ResultsFocusContext } from '@/types/datatable';
 
@@ -156,32 +155,30 @@ export default function YearPageClient({ year }: YearPageClientProps) {
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />
-            {CORRECTIONS_EMAIL && 
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                <p className="font-semibold">
-                  Spot an error in these results?
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+              <p className="font-semibold">
+                Spot an error in these results?
+              </p>
+              {focusedResultContext?.raceId && focusedResultContext?.year ? (
+                <p className="mt-1">
+                <button
+                    type="button"
+                    onClick={() => setCorrectionDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Send a correction to the results editor
+                  </button>
+                  <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                    {' '}with your correction for {focusedResultContext.raceId}{' '}
+                    ({focusedResultContext.year}).
+                  </span>
                 </p>
-                {focusedResultContext?.raceId && focusedResultContext?.year ? (
-                  <p className="mt-1">
-                  <button
-                      type="button"
-                      onClick={() => setCorrectionDialogOpen(true)}
-                      className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
-                    >
-                      Email the results editor
-                    </button>
-                    <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                      {' '}with your correction for {focusedResultContext.raceId}{' '}
-                      ({focusedResultContext.year}).
-                    </span>
-                  </p>
-                ) : (
-                  <p className="mt-1">
-                    Select the row with the error so we know which race and year.
-                  </p>
-                )}
-              </div>
-            }
+              ) : (
+                <p className="mt-1">
+                  Select the row with the error so we know which race and year.
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
@@ -192,16 +189,14 @@ export default function YearPageClient({ year }: YearPageClientProps) {
         )}
       </div>
     </main>
-    {CORRECTIONS_EMAIL && (
-      <ResultCorrectionDialog
-        open={correctionDialogOpen}
-        onClose={() => setCorrectionDialogOpen(false)}
-        raceId={correctionRaceId ?? ''}
-        raceTitle={correctionRaceId ? (races[correctionRaceId]?.title ?? correctionRaceId) : ''}
-        year={correctionYear ?? ''}
-        results={correctionFilteredResults}
-      />
-    )}
+    <ResultCorrectionDialog
+      open={correctionDialogOpen}
+      onClose={() => setCorrectionDialogOpen(false)}
+      raceId={correctionRaceId ?? ''}
+      raceTitle={correctionRaceId ? (races[correctionRaceId]?.title ?? correctionRaceId) : ''}
+      year={correctionYear ?? ''}
+      results={correctionFilteredResults}
+    />
     </>
   );
 }

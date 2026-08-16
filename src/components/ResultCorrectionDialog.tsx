@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RaceResult } from '@/types/datatable';
-import { CORRECTIONS_EMAIL } from '@/lib/site-config';
-import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
+import ChallengeQuestionBlock from '@/components/ChallengeQuestionBlock';
+import {
+  type ChallengeQuestion,
+  getRandomChallengeQuestion,
+} from '@/lib/challenge-questions';
+import { CONTENT_WEBHOOK_URL } from '@/lib/site-config';
 
 export interface ResultCorrectionDialogProps {
   open: boolean;
@@ -31,27 +35,80 @@ interface OriginalValues {
   club: string;
 }
 
-function buildCorrectionText(
+interface MinorCorrectionChange {
+  field: 'name' | 'category' | 'club' | 'notes';
+  value: string;
+}
+
+interface MinorCorrectionPayload {
+  type: 'minor-correction';
+  raceId: string;
+  year: string;
+  runnerPosition: string;
+  challengeQuestionId: string;
+  challengeAnswer: string;
+  authorityConfirmed: boolean;
+  changes: MinorCorrectionChange[];
+}
+
+function buildMinorCorrectionPayload(
+  raceId: string,
+  year: string,
   original: OriginalValues | null,
+  challengeQuestionId: string,
+  challengeAnswer: string,
+  authorityConfirmed: boolean,
   form: FormState
-): string {
-  const changes: string[] = [];
+): MinorCorrectionPayload {
+  const changes: MinorCorrectionChange[] = [];
+
   if (original) {
     const newName = form.name.trim();
     const newCategory = form.category.trim();
     const newClub = form.club.trim();
-    if (newName && newName !== original.name) changes.push(`name to ${newName}`);
-    if (newCategory && newCategory !== original.category) changes.push(`category to ${newCategory}`);
-    if (newClub && newClub !== original.club) changes.push(`club to ${newClub}`);
+    if (newName && newName !== original.name) {
+      changes.push({ field: 'name', value: newName });
+    }
+    if (newCategory && newCategory !== original.category) {
+      changes.push({ field: 'category', value: newCategory });
+    }
+    if (newClub && newClub !== original.club) {
+      changes.push({ field: 'club', value: newClub });
+    }
   }
 
-  let correctionText =
-    changes.length > 0 ? `Change ${changes.join(', ')}` : '';
   const extra = form.proposedChanges.trim();
-  if (extra) {
-    correctionText = correctionText ? `${correctionText}. ${extra}` : extra;
+  if (extra) changes.push({ field: 'notes', value: extra });
+
+  return {
+    type: 'minor-correction',
+    raceId,
+    year,
+    runnerPosition: form.position || '',
+    challengeQuestionId,
+    challengeAnswer,
+    authorityConfirmed,
+    changes,
+  };
+}
+
+async function submitMinorCorrection(payload: MinorCorrectionPayload): Promise<void> {
+  if (!CONTENT_WEBHOOK_URL) {
+    throw new Error('Content webhook URL is not configured.');
   }
-  return correctionText || '[Insert correction details]';
+
+  const response = await fetch(CONTENT_WEBHOOK_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Webhook request failed with ${response.status}`);
+  }
 }
 
 const inputClass =
@@ -69,15 +126,6 @@ export default function ResultCorrectionDialog({
 }: ResultCorrectionDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const [form, setForm] = useState<FormState>({
-    position: '',
-    name: '',
-    category: '',
-    club: '',
-    proposedChanges: '',
-  });
-  const [originalValues, setOriginalValues] = useState<OriginalValues | null>(null);
-
   // Open / close the native dialog imperatively so the backdrop renders correctly.
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -85,22 +133,6 @@ export default function ResultCorrectionDialog({
     if (open && !dialog.open) dialog.showModal();
     else if (!open && dialog.open) dialog.close();
   }, [open]);
-
-  // Reset form each time the dialog opens, seeding from initialResult if provided.
-  useEffect(() => {
-    if (!open) return;
-    const orig = initialResult
-      ? { name: initialResult.name, category: initialResult.category, club: initialResult.club }
-      : null;
-    setOriginalValues(orig);
-    setForm({
-      position: initialResult ? String(initialResult.position) : '',
-      name: initialResult?.name ?? '',
-      category: initialResult?.category ?? '',
-      club: initialResult?.club ?? '',
-      proposedChanges: '',
-    });
-  }, [open, initialResult]);
 
   // Sync native Escape-key close with React state.
   useEffect(() => {
@@ -116,15 +148,63 @@ export default function ResultCorrectionDialog({
     if (e.target === dialogRef.current) onClose();
   }
 
-  // When the user types a position, look it up and auto-fill name / category / club.
+  return (
+    <dialog
+      ref={dialogRef}
+      onClick={handleBackdropClick}
+      className="m-auto w-full max-w-lg rounded-xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-black/40 dark:border-slate-700 dark:bg-slate-900"
+    >
+      <ResultCorrectionForm
+        key={`${raceId}:${year}:${initialResult?.position ?? 'none'}:${initialResult?.name ?? ''}:${initialResult?.category ?? ''}:${initialResult?.club ?? ''}`}
+        raceId={raceId}
+        raceTitle={raceTitle}
+        year={year}
+        results={results}
+        initialResult={initialResult}
+        onClose={onClose}
+      />
+    </dialog>
+  );
+}
+
+function ResultCorrectionForm({
+  raceId,
+  raceTitle,
+  year,
+  results,
+  initialResult,
+  onClose,
+}: {
+  raceId: string;
+  raceTitle: string;
+  year: string;
+  results: RaceResult[];
+  initialResult?: RaceResult | null;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<FormState>({
+    position: initialResult ? String(initialResult.position) : '',
+    name: initialResult?.name ?? '',
+    category: initialResult?.category ?? '',
+    club: initialResult?.club ?? '',
+    proposedChanges: '',
+  });
+  const [originalValues, setOriginalValues] = useState<OriginalValues | null>(
+    initialResult
+      ? { name: initialResult.name, category: initialResult.category, club: initialResult.club }
+      : null
+  );
+  const [challengeQuestion] = useState<ChallengeQuestion>(() => getRandomChallengeQuestion());
+  const [challengeAnswer, setChallengeAnswer] = useState('');
+  const [authorityConfirmed, setAuthorityConfirmed] = useState(false);
+
   function handlePositionChange(value: string) {
     setForm((prev) => ({ ...prev, position: value }));
     const posNum = parseInt(value, 10);
-    if (!isNaN(posNum) && posNum > 0) {
+    if (!Number.isNaN(posNum) && posNum > 0) {
       const match = results.find((r) => r.position === posNum);
       if (match) {
-        const orig = { name: match.name, category: match.category, club: match.club };
-        setOriginalValues(orig);
+        setOriginalValues({ name: match.name, category: match.category, club: match.club });
         setForm((prev) => ({
           ...prev,
           position: value,
@@ -138,142 +218,150 @@ export default function ResultCorrectionDialog({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!CORRECTIONS_EMAIL) return;
-
-    const correctionText = buildCorrectionText(originalValues, form);
-    const subject = `Correction for ${raceTitle} (${raceId}) ${year}`;
-    const body =
-      `To ${toWhomItMayConcern()}:\n\n` +
-      `I would like to submit the following correction to the ${year} results for ${raceTitle}.\n\n` +
-      `- raceId: ${raceId}\n` +
-      `- year: ${year}\n` +
-      `- name: ${originalValues?.name?.trim() || '[not specified]'}\n` +
-      `- position: ${form.position || '[not specified]'}\n` +
-      `- category: ${originalValues?.category?.trim() || '[not specified]'}\n` +
-      `- club: ${originalValues?.club?.trim() || '[not specified]'}\n` +
-      `- correction: ${correctionText}\n\n` +
-      `I attest that the above information is accurate to the best of my knowledge.\n`;
-
-    window.location.href = `mailto:${CORRECTIONS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    onClose();
+    const payload = buildMinorCorrectionPayload(
+      raceId,
+      year,
+      originalValues,
+      challengeQuestion.id,
+      challengeAnswer,
+      authorityConfirmed,
+      form
+    );
+    void submitMinorCorrection(payload)
+      .then(() => onClose())
+      .catch(() => {
+        window.alert('Unable to submit the correction right now. Please try again.');
+      });
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      onClick={handleBackdropClick}
-      className="m-auto w-full max-w-lg rounded-xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-black/40 dark:border-slate-700 dark:bg-slate-900"
-    >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Email the results editor
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-slate-300">
-          Enter the position of the result to correct — the runner&apos;s details
-          will be looked up automatically. Edit any incorrect fields, then describe
-          the change below.
-        </p>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        Submit a correction
+      </h2>
+      <p className="text-sm text-gray-600 dark:text-slate-300">
+        Enter the position of the result to correct — the runner&apos;s details
+        will be looked up automatically. Edit any incorrect fields,
+        then (optionally) provide some contact details so we can get in touch
+        if any clarifications are needed.
+      </p>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/60">
-          <div className="font-medium text-gray-900 dark:text-white">{raceTitle}</div>
-          <div className="text-gray-600 dark:text-slate-300">Race ID: {raceId}</div>
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/60">
+        <div className="font-medium text-gray-900 dark:text-white">{raceTitle}</div>
+        <div className="text-gray-600 dark:text-slate-300">Race ID: {raceId}</div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-1">
+          <label className={labelClass} htmlFor="cd-position">
+            Position
+          </label>
+          <input
+            id="cd-position"
+            type="number"
+            min={1}
+            value={form.position}
+            onChange={(e) => handlePositionChange(e.target.value)}
+            className={inputClass}
+            placeholder="e.g. 42"
+          />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-1">
-            <label className={labelClass} htmlFor="cd-position">
-              Position
-            </label>
-            <input
-              id="cd-position"
-              type="number"
-              min={1}
-              value={form.position}
-              onChange={(e) => handlePositionChange(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. 42"
-            />
-          </div>
-
-          <div className="col-span-2">
-            <label className={labelClass} htmlFor="cd-name">
-              Runner name
-            </label>
-            <input
-              id="cd-name"
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              className={inputClass}
-              placeholder="Auto-filled from position"
-            />
-          </div>
-
-          <div>
-            <label className={labelClass} htmlFor="cd-category">
-              Category
-            </label>
-            <input
-              id="cd-category"
-              type="text"
-              value={form.category}
-              onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-              className={inputClass}
-              placeholder="e.g. M65"
-            />
-          </div>
-
-          <div>
-            <label className={labelClass} htmlFor="cd-club">
-              Club
-            </label>
-            <input
-              id="cd-club"
-              type="text"
-              value={form.club}
-              onChange={(e) => setForm((prev) => ({ ...prev, club: e.target.value }))}
-              className={inputClass}
-              placeholder="Auto-filled from position"
-            />
-          </div>
-
-          <div className="col-span-2">
-            <label className={labelClass} htmlFor="cd-changes">
-              Additional details (optional)
-            </label>
-            <textarea
-              id="cd-changes"
-              value={form.proposedChanges}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, proposedChanges: e.target.value }))
-              }
-              rows={3}
-              className={inputClass}
-              placeholder="Any extra context for the editor"
-            />
-          </div>
+        <div className="col-span-2">
+          <label className={labelClass} htmlFor="cd-name">
+            Runner name
+          </label>
+          <input
+            id="cd-name"
+            type="text"
+            value={form.name}
+            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            className={inputClass}
+            placeholder="Auto-filled from position"
+          />
         </div>
 
-        <p className="text-xs text-gray-500 dark:text-slate-400">
-          This will open your email client with the details pre-filled.
-        </p>
-
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Open email client
-          </button>
+        <div>
+          <label className={labelClass} htmlFor="cd-category">
+            Category
+          </label>
+          <input
+            id="cd-category"
+            type="text"
+            value={form.category}
+            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+            className={inputClass}
+            placeholder="e.g. M65"
+          />
         </div>
-      </form>
-    </dialog>
+
+        <div>
+          <label className={labelClass} htmlFor="cd-club">
+            Club
+          </label>
+          <input
+            id="cd-club"
+            type="text"
+            value={form.club}
+            onChange={(e) => setForm((prev) => ({ ...prev, club: e.target.value }))}
+            className={inputClass}
+            placeholder="Auto-filled from position"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className={labelClass} htmlFor="cd-changes">
+            Contact details (optional)
+          </label>
+          <textarea
+            id="cd-changes"
+            value={form.proposedChanges}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, proposedChanges: e.target.value }))
+            }
+            rows={3}
+            className={inputClass}
+            placeholder="Please let us know how to get in touch if we need more information about this correction."
+          />
+        </div>
+      </div>
+
+      <ChallengeQuestionBlock
+        question={challengeQuestion}
+        value={challengeAnswer}
+        onChange={setChallengeAnswer}
+      />
+
+      <label className="flex cursor-pointer items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+        <input
+          type="checkbox"
+          checked={authorityConfirmed}
+          onChange={(e) => setAuthorityConfirmed(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+          required
+        />
+        <span>
+          I attest I am correcting my own result, or I am acting with appropriate
+          authority.
+        </span>
+      </label>
+
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={!authorityConfirmed}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Submit correction
+        </button>
+      </div>
+    </form>
   );
 }

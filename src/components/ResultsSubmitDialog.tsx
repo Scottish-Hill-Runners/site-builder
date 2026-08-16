@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { RESULTS_EMAIL } from '@/lib/site-config';
+import ChallengeQuestionBlock from '@/components/ChallengeQuestionBlock';
+import {
+  type ChallengeQuestion,
+  getRandomChallengeQuestion,
+} from '@/lib/challenge-questions';
 
 export interface ResultsSubmitDialogProps {
   open: boolean;
@@ -81,6 +86,8 @@ export default function ResultsSubmitDialog({
     shortenedCourse: false,
     notes: '',
   });
+  const [challengeQuestion] = useState<ChallengeQuestion>(() => getRandomChallengeQuestion());
+  const [challengeAnswer, setChallengeAnswer] = useState('');
 
   // Open / close the native dialog imperatively so the backdrop renders correctly.
   useEffect(() => {
@@ -90,16 +97,20 @@ export default function ResultsSubmitDialog({
     else if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  // Reset form each time the dialog opens.
-  useEffect(() => {
-    if (!open) return;
-    setForm({
-      year: new Date().getFullYear().toString(),
-      suffix: '',
-      shortenedCourse: false,
-      notes: '',
-    });
-  }, [open]);
+  // Reset form each time the dialog opens; adjusting state during render
+  // (rather than in an effect) avoids an extra render pass.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setForm({
+        year: new Date().getFullYear().toString(),
+        suffix: '',
+        shortenedCourse: false,
+        notes: '',
+      });
+    }
+  }
 
   // Sync native Escape-key close with React state.
   useEffect(() => {
@@ -128,6 +139,8 @@ export default function ResultsSubmitDialog({
       `RaceId: ${raceId}\n` +
       `Year: ${yearLabel}\n` +
       `Shortened course: ${form.shortenedCourse ? 'Yes' : 'No'}\n` +
+      `Challenge question: ${challengeQuestion.prompt}\n` +
+      `Challenge answer: ${challengeAnswer || '[not selected]'}\n` +
       `\nAdditional notes:\n${form.notes.trim() || '(none)'}\n` +
       `\n---\n\n` +
       `Before sending, I confirm that I have checked that the attached spreadsheet:\n\n` +
@@ -224,6 +237,12 @@ export default function ResultsSubmitDialog({
           </div>
         </div>
 
+        <ChallengeQuestionBlock
+          question={challengeQuestion}
+          value={challengeAnswer}
+          onChange={setChallengeAnswer}
+        />
+
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
           <p className="mb-1 font-semibold">Before sending, please check your spreadsheet:</p>
           <ul className="space-y-0.5 pl-3">
@@ -252,7 +271,7 @@ export default function ResultsSubmitDialog({
 
         <p className="text-xs text-gray-500 dark:text-slate-400">
           This will open your email client. Attach your results spreadsheet before
-          sending.
+          sending. The challenge answer will be included in the message.
         </p>
 
         <div className="flex justify-end gap-3">

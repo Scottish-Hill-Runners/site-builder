@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -13,7 +14,6 @@ import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import type { RunnerNameEntry } from '@/lib/results-data';
 import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
-import { CORRECTIONS_EMAIL } from '@/lib/site-config';
 import { runnerNameMatches, surnameHash } from '@/lib/runner-name';
 import type {
   RaceInfo,
@@ -76,15 +76,26 @@ export default function RunnerPageClient({
         )
       : [];
 
-  useEffect(() => {
+  // Adjust state during render (rather than in an effect) when decodedName
+  // changes, avoiding an extra render pass.
+  const [prevDecodedName, setPrevDecodedName] = useState(decodedName);
+  if (prevDecodedName !== decodedName) {
+    setPrevDecodedName(decodedName);
     setQuery(decodedName);
-  }, [decodedName]);
+    if (!decodedName) {
+      setResults(null);
+      setErrorMessage(null);
+      setIsNotFound(false);
+      setIsLoading(false);
+    }
+  }
 
-  const [isMounted, setIsMounted] = useState(false);
-  
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  // Detect client-only rendering without an effect, avoiding hydration mismatches.
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const suggestions = useMemo(() => {
     function weightedComparator(a: RunnerNameEntry, b: RunnerNameEntry): number {
@@ -130,10 +141,6 @@ export default function RunnerPageClient({
 
   useEffect(() => {
     if (!decodedName) {
-      setResults(null);
-      setErrorMessage(null);
-      setIsNotFound(false);
-      setIsLoading(false);
       return;
     }
 
@@ -217,7 +224,7 @@ export default function RunnerPageClient({
         </nav>
 
         <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-slate-50">
-          {decodedName ? `Runner Results: ${decodedName}` : 'Runner Results'}
+          {decodedName ? `Results matching: ${decodedName}` : 'Results by name'}
         </h1>
 
         <section className="mb-8 rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-none">
@@ -304,32 +311,30 @@ export default function RunnerPageClient({
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />
-            {CORRECTIONS_EMAIL && 
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                <p className="font-semibold">
-                  Spot an error in these results?
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+              <p className="font-semibold">
+                Spot an error in these results?
+              </p>
+              {focusedResultContext?.raceId && focusedResultContext?.year ? (
+                <p className="mt-1">
+                <button
+                    type="button"
+                    onClick={() => setCorrectionDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Send a correction to the results editor
+                  </button>
+                  <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
+                    {' '}with your correction for {focusedResultContext.raceId}{' '}
+                    ({focusedResultContext.year}).
+                  </span>
                 </p>
-                {focusedResultContext?.raceId && focusedResultContext?.year ? (
-                  <p className="mt-1">
-                  <button
-                      type="button"
-                      onClick={() => setCorrectionDialogOpen(true)}
-                      className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
-                    >
-                      Email the results editor
-                    </button>
-                    <span className="mt-2 text-xs text-blue-800 dark:text-blue-200">
-                      {' '}with your correction for {focusedResultContext.raceId}{' '}
-                      ({focusedResultContext.year}).
-                    </span>
-                  </p>
-                ) : (
-                  <p className="mt-1">
-                    Select the row with the error so we know which race and year.
-                  </p>
-                )}
-              </div>
-            }
+              ) : (
+                <p className="mt-1">
+                  Select the row with the error so we know which race and year.
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
@@ -340,16 +345,14 @@ export default function RunnerPageClient({
         )}
       </div>
     </main>
-    {CORRECTIONS_EMAIL && (
-      <ResultCorrectionDialog
-        open={correctionDialogOpen}
-        onClose={() => setCorrectionDialogOpen(false)}
-        raceId={correctionRaceId ?? ''}
-        raceTitle={correctionRaceId ? (races[correctionRaceId]?.title ?? correctionRaceId) : ''}
-        year={correctionYear ?? ''}
-        results={correctionFilteredResults}
-      />
-    )}
+    <ResultCorrectionDialog
+      open={correctionDialogOpen}
+      onClose={() => setCorrectionDialogOpen(false)}
+      raceId={correctionRaceId ?? ''}
+      raceTitle={correctionRaceId ? (races[correctionRaceId]?.title ?? correctionRaceId) : ''}
+      year={correctionYear ?? ''}
+      results={correctionFilteredResults}
+    />
     </>
   );
 }
