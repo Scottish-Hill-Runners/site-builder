@@ -3,7 +3,7 @@ const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 let manifest: Record<string, string> | null = null;
 let loadedAt: number | null = null;
-let inflight: Promise<Record<string, string>> | null = null;
+let inFlight: Promise<Record<string, string>> | null = null;
 
 async function fetchManifest(): Promise<Record<string, string>> {
   try {
@@ -18,7 +18,7 @@ async function fetchManifest(): Promise<Record<string, string>> {
     // Graceful degradation: return last known manifest, or empty so paths are returned unversioned.
     return manifest ?? {};
   } finally {
-    inflight = null;
+    inFlight = null;
   }
 }
 
@@ -27,10 +27,10 @@ function getManifest(): Promise<Record<string, string>> {
   if (manifest !== null && loadedAt !== null && now - loadedAt < TTL_MS) {
     return Promise.resolve(manifest);
   }
-  if (!inflight) {
-    inflight = fetchManifest();
+  if (!inFlight) {
+    inFlight = fetchManifest();
   }
-  return inflight;
+  return inFlight;
 }
 
 export async function resolvePublicUrl(publicPath: string): Promise<string> {

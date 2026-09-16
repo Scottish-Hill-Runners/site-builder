@@ -248,6 +248,7 @@ export default function TeamResultsDataTable({
     });
   }, [displayTeams]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: displayTeams.length,
     getScrollElement: () => scrollContainerRef.current,

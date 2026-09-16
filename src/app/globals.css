@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@mdxeditor/editor/style.css";
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(html[data-theme=dark], html[data-theme=dark] *));
 
@@ -30,4 +31,39 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.mdxeditor-toolbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mdxeditor-toolbar > * {
+  flex: 0 0 auto;
+}
+
+.shr-mdxeditor-toolbar {
+  background: #f8fafc;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.35rem;
+}
+
+.shr-mdxeditor-content {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+}
+
+html[data-theme='dark'] .shr-mdxeditor-toolbar {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .shr-mdxeditor-content {
+  background: #0f172a;
+  border-color: #334155;
 }

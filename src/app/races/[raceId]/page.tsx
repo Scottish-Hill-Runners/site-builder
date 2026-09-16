@@ -1,8 +1,8 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import RacePageClient from '@/app/races/[raceId]/race-page-client';
-import { getRaceImagesBySlug } from '@/lib/imageCollections';
-import { cloudinaryUrlForPresetFromEnv } from '@/lib/cloudinary';
+import { getRaceImages } from '@/lib/assetCollections';
+import { cloudinaryUrl } from '@/lib/cloudinary';
 import { loadAllRaces, loadCalendar, loadRaceResults } from '@/lib/results-data';
 import type { AllRaceData, RaceData, RaceInfo } from '@/types/datatable';
 
@@ -29,17 +29,6 @@ function buildOgDescription(race: RaceInfo): string | undefined {
   return `A race ${parts.join(' ')}`;
 }
 
-function getOgHeroImageUrl(sourcePath: string | undefined): string | undefined {
-  if (!sourcePath)
-    return undefined;
-
-  try {
-    return cloudinaryUrlForPresetFromEnv(sourcePath, 'raceHero');
-  } catch {
-    return undefined;
-  }
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -50,12 +39,12 @@ export async function generateMetadata({
 
   const [raceData, raceImages] = await Promise.all([
     loadRaceResults(raceId).catch(() => null),
-    getRaceImagesBySlug(raceId).catch(() => null),
+    getRaceImages(raceId).catch(() => null),
   ]);
 
   const title = raceData?.info.title;
   const description = raceData ? buildOgDescription(raceData.info) : undefined;
-  const heroImageUrl = getOgHeroImageUrl(raceImages?.hero[0]?.sourcePath);
+  const heroImageUrl = raceImages?.hero ? cloudinaryUrl(raceImages.hero, 'raceHero') : undefined;
 
   return {
     ...(title ? { title } : {}),
@@ -145,22 +134,10 @@ export default async function RacePage({
 }) {
   const { raceId } = await params;
   const [raceImages, raceData, calendarEntries] = await Promise.all([
-    getRaceImagesBySlug(raceId),
+    getRaceImages(raceId),
     loadRaceResults(raceId),
     loadCalendar().catch(() => []),
   ]);
-  const optimizedRaceImages = raceImages
-    ? {
-        hero: raceImages.hero.map((item) => ({
-          ...item,
-          imageUrl: cloudinaryUrlForPresetFromEnv(item.sourcePath, 'raceHero'),
-        })),
-        gallery: raceImages.gallery.map((item) => ({
-          ...item,
-          imageUrl: cloudinaryUrlForPresetFromEnv(item.sourcePath, 'gallery'),
-        })),
-      }
-    : null;
 
   const eventDate = calendarEntries.find((entry) => entry.raceId === raceId)?.Date;
   const jsonLd = buildRaceJsonLd(raceId, raceData, eventDate);
@@ -171,7 +148,7 @@ export default async function RacePage({
         {JSON.stringify(jsonLd)}
       </script>
       <Suspense fallback={null}>
-        <RacePageClient raceId={raceId} raceImages={optimizedRaceImages} />
+        <RacePageClient raceId={raceId} hero={raceImages?.hero} gallery={raceImages?.gallery ?? []} />
       </Suspense>
     </>
   );

@@ -605,7 +605,7 @@ export default function CalendarPageClient() {
                             </div>
                             <div>
                               {entry.climb !== undefined
-                                ? `${formatClimb(entry.climb, imperial)} climb`
+                                ? `${formatClimb(entry.climb, imperial, true)}`
                                 : 'Climb: —'}
                             </div>
                           </div>

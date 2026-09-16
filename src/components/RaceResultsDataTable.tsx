@@ -532,6 +532,7 @@ export default function RaceResultsDataTable({
     return () => observer.disconnect();
   }, []);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: virtualItemList.length,
     getScrollElement: () => scrollContainerRef.current,

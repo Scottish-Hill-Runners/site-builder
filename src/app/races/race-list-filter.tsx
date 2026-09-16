@@ -242,7 +242,7 @@ export default function RaceListFilter({ races, calendar }: RaceListFilterProps)
                     <div className="text-sm text-gray-600 dark:text-slate-300">
                       {race.venue ?? 'Unknown venue'} •{' '}
                       {formatDistance(race.distance, imperial)}
-                      {race.climb != null && ` • ${formatClimb(race.climb, imperial)}`}
+                      {race.climb != null && ` • ${formatClimb(race.climb, imperial, false)}`}
                     </div>
                   </Link>
                 </li>

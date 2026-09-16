@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import { AttributionControl, LayerSpecification, LngLatLike, LngLatBoundsLike, Map, Marker, NavigationControl, Popup, RasterTileSource, StyleSpecification, TerrainControl } from 'maplibre-gl';
 import type { GeoJSON } from 'geojson';
 
 interface RouteMapProps {
@@ -21,7 +21,7 @@ interface CheckpointProperties {
   notes?: string;
 }
 
-function getBounds(geojson: GeoJSON): maplibregl.LngLatBoundsLike | null {
+function getBounds(geojson: GeoJSON): LngLatBoundsLike | null {
   let minLng = Infinity;
   let minLat = Infinity;
   let maxLng = -Infinity;
@@ -170,7 +170,7 @@ function bearingDeg(a: [number, number], b: [number, number]): number {
 
 export default function RouteMap({ raceName, geojson }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<Map | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
@@ -206,7 +206,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
         const hasDem = maptilerKey.length > 0;
         const hasOs = osKey.length > 0;
 
-        const sources: maplibregl.StyleSpecification['sources'] = {
+        const sources: StyleSpecification['sources'] = {
           'os-raster': {
             type: 'raster',
             tiles: hasOs
@@ -236,7 +236,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           sources['hillshade-dem'] = { ...demSource };
         }
 
-        const layers: maplibregl.LayerSpecification[] = [
+        const layers: LayerSpecification[] = [
           {
             id: 'os-raster',
             type: 'raster',
@@ -256,7 +256,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           });
         }
 
-        const style: maplibregl.StyleSpecification = {
+        const style: StyleSpecification = {
           version: 8,
           sources,
           layers,
@@ -265,7 +265,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
             : {}),
         };
 
-        const map = new maplibregl.Map({
+        const map = new Map({
           container: containerRef.current!,
           style,
           center: routeCenter,
@@ -284,13 +284,13 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
         mapRef.current = map;
 
         map.addControl(
-          new maplibregl.AttributionControl({ compact: true }),
+          new AttributionControl({ compact: true }),
           'bottom-right'
         );
         // visualizePitch: true — compass tilts to show pitch angle and clicking
         // it resets both bearing and pitch to 0 (standard MapLibre behaviour).
         map.addControl(
-          new maplibregl.NavigationControl({
+          new NavigationControl({
             visualizePitch: true,
             showZoom: true,
             showCompass: true,
@@ -338,7 +338,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           );
 
           map.addControl(
-            new maplibregl.TerrainControl({
+            new TerrainControl({
               source: 'terrain-dem',
               exaggeration: 1.2,
             }),
@@ -399,26 +399,26 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
 
             // Start/finish markers
             if (start) {
-              new maplibregl.Marker({
+              new Marker({
                 element: createMarkerEl('S', '#16a34a'),
                 anchor: 'center',
               })
                 .setLngLat([start.lng, start.lat])
                 .setPopup(
-                  new maplibregl.Popup({ offset: 20 }).setHTML(
+                  new Popup({ offset: 20 }).setHTML(
                     `<span style="color:#1f2937">${raceName} \u2014 Start</span>`
                   )
                 )
                 .addTo(map);
             }
             if (end) {
-              new maplibregl.Marker({
+              new Marker({
                 element: createMarkerEl('F', '#1d4ed8'),
                 anchor: 'center',
               })
                 .setLngLat([end.lng, end.lat])
                 .setPopup(
-                  new maplibregl.Popup({ offset: 20 }).setHTML(
+                  new Popup({ offset: 20 }).setHTML(
                     `<span style="color:#1f2937">${raceName} \u2014 Finish</span>`
                   )
                 )
@@ -440,18 +440,18 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
                   if (props.cutoff) popupHtml += `<br>Cutoff: ${props.cutoff}`;
                   if (props.notes) popupHtml += `<br>${props.notes}`;
                   popupHtml += '</div>';
-                  new maplibregl.Marker({
+                  new Marker({
                     element: createMarkerEl(name, '#f97316'),
                     anchor: 'center',
                   })
                     .setLngLat([lng, lat])
-                    .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(popupHtml))
+                    .setPopup(new Popup({ offset: 20 }).setHTML(popupHtml))
                     .addTo(map);
                 }
               }
             }
 
-            map.fitBounds(bounds as maplibregl.LngLatBoundsLike, {
+            map.fitBounds(bounds as LngLatBoundsLike, {
               padding: 72,
               pitch: 0,
               duration: 0,
@@ -534,7 +534,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
                   // easeTo with a short linear duration blends successive frames
                   // smoothly instead of jumping to each position instantly.
                   map.easeTo({
-                    center: pos as maplibregl.LngLatLike,
+                    center: pos as LngLatLike,
                     bearing,
                     pitch: flyPitch,
                     zoom: 15.5,
@@ -580,7 +580,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
         map.on('error', (e) => {
           const msg =
             e && typeof e === 'object' && 'error' in e
-              ? ((e as { error: Error }).error?.message ?? String(e))
+              ? (e.error?.message ?? String(e))
               : String(e);
           console.warn('MapLibre error:', msg);
           // If the OS Maps API rejects a tile (403 Premium required), swap the
@@ -591,7 +591,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
               'OS Maps API access denied — falling back to OpenTopoMap. ' +
               'Outdoor_3857 requires a premium OS Maps API plan.'
             );
-            const src = map.getSource('os-raster') as maplibregl.RasterTileSource | undefined;
+            const src = map.getSource('os-raster') as RasterTileSource | undefined;
             src?.setTiles(['https://tile.opentopomap.org/{z}/{x}/{y}.png']);
           }
         });

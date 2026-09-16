@@ -2,6 +2,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getClubItems } from '@/app/clubs/page';
+import ClubEditSection from '@/components/ClubEditSection';
 
 interface ClubSlugPageProps {
   params: Promise<{ slug: string }>;
@@ -16,8 +17,6 @@ export default async function ClubSlugPage({ params }: ClubSlugPageProps) {
   const { slug } = await params;
   const items = await getClubItems();
   const club = items.find((item) => item.slug === slug) ?? null;
-
-  const editUrl = `https://admin.scottishhillrunners.uk/clubs/${encodeURIComponent(slug)}`;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -78,20 +77,7 @@ export default async function ClubSlugPage({ params }: ClubSlugPageProps) {
           </div>
         )}
 
-        <div className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-700">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Are you a club official?{' '}
-            <a
-              href={editUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-800 dark:text-blue-400 dark:decoration-blue-700 dark:hover:text-blue-300"
-            >
-              Edit this club&apos;s information
-            </a>
-            .
-          </p>
-        </div>
+        {club && <ClubEditSection slug={slug} club={club} />}
       </article>
     </div>
   );

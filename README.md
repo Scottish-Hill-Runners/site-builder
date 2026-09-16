@@ -5,7 +5,7 @@
 This project can build from content stored in another repository.
 
 - `CONTENT_ROOT` controls where content folders are read from.
-- Supported content folders are `clubs`, `info`, `joining`, `juniors`, `long-distance`, `news`, `safety`, `championships`, and `races`.
+- Supported content folders are `clubs`, `info`, `long-distance`, `news`, `championships`, and `races`.
 
 Example workflow using a separate repository:
 
@@ -21,40 +21,6 @@ Validation against synced content:
 ```sh
 npm run validate:results:content
 ```
-
-## Image collections output
-
-If `collections.yaml` exists at the synced content root, the build step now emits:
-
-- `public/image-collections.json.gz`
-
-This payload preserves collection metadata and adds external image links for each item.
-
-- `sourcePath` keeps the original path from `collections.yaml`.
-- `imageUrl` points to Cloudinary using deterministic delivery URLs derived from each `blobs/...` path.
-
-Cloudinary upload/migration workflow:
-
-```sh
-# one-time migration (dry run first)
-npm run cloudinary:migrate:dry-run
-npm run cloudinary:migrate
-
-# verify migrated delivery URLs
-npm run cloudinary:verify
-```
-
-Required environment variables:
-
-- `CLOUDINARY_CLOUD_NAME`
-- `CLOUDINARY_API_KEY`
-- `CLOUDINARY_API_SECRET`
-
-Optional but recommended when source content repo is private:
-
-- `GITHUB_TOKEN` (read access for `CONTENT_REPO` tree lookup)
-
-Migration uses `CONTENT_REPO`/`CONTENT_REF` for source blob discovery if local `content/blobs` is not present.
 
 ## Overview
 

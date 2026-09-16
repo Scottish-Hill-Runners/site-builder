@@ -1,6 +1,5 @@
-'use client';
-
 import { useMemo, useState, useEffect } from 'react';
+import type { AssetEntry } from '@/lib/assetCollections';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
@@ -38,15 +37,10 @@ import type { GeoJSON } from 'geojson';
 import Obfuscate from 'react-obfuscate';
 import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
 import ResultsSubmitDialog from '@/components/ResultsSubmitDialog';
-import { RESULTS_EMAIL } from '@/lib/site-config';
-
-interface RaceImageProp {
-  sourcePath: string;
-  imageUrl: string;
-  caption?: string;
-  year?: number;
-  tags?: string[];
-}
+import { openPhotoSubmissionEmail } from '@/lib/photo-submission';
+import RaceInfoEditDialog from '@/components/RaceInfoEditDialog';
+import { CORRECTIONS_EMAIL, RESULTS_EMAIL, UPDATES_EMAIL } from '@/lib/site-config';
+import { cloudinaryUrl } from '@/lib/cloudinary';
 
 interface RaceDetailsTabsProps {
   raceId: string;
@@ -58,8 +52,8 @@ interface RaceDetailsTabsProps {
   elevationChartData?: ElevationChartData;
   results: RaceResult[];
   resultsError: string | null;
-  heroImages: RaceImageProp[];
-  galleryImages: RaceImageProp[];
+  heroImage?: AssetEntry;
+  galleryImages: AssetEntry[];
   initialTab?: TabKey;
   initialYearFilter?: string;
   initialCategoryFilter?: string;
@@ -85,7 +79,7 @@ export default function RaceDetailsTabs({
   elevationChartData,
   results,
   resultsError,
-  heroImages,
+  heroImage,
   galleryImages,
   initialTab,
   initialYearFilter = '',
@@ -146,30 +140,14 @@ export default function RaceDetailsTabs({
     useState<ResultsFocusContext | null>(null);
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
-  const [heroImage] = useState<RaceImageProp | null>(() =>
-    heroImages.length > 0
-      ? heroImages[Math.floor(Math.random() * heroImages.length)]
-      : null
-  );
+  const [infoEditDialogOpen, setInfoEditDialogOpen] = useState(false);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const hasRouteAssets = hasGpx || hasRaceMap;
   const hasGallery = galleryImages.length > 0;
   const allTags = [
     ...new Set(galleryImages.flatMap((img) => img.tags ?? [])),
   ].sort();
-  const filteredImages =
-    activeTags.size === 0
-      ? galleryImages
-      : galleryImages.filter((img) => img.tags?.some((t) => activeTags.has(t)));
-  const yearMap = new Map<number | null, RaceImageProp[]>();
-  for (const img of filteredImages) {
-    const y = img.year ?? null;
-    if (!yearMap.has(y)) yearMap.set(y, []);
-    yearMap.get(y)!.push(img);
-  }
-  const imagesByYear = [...yearMap.keys()]
-    .sort((a, b) => (a === null ? 1 : b === null ? -1 : b - a))
-    .map((year) => ({ year, images: yearMap.get(year)! }));
+
   function toggleTag(tag: string) {
     setActiveTags((prev) => {
       const next = new Set(prev);
@@ -304,7 +282,7 @@ export default function RaceDetailsTabs({
                   <p className="font-semibold">
                     Spot an error in these results?
                   </p>
-                  {focusedResultContext?.raceId && focusedResultContext?.year ? (
+                  {CORRECTIONS_EMAIL && focusedResultContext?.raceId && focusedResultContext?.year ? (
                     <p className="mt-1">
                     <button
                         type="button"
@@ -343,8 +321,8 @@ export default function RaceDetailsTabs({
             {heroImage && (
               <figure className="overflow-hidden rounded-xl border border-gray-200 bg-gray-100 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <Image
-                  src={heroImage.imageUrl}
-                  alt={heroImage.caption ?? `${race.title}: ${filenameToAltText(heroImage.sourcePath)}`}
+                  src={cloudinaryUrl(heroImage, 'raceHero')}
+                  alt={heroImage.title ?? `${race.title}: ${filenameToAltText(heroImage.public_id)}`}
                   width={1600}
                   height={900}
                   sizes="(min-width: 1024px) 900px, 100vw"
@@ -370,9 +348,8 @@ export default function RaceDetailsTabs({
                 {formatDistance(race.distance, imperial)}
                 {'; '}
                 <span className="font-semibold text-gray-900 dark:text-slate-100">
-                  climb:
                 </span>{' '}
-                {formatClimb(race.climb, imperial)}
+                {formatClimb(race.climb, imperial, true)}
               </p>
               {race.maleRecord && (
                 <p>
@@ -463,18 +440,19 @@ export default function RaceDetailsTabs({
 
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
               <p className="font-semibold">Race organiser?</p>
-              <p className="mt-1">
-                Edit the race description via{' '}
-                <a
-                  href={`https://admin.scottishhillrunners.uk/races/${encodeURIComponent(raceId)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
-                >
-                  the race editor
-                </a>
-                .
-              </p>
+              {UPDATES_EMAIL && (
+                <p className="mt-1">
+                  Need to update the race info?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setInfoEditDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Edit race info by email
+                  </button>
+                  .
+                </p>
+              )}
               {RESULTS_EMAIL && (
                 <p className="mt-1">
                   Results ready to submit?{' '}
@@ -484,6 +462,19 @@ export default function RaceDetailsTabs({
                     className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
                   >
                     Submit results by email
+                  </button>
+                  .
+                </p>
+              )}
+              {UPDATES_EMAIL && (
+                <p className="mt-1">
+                  Have a race photo to share?{' '}
+                  <button
+                    type="button"
+                    onClick={() => openPhotoSubmissionEmail(raceId, race.title)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Submit photos by email
                   </button>
                   .
                 </p>
@@ -522,46 +513,52 @@ export default function RaceDetailsTabs({
                 ))}
               </div>
             )}
-            {filteredImages.length === 0 ? (
+            {galleryImages.length === 0 ? (
               <p className="text-sm text-gray-600 dark:text-slate-300">
                 No photos match the selected tags.
               </p>
             ) : (
               <div className="space-y-6">
-                {imagesByYear.map(({ year, images }) => (
-                  <div key={year ?? 'other'}>
-                    {(year !== null || imagesByYear.length > 1) && (
-                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                        {year ?? 'Other'}
-                      </h3>
-                    )}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {images.map((image, index) => (
-                        <figure
-                          key={`${image.sourcePath}-${index}`}
-                          className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-800"
-                        >
-                          <Image
-                            src={image.imageUrl}
-                            alt={image.caption ?? filenameToAltText(image.sourcePath)}
-                            width={800}
-                            height={600}
-                            sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                            unoptimized
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            className="h-48 w-full object-cover"
-                          />
-                          {image.caption && (
-                            <figcaption className="px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
-                              {image.caption}
-                            </figcaption>
-                          )}
-                        </figure>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {galleryImages.map(image => (
+                    <figure
+                      key={`${image.public_id}`}
+                      className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <Image
+                        src={cloudinaryUrl(image, 'gallery')}
+                        alt={image.title ?? image.description ?? image.public_id}
+                        width={800}
+                        height={600}
+                        sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+                        unoptimized
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        className="h-48 w-full object-cover"
+                      />
+                      {image.description && (
+                        <figcaption className="px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
+                          {image.description}
+                        </figcaption>
+                      )}
+                    </figure>
+                  ))}
+                </div>
+              </div>
+            )}
+            {UPDATES_EMAIL && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                <p className="mt-1">
+                  Have a race photo to share?{' '}
+                  <button
+                    type="button"
+                    onClick={() => openPhotoSubmissionEmail(raceId, race.title)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Submit photos by email
+                  </button>
+                  .
+                </p>
               </div>
             )}
           </div>
@@ -608,20 +605,33 @@ export default function RaceDetailsTabs({
           </div>
         )}
       </div>
-      <ResultCorrectionDialog
-        open={correctionDialogOpen}
-        onClose={() => setCorrectionDialogOpen(false)}
-        raceId={correctionRaceId}
-        raceTitle={race.title}
-        year={correctionYear ?? ''}
-        results={correctionFilteredResults}
-      />
+      {CORRECTIONS_EMAIL && ( 
+        <ResultCorrectionDialog
+          open={correctionDialogOpen}
+          onClose={() => setCorrectionDialogOpen(false)}
+          raceId={correctionRaceId}
+          raceTitle={race.title}
+          year={correctionYear ?? ''}
+          results={correctionFilteredResults}
+        />
+      )}
       {RESULTS_EMAIL && (
         <ResultsSubmitDialog
           open={submitDialogOpen}
           onClose={() => setSubmitDialogOpen(false)}
           raceId={raceId}
           raceTitle={race.title}
+        />
+      )}
+      {UPDATES_EMAIL && (
+        <RaceInfoEditDialog
+          open={infoEditDialogOpen}
+          onClose={() => setInfoEditDialogOpen(false)}
+          raceId={raceId}
+          raceTitle={race.title}
+          race={race}
+          organiser={organiser}
+          contents={contents}
         />
       )}
     </section>

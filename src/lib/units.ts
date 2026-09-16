@@ -3,7 +3,7 @@ export function kmToMiles(km: number): number {
 }
 
 export function mToFeet(m: number): number {
-  return m * 3.28084;
+  return Math.abs(m) * 3.28084;
 }
 
 export function formatDistance(
@@ -19,11 +19,11 @@ export function formatDistance(
 
 export function formatClimb(
   m: number | null | undefined,
-  imperial: boolean
+  imperial: boolean,
+  addSuffix: boolean
 ): string {
   if (m == null) return '—';
-  if (imperial) {
-    return `${Math.round(mToFeet(m) / 10) * 10} ft`;
-  }
-  return `${m} m`;
+  const s = imperial ? `${Math.round(mToFeet(m) / 10) * 10} ft` : `${Math.abs(m)} m`;
+  if (!addSuffix) return m < 0 ? `(${s})` : s;
+  return m < 0 ? `${s} descent` : `${s} climb`;
 }

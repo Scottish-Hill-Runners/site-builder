@@ -2,12 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RaceResult } from '@/types/datatable';
-import ChallengeQuestionBlock from '@/components/ChallengeQuestionBlock';
-import {
-  type ChallengeQuestion,
-  getRandomChallengeQuestion,
-} from '@/lib/challenge-questions';
-import { NEXT_PUBLIC_MINOR_CORRECTION_URL } from '@/lib/site-config';
+import { CORRECTIONS_EMAIL } from '@/lib/site-config';
+import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 
 export interface ResultCorrectionDialogProps {
   open: boolean;
@@ -23,93 +19,16 @@ export interface ResultCorrectionDialogProps {
 
 interface FormState {
   position: string;
-  name: string;
-  category: string;
-  club: string;
-  proposedChanges: string;
+  originalName: string;
+  originalCategory: string;
+  originalClub: string;
+  updatedName: string;
+  updatedCategory: string;
+  updatedClub: string;
+  comments: string;
+  someChangeMade: boolean;
 }
 
-interface OriginalValues {
-  name: string;
-  category: string;
-  club: string;
-}
-
-interface MinorCorrectionChange {
-  field: 'name' | 'category' | 'club' | 'notes';
-  value: string;
-}
-
-interface MinorCorrectionPayload {
-  type: 'minor-correction';
-  raceId: string;
-  year: string;
-  runnerPosition: string;
-  challengeQuestionId: string;
-  challengeAnswer: string;
-  authorityConfirmed: boolean;
-  changes: MinorCorrectionChange[];
-}
-
-function buildMinorCorrectionPayload(
-  raceId: string,
-  year: string,
-  original: OriginalValues | null,
-  challengeQuestionId: string,
-  challengeAnswer: string,
-  authorityConfirmed: boolean,
-  form: FormState
-): MinorCorrectionPayload {
-  const changes: MinorCorrectionChange[] = [];
-
-  if (original) {
-    const newName = form.name.trim();
-    const newCategory = form.category.trim();
-    const newClub = form.club.trim();
-    if (newName && newName !== original.name) {
-      changes.push({ field: 'name', value: newName });
-    }
-    if (newCategory && newCategory !== original.category) {
-      changes.push({ field: 'category', value: newCategory });
-    }
-    if (newClub && newClub !== original.club) {
-      changes.push({ field: 'club', value: newClub });
-    }
-  }
-
-  const extra = form.proposedChanges.trim();
-  if (extra) changes.push({ field: 'notes', value: extra });
-
-  return {
-    type: 'minor-correction',
-    raceId,
-    year,
-    runnerPosition: form.position || '',
-    challengeQuestionId,
-    challengeAnswer,
-    authorityConfirmed,
-    changes,
-  };
-}
-
-async function submitMinorCorrection(payload: MinorCorrectionPayload): Promise<void> {
-  if (!NEXT_PUBLIC_MINOR_CORRECTION_URL) {
-    throw new Error('Correction submission endpoint is not configured.');
-  }
-
-  const response = await fetch(NEXT_PUBLIC_MINOR_CORRECTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Webhook request failed with ${response.status}`);
-  }
-}
 
 const inputClass =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white';
@@ -184,18 +103,16 @@ function ResultCorrectionForm({
 }) {
   const [form, setForm] = useState<FormState>({
     position: initialResult ? String(initialResult.position) : '',
-    name: initialResult?.name ?? '',
-    category: initialResult?.category ?? '',
-    club: initialResult?.club ?? '',
-    proposedChanges: '',
+    originalName: initialResult?.name ?? '',
+    originalCategory: initialResult?.category ?? '',
+    originalClub: initialResult?.club ?? '',
+    updatedName: initialResult?.name ?? '',
+    updatedCategory: initialResult?.category ?? '',
+    updatedClub: initialResult?.club ?? '',
+    comments: '',
+    someChangeMade: false,
   });
-  const [originalValues, setOriginalValues] = useState<OriginalValues | null>(
-    initialResult
-      ? { name: initialResult.name, category: initialResult.category, club: initialResult.club }
-      : null
-  );
-  const [challengeQuestion] = useState<ChallengeQuestion>(() => getRandomChallengeQuestion());
-  const [challengeAnswer, setChallengeAnswer] = useState('');
+
   const [authorityConfirmed, setAuthorityConfirmed] = useState(false);
 
   function handlePositionChange(value: string) {
@@ -204,13 +121,15 @@ function ResultCorrectionForm({
     if (!Number.isNaN(posNum) && posNum > 0) {
       const match = results.find((r) => r.position === posNum);
       if (match) {
-        setOriginalValues({ name: match.name, category: match.category, club: match.club });
         setForm((prev) => ({
           ...prev,
           position: value,
-          name: match.name,
-          category: match.category,
-          club: match.club,
+          originalName: match.name,
+          originalCategory: match.category,
+          originalClub: match.club,
+          updatedName: match.name,
+          updatedCategory: match.category,
+          updatedClub: match.club,
         }));
       }
     }
@@ -218,21 +137,28 @@ function ResultCorrectionForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = buildMinorCorrectionPayload(
-      raceId,
-      year,
-      originalValues,
-      challengeQuestion.id,
-      challengeAnswer,
-      authorityConfirmed,
-      form
-    );
-    void submitMinorCorrection(payload)
-      .then(() => onClose())
-      .catch(() => {
-        window.alert('Unable to submit the correction right now. Please try again.');
-      });
+    if (!CORRECTIONS_EMAIL) return;
+
+    const subject = `Results submission for ${raceTitle} (${raceId}) ${year}`;
+    const body =
+      `To ${toWhomItMayConcern()}:\n\n` +
+      `I believe the result below is incorrect and should be corrected as indicated.\n\n` +
+      `!-- IF YOU EDIT THE TEXT BELOW, PLEASE DO SO WITH CARE!\n` +
+      `File: races/${raceId}/${year}.csv\n` +
+      `Position: ${form.position}\n` +
+      `Name: ${form.originalName}\n` +
+      `Category: ${form.originalCategory}\n` +
+      `Club: ${form.originalClub}\n` +
+      (form.originalName !== form.updatedName ? `Change Name to: ${form.updatedName}\n` : '') +
+      (form.originalCategory !== form.updatedCategory ? `Change Category to: ${form.updatedCategory}\n` : '') +
+      (form.originalClub !== form.updatedClub ? `Change Club to: ${form.updatedClub}\n` : '') +
+      `!-- END OF SENSITIVE SECTION\n\n` +
+      `${form.comments}\n`;
+
+    window.location.href = `mailto:${CORRECTIONS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    onClose();
   }
+
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
@@ -242,12 +168,11 @@ function ResultCorrectionForm({
       <p className="text-sm text-gray-600 dark:text-slate-300">
         Enter the position of the result to correct — the runner&apos;s details
         will be looked up automatically. Edit any incorrect fields,
-        then (optionally) provide some contact details so we can get in touch
-        if any clarifications are needed.
+        then (optionally) add some comments.
       </p>
 
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/60">
-        <div className="font-medium text-gray-900 dark:text-white">{raceTitle}</div>
+        <div className="font-medium text-gray-900 dark:text-white">{raceTitle} {year}</div>
         <div className="text-gray-600 dark:text-slate-300">Race ID: {raceId}</div>
       </div>
 
@@ -274,8 +199,8 @@ function ResultCorrectionForm({
           <input
             id="cd-name"
             type="text"
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            value={form.updatedName ?? form.originalName}
+            onChange={(e) => setForm((prev) => ({ ...prev, updatedName: e.target.value }))}
             className={inputClass}
             placeholder="Auto-filled from position"
           />
@@ -287,9 +212,9 @@ function ResultCorrectionForm({
           </label>
           <input
             id="cd-category"
+            value={form.updatedCategory ?? form.originalCategory}
+            onChange={(e) => setForm((prev) => ({ ...prev, updatedCategory: e.target.value }))}
             type="text"
-            value={form.category}
-            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
             className={inputClass}
             placeholder="e.g. M65"
           />
@@ -302,8 +227,8 @@ function ResultCorrectionForm({
           <input
             id="cd-club"
             type="text"
-            value={form.club}
-            onChange={(e) => setForm((prev) => ({ ...prev, club: e.target.value }))}
+            value={form.updatedClub ?? form.originalClub}
+            onChange={(e) => setForm((prev) => ({ ...prev, updatedClub: e.target.value }))}
             className={inputClass}
             placeholder="Auto-filled from position"
           />
@@ -311,26 +236,20 @@ function ResultCorrectionForm({
 
         <div className="col-span-2">
           <label className={labelClass} htmlFor="cd-changes">
-            Contact details (optional)
+            Comments (optional)
           </label>
           <textarea
             id="cd-changes"
-            value={form.proposedChanges}
+            value={form.comments}
             onChange={(e) =>
-              setForm((prev) => ({ ...prev, proposedChanges: e.target.value }))
+              setForm((prev) => ({ ...prev, comments: e.target.value }))
             }
             rows={3}
             className={inputClass}
-            placeholder="Please let us know how to get in touch if we need more information about this correction."
+            placeholder="Please provide any additional comments about this correction."
           />
         </div>
       </div>
-
-      <ChallengeQuestionBlock
-        question={challengeQuestion}
-        value={challengeAnswer}
-        onChange={setChallengeAnswer}
-      />
 
       <label className="flex cursor-pointer items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
         <input
@@ -356,8 +275,8 @@ function ResultCorrectionForm({
         </button>
         <button
           type="submit"
-          disabled={!authorityConfirmed}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          disabled={!authorityConfirmed || (form.originalName === form.updatedName && form.originalCategory === form.updatedCategory && form.originalClub === form.updatedClub)}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:bg-gray-300 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
         >
           Submit correction
         </button>

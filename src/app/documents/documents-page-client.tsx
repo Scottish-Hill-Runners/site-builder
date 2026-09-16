@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { fetchDocuments, type RemoteDocument } from '@/lib/documents-api';
+import { AssetEntry, getDocuments } from '@/lib/assetCollections';
+import { cloudinaryUrl } from '@/lib/cloudinary';
 
 function parseTags(raw: string | null): string[] {
   if (!raw) return [];
@@ -13,10 +14,9 @@ function parseTags(raw: string | null): string[] {
     .filter(Boolean);
 }
 
-function matchCount(doc: RemoteDocument, tags: string[]): number {
+function matchCount(doc: AssetEntry, tags: string[]): number {
   if (tags.length === 0) return 0;
   const docTags = new Set(
-    // tags may come through as non-strings (e.g. unquoted numbers in YAML)
     (doc.tags ?? []).map((tag) => String(tag).toLowerCase())
   );
   return tags.reduce((count, tag) => count + (docTags.has(tag) ? 1 : 0), 0);
@@ -25,17 +25,17 @@ function matchCount(doc: RemoteDocument, tags: string[]): number {
 export default function DocumentsPageClient() {
   const searchParams = useSearchParams();
   const tags = parseTags(searchParams.get('tags'));
-  const [documents, setDocuments] = useState<RemoteDocument[]>([]);
+  const [documents, setDocuments] = useState<AssetEntry[]>([]);
   const [stale, setStale] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchDocuments(controller.signal)
+    getDocuments()
       .then((result) => {
-        setDocuments(result.documents);
-        setStale(result.stale);
+        setDocuments(result);
+        setStale(false);
         setError(null);
       })
       .catch((reason: unknown) => {
@@ -97,14 +97,14 @@ export default function DocumentsPageClient() {
           <ul className="space-y-6">
             {matchingDocuments.length > 0 ? (
               matchingDocuments.map((doc) => (
-                <li key={doc.assetId}>
+                <li key={doc.public_id}>
                   <Link
-                    href={doc.url}
+                    href={cloudinaryUrl(doc, 'document')}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-lg font-semibold text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                   >
-                    {doc.title ?? doc.publicId}
+                    {doc.title ?? doc.description ?? doc.public_id}
                   </Link>
                   {doc.description && (
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">

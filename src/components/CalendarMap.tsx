@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import maplibregl from 'maplibre-gl';
+import { Map, StyleSpecification, NavigationControl, Popup, Marker } from 'maplibre-gl';
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';
 
@@ -20,7 +20,7 @@ interface CalendarMapProps {
 
 export default function CalendarMap({ entries }: CalendarMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<Map | null>(null);
   const { imperial } = useUnits();
 
   const osKey = process.env.NEXT_PUBLIC_OS_MAPS_API_KEY ?? '';
@@ -31,7 +31,7 @@ export default function CalendarMap({ entries }: CalendarMapProps) {
 
     const hasOs = osKey.length > 0;
 
-    const style: maplibregl.StyleSpecification = {
+    const style: StyleSpecification = {
       version: 8,
       sources: {
         'os-raster': {
@@ -58,7 +58,7 @@ export default function CalendarMap({ entries }: CalendarMapProps) {
       ],
     };
 
-    const map = new maplibregl.Map({
+    const map = new Map({
       container: containerRef.current,
       style,
       center: [-4.2026, 56.4907], // center of scotland
@@ -72,7 +72,7 @@ export default function CalendarMap({ entries }: CalendarMapProps) {
     });
     mapRef.current = map;
 
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new NavigationControl(), 'top-right');
 
     const mappedEntries = entries.filter((e) => e.latitude && e.longitude && e.raceId);
 
@@ -140,7 +140,7 @@ export default function CalendarMap({ entries }: CalendarMapProps) {
         detailParts.push(formatDistance(entry.distance, imperial));
       }
       if (entry.climb != null) {
-        detailParts.push(formatClimb(entry.climb, imperial));
+        detailParts.push(formatClimb(entry.climb, imperial, false));
       }
       details.textContent = detailParts.length > 0 ? detailParts.join(' • ') : 'Distance and climb not listed';
 
@@ -222,14 +222,14 @@ export default function CalendarMap({ entries }: CalendarMapProps) {
       }
       popupContent.appendChild(popupLink);
 
-      const popup = new maplibregl.Popup({
+      const popup = new Popup({
         closeButton: false,
         closeOnClick: true,
         offset: 16,
         maxWidth: '260px',
       }).setDOMContent(popupContent);
 
-      new maplibregl.Marker({ element: el })
+      new Marker({ element: el })
         .setLngLat([entry.longitude!, entry.latitude!])
         .setPopup(popup)
         .addTo(map);

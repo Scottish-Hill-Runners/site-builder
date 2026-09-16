@@ -1,63 +1,18 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import NewsList from '@/components/NewsList';
+import AddNewsItemSection from '@/components/AddNewsItemSection';
+import HomepageImageGrid from '@/components/HomepageImageGrid';
 import { getRecentNewsItems } from '@/lib/news';
-import { getHomepageImages } from '@/lib/imageCollections';
-import { cloudinaryUrlForPresetFromEnv } from '@/lib/cloudinary';
-
-function shuffled<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function filenameToAltText(sourcePath: string): string {
-  const fileName = sourcePath.split('/').pop() ?? sourcePath;
-  const baseName = fileName.replace(/\.[^.]+$/, '');
-  return baseName.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
 export default async function Home() {
-  const [newsItems, heroImages] = await Promise.all([
-    getRecentNewsItems(10),
-    getHomepageImages().then((imgs) => shuffled(imgs).slice(0, 6)),
-  ]);
-  const optimizedHeroImages = heroImages.map((item) => ({
-    ...item,
-    imageUrl: cloudinaryUrlForPresetFromEnv(item.sourcePath, 'homepage'),
-  }));
-
+  const newsItems = await getRecentNewsItems(10);
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-slate-950">
       <main className="flex min-h-screen w-full max-w-3xl flex-col items-start justify-start bg-white px-4 py-12 dark:bg-slate-950 sm:px-6">
         <div className="flex flex-col items-start gap-6 w-full">
-          {optimizedHeroImages.length > 0 && (
-            <section className="w-full mt-2">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {optimizedHeroImages.map((item, index) => (
-                  <figure
-                    key={item.sourcePath}
-                    className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-slate-700 dark:bg-slate-900"
-                  >
-                    <Image
-                      src={item.imageUrl}
-                      alt={filenameToAltText(item.sourcePath)}
-                      width={640}
-                      height={360}
-                      sizes="(min-width: 640px) 33vw, 50vw"
-                      priority={index === 0}
-                      unoptimized
-                      className="h-32 w-full object-cover sm:h-36"
-                      referrerPolicy="no-referrer"
-                    />
-                  </figure>
-                ))}
-              </div>
-            </section>
-          )}
+          <section className="w-full mt-2">
+            <HomepageImageGrid />
+          </section>
 
           <section className="w-full mt-4">
             <Link
@@ -176,6 +131,7 @@ export default async function Home() {
               Recent News
             </h2>
             <NewsList items={newsItems} />
+            <AddNewsItemSection />
             <div className="mt-6 text-right">
               <Link
                 href="/news"

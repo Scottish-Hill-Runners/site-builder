@@ -5,25 +5,17 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import RaceDetailsTabs from '@/components/RaceDetailsTabs';
 import { fetchJsonWithApiFallback } from '@/lib/client-results-fetch';
-import type { RaceImageItem } from '@/lib/imageCollections';
 import type { RaceData } from '@/types/datatable';
+import type { AssetEntry } from '@/lib/assetCollections';
 
-type RaceImageForRender = RaceImageItem & { imageUrl: string };
-
-interface RaceImagesForRender {
-  hero: RaceImageForRender[];
-  gallery: RaceImageForRender[];
-}
 
 interface RacePageClientProps {
   raceId: string;
-  raceImages: RaceImagesForRender | null;
+  hero?: AssetEntry;
+  gallery: AssetEntry[];
 }
 
-export default function RacePageClient({
-  raceId,
-  raceImages,
-}: RacePageClientProps) {
+export default function RacePageClient({ raceId, hero, gallery }: RacePageClientProps) {
   const searchParams = useSearchParams();
   const initialCategoryFilter = searchParams.get('category') ?? '';
   const initialYearFilter = searchParams.get('year') ?? '';
@@ -156,8 +148,8 @@ export default function RacePageClient({
               elevationChartData={data.elevationChartData}
               results={data.results}
               resultsError={null}
-              heroImages={raceImages?.hero ?? []}
-              galleryImages={raceImages?.gallery ?? []}
+              heroImage={hero}
+              galleryImages={gallery}
               initialTab={initialTab}
               initialYearFilter={initialYearFilter}
               initialCategoryFilter={initialCategoryFilter}

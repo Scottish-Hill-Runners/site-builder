@@ -19,7 +19,7 @@ import {
 } from '@/types/datatable';
 import type { GeoJSON } from 'geojson';
 import { updateSitemap, writeRobotsTxt } from './update-sitemap';
-import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
+import { categoryAge, likelySex, parseEligibilityAgeCap } from '@/lib/category';
 
 type YearInfo = {
   year: string;
@@ -347,13 +347,6 @@ function applyNameChange(name: string, club: string, year: string): string {
   const rule = nameChangeRules.find((r) => nameChangeRuleMatches(r, name, club, resultYear));
   return rule ? rule.to : name;
 }
-
-function likelySex(category: string): string {
-  if (/W(OM[EA]N)?|F(EMALE)?|L(ADY)?|G(IRL)?/i.test(category)) return 'F';
-  if (/(A|NB?|NON[-\s]?BINARY)/i.test(category)) return 'NB';
-  return 'M';
-}
-
 
 function isEligibleResult(result: RaceResult, ageCap: number): boolean {
   const age = categoryAge(result.category);
@@ -1094,29 +1087,8 @@ async function buildMergedCalendarData(
   return { rows, lookup };
 }
 
-function formatCalendarDate(isoDate: string): string {
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-  const [, month, day] = isoDate.split('-');
-  return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
-}
 
-function readChampionships(
-  calendarDates: Map<string, string[]>,
-  raceMap: Map<string, RaceEntry>
-): ChampionshipData[] {
+function readChampionships(): ChampionshipData[] {
   const champDir = contentPath('championships');
   const championships: ChampionshipData[] = [];
 
@@ -1162,60 +1134,10 @@ function readChampionships(
       }
     }
 
-    let contents = content;
-    if (contents.includes('@Schedule')) {
-      const latestYear = Object.keys(years)
-        .filter((y) => years[y].length > 0)
-        .sort((a, b) => parseInt(b) - parseInt(a))[0];
-      const hasDistanceSlots = !!(data.rules as ChampionshipData['rules'])
-        ?.default?.distanceSlots;
-      let scheduleBlock = '';
-      if (latestYear) {
-        const raceIds = years[latestYear];
-        const sortedRaceIds = [...raceIds].sort((a, b) => {
-          const dateA = calendarDates.get(`${latestYear}/${a}`)?.[0];
-          const dateB = calendarDates.get(`${latestYear}/${b}`)?.[0];
-
-          if (dateA && dateB)
-            return dateA.localeCompare(dateB);
-          if (dateA) return -1;
-          if (dateB) return 1;
-          return a.localeCompare(b);
-        });
-
-        const items = sortedRaceIds
-          .filter((id) => !id.startsWith('no-slug'))
-          .map((raceId) => {
-            const raceEntry = raceMap.get(raceId);
-            let title = raceId;
-            let distancePart = '';
-            const hasPage = raceEntry !== undefined;
-            if (hasPage) {
-              title = raceEntry.meta.info.title ?? raceId;
-              if (hasDistanceSlots) {
-                const distance = raceEntry.meta.info.distance;
-                if (!Number.isNaN(distance)) {
-                  const bucket =
-                    distance < 10 ? 'short' : distance > 20 ? 'long' : 'medium';
-                  distancePart = ` (${bucket})`;
-                }
-              }
-            }
-            const isoDate = calendarDates.get(`${latestYear}/${raceId}`)?.[0];
-            const datePart = isoDate ? ` - ${formatCalendarDate(isoDate)}` : '';
-            const titlePart = hasPage ? `[${title}](/races/${raceId})` : title;
-            return `* ${titlePart}${distancePart}${datePart}`;
-          })
-          .join('\n');
-        scheduleBlock = `## ${latestYear} race schedule\n\nThe ${raceIds.length} races in the ${latestYear} ${data.title} series are:\n\n${items}`;
-      }
-      contents = contents.replace('@Schedule', scheduleBlock);
-    }
-
     championships.push({
       slug,
       title: data.title as string,
-      contents,
+      contents: content,
       years,
       yearScoring,
       rules: data.rules as ChampionshipData['rules'],
@@ -1250,17 +1172,14 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
     'clubs.json',
     JSON.stringify(output)
   );
-  progress('Wrote clubs.json.gz');
 }
 
 function writeChampionshipData(championships: ChampionshipData[]): void {
-  progress(`Read ${championships.length} championships`);
   writeGz(
     path.join(process.cwd(), 'public'),
     'championships.json',
     JSON.stringify(championships)
   );
-  progress('Wrote championships.json.gz');
 }
 
 function parseTimeToSeconds(time: string): number | null {
@@ -1814,7 +1733,7 @@ async function main() {
   const { rows: calendarRows, lookup: calendarDates } =
     await buildMergedCalendarData(raceMap);
   const allResults = [...raceMap.values()].flatMap((e) => e.results);
-  const championships = readChampionships(calendarDates, raceMap);
+  const championships = readChampionships();
   writeClubData(clubs, allResults);
   writeYearData(allResults);
   writeRaceData(raceMap);
