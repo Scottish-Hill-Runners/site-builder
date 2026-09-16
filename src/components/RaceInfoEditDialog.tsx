@@ -52,7 +52,7 @@ function toFields(race: RaceInfo, organiser: string | null): FrontmatterFields {
     climb: race.climb !== undefined && race.climb !== null ? String(race.climb) : '',
     maleRecord: race.maleRecord ?? '',
     femaleRecord: race.femaleRecord ?? '',
-    raceDate: race.raceDate ?? '',
+    raceDate: race.raceDate ?? (race.raceDates ? race.raceDates.join(', ') : ''),
     web: race.web ?? '',
     organiser: organiser ?? '',
   };
@@ -111,13 +111,18 @@ export default function RaceInfoEditDialog({
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  const changedFrontmatter: Record<string, string | number> = {};
+  const changedFrontmatter: Record<string, string | number | string[]> = {};
   (Object.keys(fields) as Array<keyof FrontmatterFields>).forEach((key) => {
     const value = fields[key].trim();
     if (!value || value === original[key].trim()) return;
     if (key === 'distance' || key === 'climb') {
       const numeric = Number(value);
       if (!Number.isNaN(numeric)) changedFrontmatter[key] = numeric;
+    } else if (key === 'raceDate' && value.includes(',')) {
+      changedFrontmatter.raceDates = value
+        .split(',')
+        .map((date) => date.trim())
+        .filter(Boolean);
     } else {
       changedFrontmatter[key] = value;
     }

@@ -13,6 +13,11 @@ export const UPDATES_EMAIL: string | null =
     ? `updates@${process.env.NEXT_PUBLIC_CORRECTIONS_EMAIL_DOMAIN.trim()}`
     : null;
 
+export const PHOTOS_EMAIL: string | null =
+  process.env.NEXT_PUBLIC_CORRECTIONS_EMAIL_DOMAIN
+    ? `photos@${process.env.NEXT_PUBLIC_CORRECTIONS_EMAIL_DOMAIN.trim()}`
+    : null;
+
 export const CLOUDINARY_CLOUD_NAME: string | null =
   process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
     ? process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME.trim()

@@ -35,6 +35,7 @@ export interface RaceInfo {
   distance: number;
   climb?: number;
   raceDate?: string;
+  raceDates?: string[];
   maleRecord?: string;
   femaleRecord?: string;
   nonBinaryRecord?: string;

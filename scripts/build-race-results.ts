@@ -495,6 +495,8 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           venue: data.venue,
           distance: parseFloat(data.distance),
           climb: parseFloat(data.climb),
+          raceDate: data.raceDate,
+          raceDates: Array.isArray(data.raceDates) ? data.raceDates : undefined,
           maleRecord: data.maleRecord ?? data.record,
           femaleRecord: data.femaleRecord,
           nonBinaryRecord: data.nonBinaryRecord,

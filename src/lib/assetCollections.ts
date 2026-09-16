@@ -34,11 +34,11 @@ export async function getFolders(): Promise<FolderEntry[]> {
 export function pickWeightedFolders(folders: FolderEntry[], count: number): FolderEntry[] {
   const pool = [...folders];
   const picked: FolderEntry[] = [];
-  for (let i = 0; i < count && pool.length > 0; i += 1) {
-    const totalWeight = pool.reduce((sum, folder) => sum + folder.count, 0);
+  let totalWeight = pool.reduce((sum, folder) => sum + folder.count, 0);
+  for (let i = 0; i < count && pool.length > 0; i++) {
     let remaining = Math.random() * totalWeight;
     let index = pool.length - 1;
-    for (let candidate = 0; candidate < pool.length; candidate += 1) {
+    for (let candidate = 0; candidate < pool.length; candidate++) {
       remaining -= pool[candidate].count;
       if (remaining <= 0) {
         index = candidate;
@@ -46,8 +46,10 @@ export function pickWeightedFolders(folders: FolderEntry[], count: number): Fold
       }
     }
     picked.push(pool[index]);
+    totalWeight -= pool[index].count;
     pool.splice(index, 1);
   }
+  
   return picked;
 }
 
