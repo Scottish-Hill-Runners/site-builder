@@ -34,6 +34,7 @@ export interface RaceInfo {
   venue: string;
   distance: number;
   climb?: number;
+  raceDate?: string;
   maleRecord?: string;
   femaleRecord?: string;
   nonBinaryRecord?: string;

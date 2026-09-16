@@ -36,6 +36,7 @@ interface FrontmatterFields {
   climb: string;
   maleRecord: string;
   femaleRecord: string;
+  raceDate: string;
   web: string;
   organiser: string;
 }
@@ -51,6 +52,7 @@ function toFields(race: RaceInfo, organiser: string | null): FrontmatterFields {
     climb: race.climb !== undefined && race.climb !== null ? String(race.climb) : '',
     maleRecord: race.maleRecord ?? '',
     femaleRecord: race.femaleRecord ?? '',
+    raceDate: race.raceDate ?? '',
     web: race.web ?? '',
     organiser: organiser ?? '',
   };
@@ -231,6 +233,25 @@ export default function RaceInfoEditDialog({
               className={inputClass}
               placeholder="Name, time (year)"
             />
+          </div>
+
+          <div className="col-span-2">
+            <label className={labelClass} htmlFor="ri-race-date">
+              Race date rule
+            </label>
+            <input
+              id="ri-race-date"
+              type="text"
+              value={fields.raceDate}
+              onChange={(e) => updateField('raceDate', e.target.value)}
+              className={inputClass}
+              placeholder="e.g. Last Saturday in June"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+              Used to work out future dates automatically. Supported formats: &quot;2nd
+              Sunday in May&quot;, &quot;Last Saturday in June&quot;, &quot;25th December&quot;,
+              or &quot;Day after some-other-race-id&quot;.
+            </p>
           </div>
 
           <div>
