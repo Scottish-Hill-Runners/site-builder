@@ -9,7 +9,7 @@ import { UPDATES_EMAIL } from '@/lib/site-config';
 import ChampionshipRacesEditDialog from '@/components/ChampionshipRacesEditDialog';
 import ChampionshipInfoEditDialog from '@/components/ChampionshipInfoEditDialog';
 import { ScoringRules } from '@/types/datatable';
-import type { RaceEntry } from '@/types/datatable';
+import type { RaceInfo } from '@/types/datatable';
 import { formatCalendarDate } from '@/lib/dates';
 import { CalendarEntry } from '@/lib/calendar';
 
@@ -32,7 +32,7 @@ interface ChampionshipPageClientProps {
 function fillInSchedule(
   data: ChampionshipData,
   calendarDates: Map<string, string[]> | null,
-  raceMap: Map<string, RaceEntry> | null) {
+  raceMap: Map<string, RaceInfo> | null) {
   if (!data.contents.includes('@Schedule'))
     return data.contents;
 
@@ -62,7 +62,7 @@ function fillInSchedule(
         let distancePart = '';
         if (hasDistanceSlots) {
           const distance = raceEntry?.distance;
-          if (!Number.isNaN(distance)) {
+          if (distance !== undefined && !Number.isNaN(distance)) {
             const bucket = distance < 10 ? 'short' : distance > 20 ? 'long' : 'medium';
             distancePart = ` (${bucket})`;
           }
@@ -84,7 +84,7 @@ export default function ChampionshipPageClient({
 }: ChampionshipPageClientProps) {
   const [data, setData] = useState<ChampionshipData | null>(null);
   const [calendarDates, setCalendarDates] = useState<Map<string, string[]> | null>(null);
-  const [raceMap, setRaceMap] = useState<Map<string, RaceEntry> | null>(null);
+  const [raceMap, setRaceMap] = useState<Map<string, RaceInfo> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
@@ -103,7 +103,7 @@ export default function ChampionshipPageClient({
         const [result, calendarDates, raceMap] = await Promise.all([
           fetchGzipJson<ChampionshipData[]>('/championships.json.gz'),
           fetchGzipJson<CalendarEntry[]>('/calendar.json.gz'),
-          fetchGzipJson<Map<string, RaceEntry>>('/results/races.json.gz'),
+          fetchGzipJson<Map<string, RaceInfo>>('/results/races.json.gz'),
         ]);
 
         if (!isCancelled) {
