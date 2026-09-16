@@ -1395,7 +1395,8 @@ function writeChampionshipResultsData(
           : null;
 
       const excludedClubs = new Set(
-        clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name)
+        // *** Just for 2026, allow English runners in.
+        // clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name)
       );
 
       const results = allResults.filter(
