@@ -19,7 +19,8 @@ const PRESET_TRANSFORMS: Record<CloudinaryPreset, string[]> = {
 export function cloudinaryUrl(asset: AssetEntry, preset: CloudinaryPreset): string {
   if (!CLOUDINARY_CLOUD_NAME)
     throw new Error('CLOUDINARY_CLOUD_NAME is required for Cloudinary image URLs');
-  const transforms = PRESET_TRANSFORMS[preset] ?? [];
+  const transforms = PRESET_TRANSFORMS[preset];
+  const format = asset.format ? `.${asset.format}` : '';
   const transformSegment = transforms.length > 0 ? `${transforms.join(',')}/` : '';
-  return `https://res.cloudinary.com/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/${asset.resource_type}/upload/${transformSegment}${asset.public_id}.${asset.format}`;
+  return `https://res.cloudinary.com/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/${asset.resource_type}/upload/${transformSegment}${asset.public_id}${format}`;
 }

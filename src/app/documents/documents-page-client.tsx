@@ -22,6 +22,30 @@ function matchCount(doc: AssetEntry, tags: string[]): number {
   return tags.reduce((count, tag) => count + (docTags.has(tag) ? 1 : 0), 0);
 }
 
+function docName(doc: AssetEntry): string {
+  return doc.title ?? doc.description ?? doc.public_id;
+}
+
+function makeEntry(doc: AssetEntry) {
+  return (
+    <li key={doc.public_id}>
+      <Link
+        href={cloudinaryUrl(doc, 'document')}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-lg font-semibold text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+      >
+        {docName(doc)}
+      </Link>
+      {doc.description && doc.title !== doc.description && (
+        <span className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          {' '} ({doc.description})
+        </span>
+      )}
+    </li>
+  );
+}
+
 export default function DocumentsPageClient() {
   const searchParams = useSearchParams();
   const tags = parseTags(searchParams.get('tags'));
@@ -48,12 +72,31 @@ export default function DocumentsPageClient() {
     return () => controller.abort();
   }, []);
 
-  const matchingDocuments = useMemo(
-    () => documents
-      .map((doc) => ({ doc, matches: matchCount(doc, tags) }))
-      .filter((entry) => tags.length === 0 || entry.matches > 0)
-      .sort((a, b) => b.matches - a.matches)
-      .map((entry) => entry.doc),
+  const {
+    exact: exactMatchingDocuments,
+    partial: partialMatchingDocuments,
+    untagged: untaggedMatchingDocuments} = useMemo(
+    () => {
+      const exact = [];
+      const partial = [];
+      const untagged = [];
+      for (const doc of documents) {
+        const matches = matchCount(doc, tags);
+        if (tags.length > 0 && matches === tags.length)
+          exact.push({ doc, matches });
+        else if (matches > 0)
+          partial.push({ doc, matches });
+        else
+          untagged.push({ doc, matches: 0 });
+      }
+      return {
+        exact,
+        partial: partial.sort((a, b) => b.matches - a.matches),
+        untagged: exact.length === 0 && partial.length === 0
+         ? untagged.sort((a, b) => docName(a.doc).localeCompare(docName(b.doc)))
+         : []
+      };
+    },
     [documents, tags]
   );
 
@@ -79,7 +122,7 @@ export default function DocumentsPageClient() {
         </ol>
       </nav>
       <h1 className="mb-8 text-3xl font-bold text-slate-900 dark:text-slate-50">
-        {tags.length > 0 ? "Matching documents" : 'All Documents'}
+        {tags.length > 0 ? `Matching documents for: ${tags.join(', ')}` : 'All documents'}
       </h1>
       {stale && (
         <p className="mb-4 text-sm text-amber-700 dark:text-amber-300">
@@ -94,33 +137,54 @@ export default function DocumentsPageClient() {
         <p className="text-slate-600 dark:text-slate-300">{error}</p>
       ) : (
         <div className="mb-8">
-          <ul className="space-y-6">
-            {matchingDocuments.length > 0 ? (
-              matchingDocuments.map((doc) => (
-                <li key={doc.public_id}>
-                  <Link
-                    href={cloudinaryUrl(doc, 'document')}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-lg font-semibold text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    {doc.title ?? doc.description ?? doc.public_id}
-                  </Link>
-                  {doc.description && (
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                      {doc.description}
-                    </p>
+          { exactMatchingDocuments.length === 0 &&
+            partialMatchingDocuments.length === 0 &&
+            untaggedMatchingDocuments.length === 0 ? (
+            <p className="text-slate-600 dark:text-slate-300">
+              {tags.length === 0
+                ? 'No documents available.'
+                : 'No documents match the selected tags.'}
+            </p>
+          ) : (
+            <div>
+              { exactMatchingDocuments.length > 0 && (
+                <section>
+                  <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    Exact matches
+                  </h2>
+                  <ul className="space-y-6">
+                    {exactMatchingDocuments.map(({ doc }) => makeEntry(doc)) }
+                  </ul>
+                </section>
+              )}
+              { partialMatchingDocuments.length > 0 && (
+                <section>
+                  { exactMatchingDocuments.length > 0 &&
+                    <hr className="my-6 border-slate-200 dark:border-slate-700" />
+                  }
+                  <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    Partial matches
+                  </h2>
+                  <ul className="space-y-6">
+                    {partialMatchingDocuments.map(({ doc }) => makeEntry(doc))}
+                  </ul>
+                </section>
+              )}
+              { untaggedMatchingDocuments.length > 0 && (
+                <section>
+                 { tags.length > 0 ? (
+                    <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      No documents match the selected tags
+                    </h2>
+                 ) : (
+                  <ul className="space-y-6">
+                    {untaggedMatchingDocuments.map(({ doc }) => makeEntry(doc))}
+                  </ul>
                   )}
-                </li>
-              ))
-            ) : (
-              <li>
-                {tags.length === 0
-                  ? 'No documents available.'
-                  : `No documents match the selected tags: ${tags.join(', ')}.`}
-              </li>
-            )}
-          </ul>
+                </section>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
