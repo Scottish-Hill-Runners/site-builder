@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { writeGz, progress } from './write-gz-util';
+import { writeGz, prebuildDir, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { updateSitemap } from './update-sitemap';
 
@@ -31,15 +31,14 @@ function collectMarkdownFiles(dir: string): string[] {
 
 function buildNews(): string[] {
   const newsDir = contentPath('news');
-  const outputDir = path.join(process.cwd(), 'public');
   const routes: string[] = [];
 
-  if (!fs.existsSync(outputDir))
-    fs.mkdirSync(outputDir, { recursive: true });
+  if (!fs.existsSync(prebuildDir))
+    fs.mkdirSync(prebuildDir, { recursive: true });
 
   if (!fs.existsSync(newsDir)) {
     console.warn('News directory not found, creating empty news.json.gz');
-    writeGz(outputDir, 'news.json', JSON.stringify([]));
+    writeGz(prebuildDir, 'news.json', JSON.stringify([]));
     return routes;
   }
 
@@ -65,7 +64,7 @@ function buildNews(): string[] {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   routes.push('/news');
-  writeGz(outputDir, 'news.json', JSON.stringify(newsItems));
+  writeGz(prebuildDir, 'news.json', JSON.stringify(newsItems));
   progress(`✓ Built ${newsItems.length} news items`);
 
   return routes;

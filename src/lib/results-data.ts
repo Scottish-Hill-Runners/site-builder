@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import type { AllRaceData, RaceData, RaceResult } from '@/types/datatable';
+import { prebuildDir } from '../../scripts/write-gz-util';
 
 export type RunnerNameEntry = {
   name: string;
@@ -15,7 +16,7 @@ export type RecentRaceLinkTarget = {
 };
 
 function resultsPath(fileName: string): string {
-  return path.join(process.cwd(), 'public', 'results', fileName);
+  return path.join(prebuildDir, 'results', fileName);
 }
 
 async function readJsonGzip<T>(fileName: string): Promise<T> {
@@ -40,7 +41,7 @@ export type CalendarEntry = {
 };
 
 export async function loadCalendar(): Promise<CalendarEntry[]> {
-  const buffer = await fs.readFile(path.join(process.cwd(), 'public', 'calendar.json.gz'));
+  const buffer = await fs.readFile(path.join(prebuildDir, 'calendar.json.gz'));
   const decompressed = gunzipSync(buffer).toString('utf8');
   return JSON.parse(decompressed) as CalendarEntry[];
 }

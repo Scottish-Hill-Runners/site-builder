@@ -165,3 +165,11 @@ export interface ChampionshipYearPayload {
   raceSchedule?: { raceId: string; date?: string }[];
   teams?: TeamResult[];
 }
+
+export interface CalendarEntry {
+  Date: string;
+  raceName: string;
+  raceId?: string;
+  distance?: number;
+  climb?: number;
+}

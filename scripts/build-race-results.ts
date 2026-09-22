@@ -1,8 +1,8 @@
 import csv from 'csvtojson';
 import fs from 'fs';
-import matter from 'gray-matter';
 import path from 'path';
-import { writeGz, progress } from './write-gz-util';
+import matter from 'gray-matter';
+import { writeGz, prebuildDir, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { buildElevationChartData } from './elevation-chart';
 import { surnameHash } from '@/lib/runner-name';
@@ -566,7 +566,7 @@ function groupBy<K, V>(data: V[], key: (t: V) => K): Map<K, V[]> {
   return result;
 }
 
-const outputDir = path.join(process.cwd(), 'public', 'results');
+const outputDir = path.join(prebuildDir, 'results');
 if (fs.existsSync(outputDir)) {
   fs.readdirSync(outputDir).forEach((file) => {
     const filePath = path.join(outputDir, file);
@@ -1020,6 +1020,9 @@ async function buildMergedCalendarData(
     lookup.get(key)!.push(row.Date);
   }
 
+  // Explicit calendar rows take precedence: never generate a computed date for a year that already has one.
+  const explicitKeys = new Set(lookup.keys());
+
   const todayIso = londonTodayIso();
   const currentYear = Number.parseInt(todayIso.slice(0, 4), 10);
   const previousYear = currentYear - 1;
@@ -1063,13 +1066,15 @@ async function buildMergedCalendarData(
         currentYearDate < todayIso ? [currentYear, nextYear] : [currentYear];
 
       for (const year of yearsToAdd) {
+          const key = `${year}/${raceId}`;
+          if (explicitKeys.has(key)) continue;
+
           const dates =
           year === currentYear
             ? [currentYearDate]
             : nextYearResolved.get(raceId);
           if (!dates) continue;
 
-          const key = `${year}/${raceId}`;
           const existingDates = lookup.get(key) ?? [];
           const seenDates = new Set(existingDates);
           const newDates = dates.filter((date) => !seenDates.has(date));
@@ -1170,7 +1175,7 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
     active: activeClubNames.has(name),
   }));
   writeGz(
-    path.join(process.cwd(), 'public'),
+    prebuildDir,
     'clubs.json',
     JSON.stringify(output)
   );
@@ -1178,7 +1183,7 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
 
 function writeChampionshipData(championships: ChampionshipData[]): void {
   writeGz(
-    path.join(process.cwd(), 'public'),
+    prebuildDir,
     'championships.json',
     JSON.stringify(championships)
   );
@@ -1723,7 +1728,7 @@ async function writeCalendarData(
   });
 
   writeGz(
-    path.join(process.cwd(), 'public'),
+    prebuildDir,
     'calendar.json',
     JSON.stringify(entries)
   );

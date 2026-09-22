@@ -2,13 +2,14 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { type ContentItem } from '@/lib/info';
+import { prebuildDir } from '../../scripts/write-gz-util';
 
 export type EpicItem = ContentItem;
 
 let cachedEpicItems: EpicItem[] | null = null;
 
 async function readEpicItemsFromFile(): Promise<EpicItem[]> {
-  const filePath = path.join(process.cwd(), 'public', 'epics.json.gz');
+  const filePath = path.join(prebuildDir, 'epics.json.gz');
   const compressed = await fs.readFile(filePath);
   const file = gunzipSync(compressed).toString('utf8');
   const epicItems = JSON.parse(file) as EpicItem[];

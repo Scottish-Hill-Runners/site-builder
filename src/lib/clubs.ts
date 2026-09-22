@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { prebuildDir } from '../../scripts/write-gz-util';
 
 export interface ClubItem {
   slug: string;
@@ -14,7 +15,7 @@ export interface ClubItem {
 let cachedClubItems: ClubItem[] | null = null;
 
 async function readClubItemsFromFile(): Promise<ClubItem[]> {
-  const filePath = path.join(process.cwd(), 'public', 'clubs.json.gz');
+  const filePath = path.join(prebuildDir, 'clubs.json.gz');
   const compressed = await fs.readFile(filePath);
   const file = gunzipSync(compressed).toString('utf8');
   const items = JSON.parse(file) as ClubItem[];

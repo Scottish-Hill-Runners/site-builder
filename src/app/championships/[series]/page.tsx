@@ -2,17 +2,14 @@ import ChampionshipPageClient from '@/app/championships/[series]/championship-pa
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
+import { prebuildDir } from '../../../../scripts/write-gz-util';
 
 type ChampionshipSummary = {
   slug: string;
 };
 
 export async function generateStaticParams() {
-  const championshipsPath = path.join(
-    process.cwd(),
-    'public',
-    'championships.json.gz'
-  );
+  const championshipsPath = path.join(prebuildDir, 'championships.json.gz');
 
   if (!fs.existsSync(championshipsPath)) {
     return [] as { series: string }[];

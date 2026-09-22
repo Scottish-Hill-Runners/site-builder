@@ -1,11 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { progress } from './write-gz-util';
+import { prebuildDir, progress } from './write-gz-util';
 
 const SITE_URL = 'https://beta.scottishhillrunners.uk';
-const PUBLIC_DIR = path.join(process.cwd(), 'public');
-const SITEMAP_PATH = path.join(PUBLIC_DIR, 'sitemap.xml');
-const ROBOTS_PATH = path.join(PUBLIC_DIR, 'robots.txt');
+const SITEMAP_PATH = path.join(prebuildDir, 'sitemap.xml');
+const ROBOTS_PATH = path.join(prebuildDir, 'robots.txt');
 
 function xmlEscape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

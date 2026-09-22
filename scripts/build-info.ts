@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { writeGz, progress } from './write-gz-util';
+import { writeGz, prebuildDir, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { updateSitemap } from './update-sitemap';
 
@@ -33,12 +33,11 @@ function collectFiles(
 
 function buildInfo(): string[] {
   const infoDir = contentPath('info');
-  const outputDir = path.join(process.cwd(), 'public');
   const routes: string[] = [];
 
   if (!fs.existsSync(infoDir)) {
     console.warn('Info directory not found, creating empty info.json.gz');
-    writeGz(outputDir, 'info.json', JSON.stringify([]));
+    writeGz(prebuildDir, 'info.json', JSON.stringify([]));
     return routes;
   }
 
@@ -69,7 +68,7 @@ function buildInfo(): string[] {
   });
 
   // Write to compressed JSON file
-  writeGz(outputDir, 'info.json', JSON.stringify(infoItems));
+  writeGz(prebuildDir, 'info.json', JSON.stringify(infoItems));
   progress(`✓ Built ${infoItems.length} info items`);
 
   return routes;

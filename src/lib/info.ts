@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { prebuildDir } from '../../scripts/write-gz-util';
 
 export interface ContentItem {
   slug: string;
@@ -14,7 +15,7 @@ let cachedAllInfoItems: InfoItem[] | null = null;
 let cachedInfoItems: InfoItem[] | null = null;
 
 async function readAllInfoItemsFromFile(): Promise<InfoItem[]> {
-  const filePath = path.join(process.cwd(), 'public', 'info.json.gz');
+  const filePath = path.join(prebuildDir, 'info.json.gz');
   const compressed = await fs.readFile(filePath);
   const file = gunzipSync(compressed).toString('utf8');
   const allItems = JSON.parse(file) as InfoItem[];

@@ -8,10 +8,8 @@ import remarkGfm from 'remark-gfm';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import ChampionshipRacesEditDialog from '@/components/ChampionshipRacesEditDialog';
 import ChampionshipInfoEditDialog from '@/components/ChampionshipInfoEditDialog';
-import { ScoringRules } from '@/types/datatable';
-import type { RaceInfo } from '@/types/datatable';
+import { CalendarEntry, RaceInfo, ScoringRules } from '@/types/datatable';
 import { formatCalendarDate } from '@/lib/dates';
-import { CalendarEntry } from '@/lib/calendar';
 
 interface ChampionshipData {
   slug: string;

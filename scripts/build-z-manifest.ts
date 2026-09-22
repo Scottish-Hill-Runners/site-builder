@@ -1,8 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-
-const publicDir = path.join(process.cwd(), 'public');
+import { prebuildDir } from './write-gz-util';
 
 function findGzFiles(dir: string, base: string): string[] {
   const results: string[] = [];
@@ -17,11 +16,11 @@ function findGzFiles(dir: string, base: string): string[] {
   return results;
 }
 
-const files = findGzFiles(publicDir, publicDir);
+const files = findGzFiles(prebuildDir, prebuildDir);
 const hashes: Record<string, string> = {};
 
 for (const filePath of files) {
-  const absPath = path.join(publicDir, filePath);
+  const absPath = path.join(prebuildDir, filePath);
   const buffer = fs.readFileSync(absPath);
   const hash = crypto
     .createHash('sha256')
@@ -36,6 +35,6 @@ const manifest = {
   files: hashes,
 };
 
-const outputPath = path.join(publicDir, 'asset-manifest.json');
+const outputPath = path.join(prebuildDir, 'asset-manifest.json');
 fs.writeFileSync(outputPath, JSON.stringify(manifest));
 console.log(`✓ asset-manifest.json (${files.length} files)`);

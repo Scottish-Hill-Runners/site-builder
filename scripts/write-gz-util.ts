@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 
+export const prebuildDir = path.join(process.cwd(), 'public');
+
 export function progress(message: string): void {
   if ('VERBOSE' in process.env) process.stdout.write(`\x1b[K${message}\r`);
 }
@@ -12,6 +14,7 @@ export function writeGz(
   data: string
 ): void {
   const outputFile = path.join(outputDir, `${fileName}.gz`);
+  fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(outputFile, zlib.gzipSync(Buffer.from(data, 'utf8')));
 
   const rawSize = Buffer.byteLength(data);
