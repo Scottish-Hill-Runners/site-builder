@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getEpicItems } from '@/lib/epics';
 import EpicsFilter from './epics-filter';
+import EpicNewSection from '@/components/EpicNewSection';
 
 export { getEpicItems };
 
@@ -31,6 +32,7 @@ export default async function EpicsPage() {
       <h1 className="mb-8 text-3xl font-bold text-slate-900 dark:text-slate-50">
         Epics
       </h1>
+      <EpicNewSection />
       {epicItems.length === 0 ? (
         <p className="text-slate-600 dark:text-slate-300">
           No epics available.
