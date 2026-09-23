@@ -455,6 +455,14 @@ export default function RaceDetailsTabs({
                   )}
                 </p>
               )}
+              {latestCalendarDate && !isLatestCalendarEntryPast && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    Next race date:
+                  </span>{' '}
+                  {latestCalendarDateLabel}
+                </p>
+              )}
             </div>
 
             <div>
