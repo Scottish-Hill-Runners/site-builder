@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AttributionControl, LayerSpecification, LngLatLike, LngLatBoundsLike, Map, Marker, NavigationControl, Popup, RasterTileSource, StyleSpecification, TerrainControl } from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import type { GeoJSON } from 'geojson';
 
 interface RouteMapProps {
@@ -21,17 +21,19 @@ interface CheckpointProperties {
   notes?: string;
 }
 
-function getBounds(geojson: GeoJSON): LngLatBoundsLike | null {
+function getBounds(geojson: GeoJSON): [[number, number], [number, number]] | null {
   let minLng = Infinity;
   let minLat = Infinity;
   let maxLng = -Infinity;
   let maxLat = -Infinity;
+
   function expand(lng: number, lat: number) {
     if (lng < minLng) minLng = lng;
     if (lat < minLat) minLat = lat;
     if (lng > maxLng) maxLng = lng;
     if (lat > maxLat) maxLat = lat;
   }
+
   function collect(obj: GeoJSON) {
     if (obj.type === 'FeatureCollection') {
       obj.features.forEach(collect);
@@ -45,6 +47,7 @@ function getBounds(geojson: GeoJSON): LngLatBoundsLike | null {
       obj.geometries.forEach(collect);
     }
   }
+
   collect(geojson);
   if (minLng === Infinity) return null;
   return [
@@ -94,83 +97,9 @@ function createMarkerEl(label: string, color: string): HTMLElement {
   return el;
 }
 
-function getAllCoordinates(geojson: GeoJSON): [number, number][] {
-  const coords: [number, number][] = [];
-  function collect(obj: GeoJSON) {
-    if (obj.type === 'FeatureCollection') {
-      obj.features.forEach(collect);
-    } else if (obj.type === 'Feature') {
-      collect(obj.geometry);
-    } else if (obj.type === 'LineString') {
-      obj.coordinates.forEach((c) => coords.push([c[0], c[1]]));
-    } else if (obj.type === 'MultiLineString') {
-      obj.coordinates.forEach((line) =>
-        line.forEach((c) => coords.push([c[0], c[1]]))
-      );
-    } else if (obj.type === 'GeometryCollection') {
-      obj.geometries.forEach(collect);
-    }
-  }
-  collect(geojson);
-  return coords;
-}
-
-function haversineMetres(a: [number, number], b: [number, number]): number {
-  const R = 6_371_000;
-  const lat1 = (a[1] * Math.PI) / 180;
-  const lat2 = (b[1] * Math.PI) / 180;
-  const dLat = ((b[1] - a[1]) * Math.PI) / 180;
-  const dLng = ((b[0] - a[0]) * Math.PI) / 180;
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(x));
-}
-
-function buildCumulativeDistances(coords: [number, number][]): number[] {
-  const cumDists = [0];
-  for (let i = 1; i < coords.length; i++) {
-    cumDists.push(cumDists[i - 1] + haversineMetres(coords[i - 1], coords[i]));
-  }
-  return cumDists;
-}
-
-function sampleRoute(
-  coords: [number, number][],
-  cumDists: number[],
-  totalDist: number,
-  t: number,
-): [number, number] {
-  const target = Math.min(t * totalDist, totalDist);
-  let lo = 0;
-  let hi = cumDists.length - 1;
-  while (lo < hi - 1) {
-    const mid = (lo + hi) >> 1;
-    if (cumDists[mid] <= target) lo = mid;
-    else hi = mid;
-  }
-  const segLen = cumDists[hi] - cumDists[lo];
-  if (segLen === 0) return coords[lo];
-  const frac = (target - cumDists[lo]) / segLen;
-  const a = coords[lo];
-  const b = coords[hi];
-  return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
-}
-
-function bearingDeg(a: [number, number], b: [number, number]): number {
-  const lat1 = (a[1] * Math.PI) / 180;
-  const lat2 = (b[1] * Math.PI) / 180;
-  const dLng = ((b[0] - a[0]) * Math.PI) / 180;
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-}
-
 export default function RouteMap({ raceName, geojson }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<Map | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
@@ -196,8 +125,8 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
 
         // Derive initial centre from the route bounding box so the first tile
         // requests land over the route, not at the default world origin.
-        const sw = (bounds as [[number, number], [number, number]])[0];
-        const ne = (bounds as [[number, number], [number, number]])[1];
+        const sw = bounds[0];
+        const ne = bounds[1];
         const routeCenter: [number, number] = [
           (sw[0] + ne[0]) / 2,
           (sw[1] + ne[1]) / 2,
@@ -206,7 +135,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
         const hasDem = maptilerKey.length > 0;
         const hasOs = osKey.length > 0;
 
-        const sources: StyleSpecification['sources'] = {
+        const sources: maplibregl.StyleSpecification['sources'] = {
           'os-raster': {
             type: 'raster',
             tiles: hasOs
@@ -236,7 +165,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           sources['hillshade-dem'] = { ...demSource };
         }
 
-        const layers: LayerSpecification[] = [
+        const layers: maplibregl.LayerSpecification[] = [
           {
             id: 'os-raster',
             type: 'raster',
@@ -256,7 +185,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           });
         }
 
-        const style: StyleSpecification = {
+        const style: maplibregl.StyleSpecification = {
           version: 8,
           sources,
           layers,
@@ -265,7 +194,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
             : {}),
         };
 
-        const map = new Map({
+        const map = new maplibregl.Map({
           container: containerRef.current!,
           style,
           center: routeCenter,
@@ -274,7 +203,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           maxZoom: 20,
           pitch: 0,
           bearing: 0,
-          maxBounds: [
+          maxBounds: [ // limit to UK
             [-10.76, 49.52],
             [2.0, 61.4],
           ],
@@ -284,13 +213,13 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
         mapRef.current = map;
 
         map.addControl(
-          new AttributionControl({ compact: true }),
+          new maplibregl.AttributionControl({ compact: true }),
           'bottom-right'
         );
         // visualizePitch: true — compass tilts to show pitch angle and clicking
         // it resets both bearing and pitch to 0 (standard MapLibre behaviour).
         map.addControl(
-          new NavigationControl({
+          new maplibregl.NavigationControl({
             visualizePitch: true,
             showZoom: true,
             showCompass: true,
@@ -338,7 +267,7 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
           );
 
           map.addControl(
-            new TerrainControl({
+            new maplibregl.TerrainControl({
               source: 'terrain-dem',
               exaggeration: 1.2,
             }),
@@ -349,22 +278,6 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
         map.on('load', () => {
           if (cancelled) return;
           try {
-            // Satellite imagery — added now (hidden) so it sits below the route
-            // layers; swapped in as the basemap during fly-through.
-            if (maptilerKey.length > 0) {
-              map.addSource('satellite', {
-                type: 'raster',
-                url: `https://api.maptiler.com/tiles/satellite-v2/tiles.json?key=${maptilerKey}`,
-                tileSize: 512,
-              });
-              map.addLayer({
-                id: 'satellite-layer',
-                type: 'raster',
-                source: 'satellite',
-                layout: { visibility: 'none' },
-              });
-            }
-
             // Add route
             map.addSource('route', { type: 'geojson', data: geojson });
 
@@ -373,7 +286,6 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
               id: 'route-shadow',
               type: 'line',
               source: 'route',
-              filter: ['==', '$type', 'LineString'],
               layout: { 'line-join': 'round', 'line-cap': 'round' },
               paint: {
                 'line-color': '#000000',
@@ -388,7 +300,6 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
               id: 'route-line',
               type: 'line',
               source: 'route',
-              filter: ['==', '$type', 'LineString'],
               layout: { 'line-join': 'round', 'line-cap': 'round' },
               paint: {
                 'line-color': '#e63012',
@@ -399,26 +310,26 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
 
             // Start/finish markers
             if (start) {
-              new Marker({
+              new maplibregl.Marker({
                 element: createMarkerEl('S', '#16a34a'),
                 anchor: 'center',
               })
                 .setLngLat([start.lng, start.lat])
                 .setPopup(
-                  new Popup({ offset: 20 }).setHTML(
+                  new maplibregl.Popup({ offset: 20 }).setHTML(
                     `<span style="color:#1f2937">${raceName} \u2014 Start</span>`
                   )
                 )
                 .addTo(map);
             }
             if (end) {
-              new Marker({
+              new maplibregl.Marker({
                 element: createMarkerEl('F', '#1d4ed8'),
                 anchor: 'center',
               })
                 .setLngLat([end.lng, end.lat])
                 .setPopup(
-                  new Popup({ offset: 20 }).setHTML(
+                  new maplibregl.Popup({ offset: 20 }).setHTML(
                     `<span style="color:#1f2937">${raceName} \u2014 Finish</span>`
                   )
                 )
@@ -434,24 +345,24 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
                   (feature.properties as CheckpointProperties | null)?.type === 'checkpoint'
                 ) {
                   const props = feature.properties as CheckpointProperties;
-                  const [lng, lat] = (feature.geometry as import('geojson').Point).coordinates;
+                  const [lng, lat] = feature.geometry.coordinates;
                   const name = props.name ?? 'CP';
                   let popupHtml = `<div style="color:#1f2937;font-size:13px"><strong>${name}</strong>`;
                   if (props.cutoff) popupHtml += `<br>Cutoff: ${props.cutoff}`;
                   if (props.notes) popupHtml += `<br>${props.notes}`;
                   popupHtml += '</div>';
-                  new Marker({
+                  new maplibregl.Marker({
                     element: createMarkerEl(name, '#f97316'),
                     anchor: 'center',
                   })
                     .setLngLat([lng, lat])
-                    .setPopup(new Popup({ offset: 20 }).setHTML(popupHtml))
+                    .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(popupHtml))
                     .addTo(map);
                 }
               }
             }
 
-            map.fitBounds(bounds as LngLatBoundsLike, {
+            map.fitBounds(bounds, {
               padding: 72,
               pitch: 0,
               duration: 0,
@@ -460,118 +371,10 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
             // have triggered a layout change.
             map.resize();
 
-            // Fly-through animation — camera travels along the route.
-            const routeCoords = getAllCoordinates(geojson);
-            if (routeCoords.length >= 2) {
-              const cumDists = buildCumulativeDistances(routeCoords);
-              const totalDist = cumDists[cumDists.length - 1];
-              // Ground speed ~5 m/s ≈ 1 min per km; floor at 30 s for short routes.
-              const durationMs = Math.max(30_000, totalDist / 5);
-              // Look-ahead: fixed 300 m gives stable bearing across route lengths.
-              const lookAheadFrac = Math.min(300 / Math.max(totalDist, 1), 0.05);
-              const flyPitch = hasDem ? 50 : 35;
-              let flyRafId: number | null = null;
-              let flyStartTime: number | null = null;
-
-              const flyBtn = document.createElement('button');
-              flyBtn.type = 'button';
-              flyBtn.title = 'Fly through route';
-              flyBtn.setAttribute('aria-label', 'Fly through route');
-              flyBtn.setAttribute('aria-pressed', 'false');
-              flyBtn.style.cssText = [
-                'width:29px;height:29px;cursor:not-allowed;border:none;background:white;',
-                'font-size:13px;font-weight:700;color:#333;letter-spacing:0;',
-                'display:flex;align-items:center;justify-content:center;opacity:0.35;',
-              ].join('');
-              flyBtn.textContent = '\u25b6';
-              flyBtn.disabled = true;
-
-              const stopFly = () => {
-                if (flyRafId !== null) {
-                  cancelAnimationFrame(flyRafId);
-                  flyRafId = null;
-                }
-                flyStartTime = null;
-                flyBtn.textContent = '\u25b6';
-                flyBtn.title = 'Fly through route';
-                flyBtn.setAttribute('aria-pressed', 'false');
-                flyBtn.style.color = '#333';
-                // Guard against calling map methods after the map has been
-                // removed (e.g. cleanup fires while a RAF frame is in flight).
-                if (!cancelled && maptilerKey.length > 0) {
-                  map.setLayoutProperty('satellite-layer', 'visibility', 'none');
-                  map.setLayoutProperty('os-raster', 'visibility', 'visible');
-                  if (hasDem) map.setLayoutProperty('hillshade', 'visibility', 'visible');
-                }
-              };
-
-              const startFly = () => {
-                flyStartTime = null;
-                flyBtn.textContent = '\u25a0';
-                flyBtn.title = 'Stop fly-through';
-                flyBtn.setAttribute('aria-pressed', 'true');
-                flyBtn.style.color = '#2563eb';
-                if (maptilerKey.length > 0) {
-                  map.setLayoutProperty('os-raster', 'visibility', 'none');
-                  if (hasDem) map.setLayoutProperty('hillshade', 'visibility', 'none');
-                  map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
-                }
-
-                const frame = (timestamp: number) => {
-                  if (cancelled) { stopFly(); return; }
-                  if (flyStartTime === null) flyStartTime = timestamp;
-                  const elapsed = timestamp - flyStartTime;
-                  const t = Math.min(elapsed / durationMs, 1);
-
-                  const pos = sampleRoute(routeCoords, cumDists, totalDist, t);
-                  const lookAheadT = Math.min(t + lookAheadFrac, 1);
-                  const ahead = sampleRoute(routeCoords, cumDists, totalDist, lookAheadT);
-                  const bearing =
-                    ahead[0] !== pos[0] || ahead[1] !== pos[1]
-                      ? bearingDeg(pos, ahead)
-                      : map.getBearing();
-
-                  // easeTo with a short linear duration blends successive frames
-                  // smoothly instead of jumping to each position instantly.
-                  map.easeTo({
-                    center: pos as LngLatLike,
-                    bearing,
-                    pitch: flyPitch,
-                    zoom: 15.5,
-                    duration: 100,
-                    easing: (x) => x,
-                  });
-
-                  if (t < 1) {
-                    flyRafId = requestAnimationFrame(frame);
-                  } else {
-                    stopFly();
-                  }
-                };
-
-                flyRafId = requestAnimationFrame(frame);
-              };
-
-              flyBtn.addEventListener('click', () => {
-                if (flyRafId !== null) stopFly();
-                else startFly();
-              });
-
-              const flyContainer = document.createElement('div');
-              flyContainer.className = 'maplibregl-ctrl maplibregl-ctrl-group';
-              flyContainer.appendChild(flyBtn);
-              map.addControl(
-                {
-                  onAdd: () => flyContainer,
-                  onRemove: () => { stopFly(); flyContainer.remove(); },
-                },
-                'top-right',
-              );
-            }
           } catch (overlayErr) {
             console.warn('Error adding route overlay:', overlayErr);
           }
-          // Reveal the map regardless — basemap is usable even if overlay failed
+          // Reveal the map regardless — base map is usable even if overlay failed
           setStatus('ready');
         });
 
@@ -584,14 +387,14 @@ export default function RouteMap({ raceName, geojson }: RouteMapProps) {
               : String(e);
           console.warn('MapLibre error:', msg);
           // If the OS Maps API rejects a tile (403 Premium required), swap the
-          // basemap to OpenTopoMap so the map stays usable without a premium key.
+          // base map to OpenTopoMap so the map stays usable without a premium key.
           if (hasOs && !osTilesFailed && msg.includes('os.uk')) {
             osTilesFailed = true;
             console.warn(
               'OS Maps API access denied — falling back to OpenTopoMap. ' +
               'Outdoor_3857 requires a premium OS Maps API plan.'
             );
-            const src = map.getSource('os-raster') as RasterTileSource | undefined;
+            const src = map.getSource('os-raster') as maplibregl.RasterTileSource | undefined;
             src?.setTiles(['https://tile.opentopomap.org/{z}/{x}/{y}.png']);
           }
         });
