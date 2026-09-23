@@ -4,10 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import RaceDetailsTabs from '@/components/RaceDetailsTabs';
-import { fetchJsonWithApiFallback } from '@/lib/client-results-fetch';
+import { fetchGzipJson, fetchJsonWithApiFallback } from '@/lib/client-results-fetch';
 import type { RaceData } from '@/types/datatable';
 import type { AssetEntry } from '@/lib/assetCollections';
 
+type CalendarEntry = {
+  Date: string;
+  raceId?: string;
+};
 
 interface RacePageClientProps {
   raceId: string;
@@ -24,6 +28,23 @@ export default function RacePageClient({ raceId, hero, gallery }: RacePageClient
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
+  const [latestCalendarDate, setLatestCalendarDate] = useState<string | undefined>();
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    fetchGzipJson<CalendarEntry[]>('/calendar.json.gz').then((result) => {
+      if (isCancelled || result.status !== 'ok') return;
+      const latest = result.data
+        .filter((entry) => entry.raceId === raceId)
+        .sort((a, b) => b.Date.localeCompare(a.Date))[0];
+      setLatestCalendarDate(latest?.Date);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [raceId]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -153,6 +174,7 @@ export default function RacePageClient({ raceId, hero, gallery }: RacePageClient
               initialTab={initialTab}
               initialYearFilter={initialYearFilter}
               initialCategoryFilter={initialCategoryFilter}
+              latestCalendarDate={latestCalendarDate}
             />
           </>
         ) : (

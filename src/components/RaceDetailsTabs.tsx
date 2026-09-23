@@ -57,6 +57,8 @@ interface RaceDetailsTabsProps {
   initialTab?: TabKey;
   initialYearFilter?: string;
   initialCategoryFilter?: string;
+  /** ISO date (YYYY-MM-DD) of the most recent calendar occurrence for this race, if any. */
+  latestCalendarDate?: string;
 }
 
 type TabKey = 'results' | 'info' | 'gpx' | 'gallery';
@@ -84,6 +86,7 @@ export default function RaceDetailsTabs({
   initialTab,
   initialYearFilter = '',
   initialCategoryFilter = '',
+  latestCalendarDate,
 }: RaceDetailsTabsProps) {
   const { imperial } = useUnits();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
@@ -161,6 +164,21 @@ export default function RaceDetailsTabs({
     [results]
   );
   const effectiveInitialYearFilter = initialYearFilter || pageDefaultYear || '';
+  const latestCalendarYear = latestCalendarDate?.slice(0, 4);
+  const isLatestCalendarEntryPast = Boolean(
+    latestCalendarDate && latestCalendarDate < new Date().toISOString().slice(0, 10)
+  );
+  const missingResultsForLatestEntry =
+    isLatestCalendarEntryPast &&
+    Boolean(latestCalendarYear) &&
+    !results.some((r) => r.year === latestCalendarYear);
+  const latestCalendarDateLabel = latestCalendarDate
+    ? new Date(`${latestCalendarDate}T00:00:00`).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
   const correctionRaceId = focusedResultContext?.raceId ?? raceId;
   const correctionYear = focusedResultContext?.year ?? pageDefaultYear;
   const correctionFilteredResults = useMemo(
@@ -224,6 +242,21 @@ export default function RaceDetailsTabs({
             id="race-tab-panel-results"
             aria-labelledby="race-tab-results"
           >
+            {RESULTS_EMAIL && missingResultsForLatestEntry && (
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                <p className="mb-2">
+                  Results for the race on {latestCalendarDateLabel} have not
+                  been uploaded yet. If you have them, please {' '}
+                  <button
+                    type="button"
+                    onClick={() => setSubmitDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    submit results.
+                  </button>
+                </p>
+              </div>
+            )}
             {resultsError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-900 dark:bg-red-950/40">
                 <p className="mb-2 font-semibold text-red-700">
@@ -438,48 +471,35 @@ export default function RaceDetailsTabs({
               )}
             </div>
 
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-              <p className="font-semibold">Race organiser?</p>
-              {UPDATES_EMAIL && (
+            {UPDATES_EMAIL && RESULTS_EMAIL && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
                 <p className="mt-1">
-                  Need to update the race info?{' '}
                   <button
                     type="button"
                     onClick={() => setInfoEditDialogOpen(true)}
                     className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
                   >
-                    Edit race info by email
+                    Update race info
                   </button>
-                  .
-                </p>
-              )}
-              {RESULTS_EMAIL && (
-                <p className="mt-1">
-                  Results ready to submit?{' '}
+                  {' / '}
                   <button
                     type="button"
                     onClick={() => setSubmitDialogOpen(true)}
                     className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
                   >
-                    Submit results by email
+                    Submit results
                   </button>
-                  .
-                </p>
-              )}
-              {UPDATES_EMAIL && (
-                <p className="mt-1">
-                  Have a race photo to share?{' '}
+                  {' / '}
                   <button
                     type="button"
                     onClick={() => openPhotoSubmissionEmail(raceId, race.title)}
                     className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
                   >
-                    Submit photos by email
+                    Share race photos
                   </button>
-                  .
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
