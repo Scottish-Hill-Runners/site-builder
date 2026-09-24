@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import '@/lib/maplibre-worker';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSON } from 'geojson';
 

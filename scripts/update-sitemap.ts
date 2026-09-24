@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prebuildDir, progress } from './write-gz-util';
 
-const SITE_URL = 'https://beta.scottishhillrunners.uk';
+const SITE_URL = 'https://www.scottishhillrunners.uk';
 const SITEMAP_PATH = path.join(prebuildDir, 'sitemap.xml');
 const ROBOTS_PATH = path.join(prebuildDir, 'robots.txt');
 

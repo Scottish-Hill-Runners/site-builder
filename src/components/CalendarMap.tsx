@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import '@/lib/maplibre-worker';
 import { Map, StyleSpecification, NavigationControl, Popup, Marker } from 'maplibre-gl';
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';

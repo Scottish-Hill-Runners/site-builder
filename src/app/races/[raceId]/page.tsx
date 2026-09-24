@@ -6,7 +6,7 @@ import { cloudinaryUrl } from '@/lib/cloudinary';
 import { loadAllRaces, loadCalendar, loadRaceResults } from '@/lib/results-data';
 import type { AllRaceData, RaceData, RaceInfo } from '@/types/datatable';
 
-const SITE_URL = 'https://beta.scottishhillrunners.uk';
+const SITE_URL = 'https://www.scottishhillrunners.uk';
 
 export async function generateStaticParams() {
   const allRaces = await loadAllRaces().catch(() => ({}) as AllRaceData);
