@@ -9,9 +9,8 @@ const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
 const destination = path.resolve(process.cwd(), targetDir);
 
-if (existsSync(destination)) {
+if (existsSync(destination))
   rmSync(destination, { recursive: true, force: true });
-}
 
 const repoUrl =
   repo.startsWith('http') || repo.startsWith('/') || repo.startsWith('.')
@@ -19,15 +18,13 @@ const repoUrl =
     : `https://github.com/${repo}.git`;
 
 function withGitHubToken(urlString, token) {
-  if (!token) {
+  if (!token)
     return urlString;
-  }
 
   try {
     const url = new URL(urlString);
-    if (url.protocol !== 'https:' || url.hostname !== 'github.com') {
+    if (url.protocol !== 'https:' || url.hostname !== 'github.com')
       return urlString;
-    }
 
     // PAT over HTTPS for private-repo read access in CI.
     url.username = token;
@@ -41,14 +38,7 @@ function withGitHubToken(urlString, token) {
 const cloneUrl = withGitHubToken(repoUrl, githubToken);
 
 console.log(`Cloning ${repoUrl}#${ref} into ${destination}`);
-execFileSync(
-  'git',
-  ['clone', '--depth', '1', '--filter=blob:none', '--sparse', '--branch', ref, cloneUrl, destination],
-  { stdio: 'inherit' },
-);
-
-execFileSync('git', ['sparse-checkout', 'set', '--no-cone', '/*', '!/blobs/', '!/blobs/**'], {
-  cwd: destination,
+execFileSync('git', ['clone', '--depth', '1', '--branch', ref, cloneUrl, destination], {
   stdio: 'inherit',
 });
 
