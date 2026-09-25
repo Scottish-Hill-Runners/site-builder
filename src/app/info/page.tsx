@@ -2,6 +2,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getAllInfoItems } from '@/lib/info';
+import TaggedImage from '@/components/TaggedImage';
 
 export { getAllInfoItems };
 
@@ -47,7 +48,11 @@ export async function InfoPageContent({ slug = 'index' }: { slug?: string }) {
       ) : (
         <article className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 sm:p-8">
           <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{ img: TaggedImage }}
+              urlTransform={(url) => url}
+            >
               {infoPage.content.replace(/\u00a0/g, ' ')}
             </ReactMarkdown>
           </div>

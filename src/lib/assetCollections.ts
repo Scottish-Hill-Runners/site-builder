@@ -105,3 +105,37 @@ export async function getDocuments(): Promise<AssetEntry[]> {
 export async function getCommitteePortraits(): Promise<AssetEntry[]> {
   return await getAssets('portraits');
 }
+
+export function parseTags(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function tagMatchCount(asset: AssetEntry, tags: string[]): number {
+  if (tags.length === 0) return 0;
+  const assetTags = new Set((asset.tags ?? []).map((tag) => tag.toLowerCase()));
+  return tags.reduce((count, tag) => count + (assetTags.has(tag) ? 1 : 0), 0);
+}
+
+// Picks the asset with the most matching tags; ties broken randomly.
+export function pickBestMatch(assets: AssetEntry[], tags: string[]): AssetEntry | null {
+  let best: AssetEntry | null = null;
+  let bestScore = 0;
+  let bestTieCount = 0;
+  for (const asset of assets) {
+    const score = tagMatchCount(asset, tags);
+    if (score > bestScore) {
+      best = asset;
+      bestScore = score;
+      bestTieCount = 1;
+    } else if (score === bestScore) {
+      bestTieCount += 1;
+      if (Math.random() < 1 / bestTieCount) best = asset;
+    }
+  }
+
+  return bestScore == 0 ? null : best;
+}
