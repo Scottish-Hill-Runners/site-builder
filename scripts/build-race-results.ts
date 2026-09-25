@@ -51,6 +51,8 @@ type ChampionshipData = {
   slug: string;
   title: string;
   contents: string;
+  /** 'standings' championships store pre-computed per-race points in {slug}/{year}.csv rather than raw results. */
+  resultsFormat: 'race-results' | 'standings';
   years: { [year: string]: string[] };
   yearScoring?: {
     [year: string]: {
@@ -1099,11 +1101,28 @@ function readChampionships(): ChampionshipData[] {
   const champDir = contentPath('championships');
   const championships: ChampionshipData[] = [];
 
-  for (const file of fs.readdirSync(champDir, { withFileTypes: true })) {
-    if (!file.isFile() || path.extname(file.name) !== '.md') continue;
+  const entries: { slug: string; indexPath: string; resultsFormat: ChampionshipData['resultsFormat'] }[] = [];
+  for (const entry of fs.readdirSync(champDir, { withFileTypes: true })) {
+    if (entry.isFile() && path.extname(entry.name) === '.md') {
+      entries.push({
+        slug: path.basename(entry.name, '.md'),
+        indexPath: path.join(champDir, entry.name),
+        resultsFormat: 'race-results',
+      });
+    } else if (
+      entry.isDirectory() &&
+      fs.existsSync(path.join(champDir, entry.name, 'index.md'))
+    ) {
+      entries.push({
+        slug: entry.name,
+        indexPath: path.join(champDir, entry.name, 'index.md'),
+        resultsFormat: 'standings',
+      });
+    }
+  }
 
-    const { data, content } = matter.read(path.join(champDir, file.name));
-    const slug = path.basename(file.name, '.md');
+  for (const { slug, indexPath, resultsFormat } of entries) {
+    const { data, content } = matter.read(indexPath);
     const years: { [year: string]: string[] } = {};
     const yearScoring: NonNullable<ChampionshipData['yearScoring']> = {};
 
@@ -1145,6 +1164,7 @@ function readChampionships(): ChampionshipData[] {
       slug,
       title: data.title as string,
       contents: content,
+      resultsFormat,
       years,
       yearScoring,
       rules: data.rules as ChampionshipData['rules'],
@@ -1379,12 +1399,82 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
   };
 }
 
-function writeChampionshipResultsData(
+/**
+ * Reads a standings-only championship's `{year}.csv` (columns: Category, Runner,
+ * Club, then one column per raceId holding that runner's already-computed points
+ * for that race). Position/categoryPos are left as placeholders here; the caller
+ * recalculates them the same way as ordinary race results.
+ */
+async function readChampionshipStandingsCsv(
+  slug: string,
+  year: string,
+  expectedRaceIds: string[]
+): Promise<RaceResult[]> {
+  const csvPath = path.join(contentPath('championships'), slug, `${year}.csv`);
+  if (!fs.existsSync(csvPath)) return [];
+
+  const rows = (await csv().fromFile(csvPath)) as Record<string, string>[];
+  if (rows.length === 0) return [];
+
+  // Columns are always Category, Runner, Club, {raceId...} by position — some
+  // content files leave the Category column header blank, so don't rely on the
+  // literal header names "Category"/"Runner"/"Club".
+  const headerKeys = Object.keys(rows[0]);
+  const [categoryKey, runnerKey, clubKey, ...raceIdKeys] = headerKeys;
+  const raceIds = raceIdKeys;
+  const expectedSet = new Set(expectedRaceIds);
+  if (raceIds.length !== expectedRaceIds.length || !raceIds.every((id) => expectedSet.has(id))) {
+    progress(
+      `Warning: ${slug}/${year}.csv race columns (${raceIds.join(', ')}) do not match ` +
+        `frontmatter races (${expectedRaceIds.join(', ')}); using the CSV's own columns.\n`
+    );
+  }
+
+  const entriesByRace = new Map<string, RaceResult[]>();
+  for (const row of rows) {
+    const name = normaliseRunnerName(row[runnerKey]);
+    if (!name) continue;
+    const club = clubAliases.get(row[clubKey]?.toUpperCase() as string) ?? row[clubKey];
+    const category = (row[categoryKey] ?? '').trim().toUpperCase();
+
+    for (const raceId of raceIds) {
+      const raw = row[raceId]?.trim();
+      if (!raw) continue; // Empty cell means the runner did not compete in that race.
+      const points = Number.parseFloat(raw);
+      if (!Number.isFinite(points)) continue;
+
+      if (!entriesByRace.has(raceId)) entriesByRace.set(raceId, []);
+      entriesByRace.get(raceId)!.push({
+        raceId,
+        year,
+        position: 0,
+        name: applyNameChange(name, club, year),
+        club,
+        category: category === '' ? 'M' : category,
+        categoryPos: {},
+        time: '',
+        points,
+      });
+    }
+  }
+
+  // Rank descending by points within each race so the shared position/categoryPos
+  // recalculation below (which assigns position by array order) is correct.
+  const results: RaceResult[] = [];
+  entriesByRace.forEach((entries) => {
+    entries.sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+    results.push(...entries);
+  });
+
+  return results;
+}
+
+async function writeChampionshipResultsData(
   allResults: RaceResult[],
   championships: ChampionshipData[],
   raceMap: Map<string, RaceEntry>,
   calendarDates: Map<string, string[]>
-): void {
+): Promise<void> {
   for (const championship of championships) {
     championship.yearHasData = {};
 
@@ -1406,13 +1496,20 @@ function writeChampionshipResultsData(
         // clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name)
       );
 
-      const results = allResults.filter(
-        (result) =>
-          result.year.startsWith(year) &&
-          raceSet.has(result.raceId) &&
-          !excludedClubs.has(result.club) &&
-          (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
-      );
+      const results =
+        championship.resultsFormat === 'standings'
+          ? (await readChampionshipStandingsCsv(championship.slug, year, raceIds)).filter(
+              (result) =>
+                !excludedClubs.has(result.club) &&
+                (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
+            )
+          : allResults.filter(
+              (result) =>
+                result.year.startsWith(year) &&
+                raceSet.has(result.raceId) &&
+                !excludedClubs.has(result.club) &&
+                (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
+            );
 
       const championshipResults = results.map((r) => ({ ...r }));
 
@@ -1422,10 +1519,18 @@ function writeChampionshipResultsData(
         // Assume results are already sorted by time/original position
         type PosByCategory = { [cat: string]: number };
         const posByCategory = {} as PosByCategory;
-        
+
         raceResults.forEach((result, idx) => {
           result.position = idx + 1;
-          
+
+          // Standings-only rows only ever score in their one given category —
+          // no cumulative open/age-band categories like ordinary race results.
+          if (championship.resultsFormat === 'standings') {
+            posByCategory[result.category] = (posByCategory[result.category] ?? 0) + 1;
+            result.categoryPos = { [result.category]: posByCategory[result.category] };
+            return;
+          }
+
           const updateCategoryPos = (category: string) => {
             const sex = likelySex(category);
             const age = categoryAge(category) ?? openAge;
@@ -1459,7 +1564,9 @@ function writeChampionshipResultsData(
           ? null
           : parsePointsPattern(rules.points, maxPatternPosition);
 
-      // Compute per-race points according to the resolved rules
+      // Compute per-race points according to the resolved rules (standings-only
+      // championships already have final per-race points from the CSV, so skip this).
+      if (championship.resultsFormat !== 'standings') {
       if (rules.points === 'time-ratio') {
         const extractRecord = (rec: unknown) => {
           if (typeof rec !== 'string') return null;
@@ -1533,6 +1640,7 @@ function writeChampionshipResultsData(
           row.points = (row.points ?? 0) + participationBonus;
         }
       }
+      }
 
       // Build raceSchedule: all scheduled races sorted by calendar date.
       const raceSchedule = [...raceIds]
@@ -1552,7 +1660,7 @@ function writeChampionshipResultsData(
       let teams: TeamResult[] | undefined = undefined;
       const teamSizeRules = rules.teamSize;
 
-      if (teamSizeRules) {
+      if (teamSizeRules && championship.resultsFormat !== 'standings') {
         teams = [];
         const includedClubs = new Set(
           clubs.filter((c) => !c.excludeFromChampionships).map((c) => c.name)
@@ -1636,12 +1744,15 @@ function writeChampionshipResultsData(
 
       const payload: ChampionshipYearPayload = {
         title: championship.title,
+        resultsFormat: championship.resultsFormat,
         rules,
         results: championshipResults,
         participationBonusByRace:
-          Object.keys(participationBonusByRace).length > 0
-            ? participationBonusByRace
-            : undefined,
+          championship.resultsFormat === 'standings'
+            ? undefined // already baked into the CSV's per-race points
+            : Object.keys(participationBonusByRace).length > 0
+              ? participationBonusByRace
+              : undefined,
         raceSchedule,
         teams,
       };
@@ -1747,7 +1858,7 @@ async function main() {
   writeRaceData(raceMap);
   writeRunnerData(allResults);
   summariseCategories(allResults);
-  writeChampionshipResultsData(allResults, championships, raceMap, calendarDates);
+  await writeChampionshipResultsData(allResults, championships, raceMap, calendarDates);
   writeChampionshipData(championships);
   await writeCalendarData(championships, raceMap, calendarRows);
 

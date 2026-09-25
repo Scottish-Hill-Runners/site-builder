@@ -623,6 +623,7 @@ export default function ChampionshipYearPageClient({
 }: ChampionshipYearPageClientProps) {
   const [results, setResults] = useState<RaceResult[] | null>(null);
   const [scoringRules, setScoringRules] = useState<ScoringRules | null>(null);
+  const [resultsFormat, setResultsFormat] = useState<'race-results' | 'standings'>('race-results');
   const [raceMetadata, setRaceMetadata] = useState<RaceMetadata>({});
   const [title, setTitle] = useState<string>(series);
   const [activeTab, setActiveTab] = useState<ChampionshipTab>(() => {
@@ -708,9 +709,12 @@ export default function ChampionshipYearPageClient({
   }, [availableCategoryPos, selectedCategoryPos]);
 
   // Derived display tab: falls back to 'standings' when a stale 'teams' tab
-  // is stored but this championship has no teams (avoids setState-in-effect).
+  // is stored but this championship has no teams, or a stale 'results' tab is
+  // stored but this championship has no individual race results (avoids
+  // setState-in-effect).
   const effectiveActiveTab =
-    activeTab === 'teams' && scoringRules && !scoringRules.teamSize
+    (activeTab === 'teams' && scoringRules && !scoringRules.teamSize) ||
+    (activeTab === 'results' && resultsFormat === 'standings')
       ? 'standings'
       : activeTab;
 
@@ -991,6 +995,7 @@ export default function ChampionshipYearPageClient({
   ]);
 
   const handleRunnerClick = (runnerName: string) => {
+    if (resultsFormat === 'standings') return; // No individual race results to show.
     setSelectedRunnerName(runnerName);
     setActiveTab('results');
   };
@@ -1014,6 +1019,7 @@ export default function ChampionshipYearPageClient({
         if (!isCancelled) {
           if (result.status === 'ok') {
             setScoringRules(result.data.rules);
+            setResultsFormat(result.data.resultsFormat ?? 'race-results');
             setResults(result.data.results);
             setRaceSchedule(result.data.raceSchedule ?? []);
             setPrebuiltTeams(result.data.teams ?? null);
@@ -1154,19 +1160,21 @@ export default function ChampionshipYearPageClient({
               >
                 Standings
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={effectiveActiveTab === 'results'}
-                onClick={() => setActiveTab('results')}
-                className={
-                  effectiveActiveTab === 'results'
-                    ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
-                    : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
-                }
-              >
-                Results
-              </button>
+              {resultsFormat !== 'standings' && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={effectiveActiveTab === 'results'}
+                  onClick={() => setActiveTab('results')}
+                  className={
+                    effectiveActiveTab === 'results'
+                      ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
+                      : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                  }
+                >
+                  Results
+                </button>
+              )}
               {scoringRules?.teamSize && (
                 <button
                   type="button"

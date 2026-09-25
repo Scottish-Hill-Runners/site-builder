@@ -153,6 +153,11 @@ export interface TeamResult {
 
 export interface ChampionshipYearPayload {
   title: string;
+  /**
+   * 'standings' championships have no individual race results (position/time);
+   * `results` rows carry final per-race points read directly from a CSV.
+   */
+  resultsFormat?: 'race-results' | 'standings';
   rules: ScoringRules;
   results: RaceResult[];
   /** Optional race-level participation bonuses (raceId -> bonus points). */
