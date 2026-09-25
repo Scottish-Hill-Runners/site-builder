@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getAllInfoItems } from '@/lib/info';
 import TaggedImage from '@/components/TaggedImage';
+import InfoPageEditSection from '@/components/InfoPageEditSection';
 
 export { getAllInfoItems };
 
@@ -56,6 +57,7 @@ export async function InfoPageContent({ slug = 'index' }: { slug?: string }) {
               {infoPage.content.replace(/\u00a0/g, ' ')}
             </ReactMarkdown>
           </div>
+          <InfoPageEditSection slug={infoPage.slug} title={infoPage.title} contents={infoPage.content} />
         </article>
       )}
     </div>

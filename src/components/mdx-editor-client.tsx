@@ -21,6 +21,8 @@ import {
   UndoRedo,
   codeBlockPlugin,
   codeMirrorPlugin,
+  imagePlugin,
+  InsertImage,
 } from '@mdxeditor/editor';
 
 interface MdxEditorClientProps {
@@ -48,6 +50,7 @@ export function MdxEditorClient({ markdown, onChange, placeholder }: MdxEditorCl
       codeMirrorPlugin({ codeBlockLanguages: { text: 'Text' } }),  
       linkPlugin({ validateUrl: isSafeEditorUrl }),
       linkDialogPlugin(),
+      imagePlugin(),
       markdownShortcutPlugin(),
       toolbarPlugin({
         toolbarClassName: 'shr-mdxeditor-toolbar',
@@ -64,6 +67,7 @@ export function MdxEditorClient({ markdown, onChange, placeholder }: MdxEditorCl
             <InsertTable />
             <Separator />
             <CreateLink />
+            <InsertImage />
           </>
         ),
       }),
