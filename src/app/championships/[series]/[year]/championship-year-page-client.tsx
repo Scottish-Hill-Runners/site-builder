@@ -372,6 +372,46 @@ function formatPoints(points: number): string {
   return String(Math.round(points));
 }
 
+function EventLink({
+  raceId,
+  points,
+  raceMetadata,
+}: {
+  raceId: string;
+  points: number;
+  raceMetadata: RaceMetadata;
+}) {
+  const title = raceMetadata[raceId]?.title;
+  return (
+    <>
+      {title ? (
+        <Link
+          href={`/races/${encodeURIComponent(raceId)}`}
+          className="text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {title}
+        </Link>
+      ) : (
+        raceId
+      )}
+      {`: ${formatPoints(points)}`}
+    </>
+  );
+}
+
+function renderEventList(
+  events: Array<{ raceId: string; points: number }> | undefined,
+  raceMetadata: RaceMetadata
+) {
+  if (!events || events.length === 0) return null;
+  return events.map((event, index) => (
+    <Fragment key={`${event.raceId}-${index}`}>
+      {index > 0 ? ', ' : ''}
+      <EventLink raceId={event.raceId} points={event.points} raceMetadata={raceMetadata} />
+    </Fragment>
+  ));
+}
+
 function formatOrdinal(position: number | null): string {
   if (!position || position < 1) return '-';
 
@@ -1334,21 +1374,15 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {runner.countingEvents
-                                  ?.map(
-                                    (event) =>
-                                      `${event.raceId}: ${formatPoints(event.points)}`
-                                  )
-                                  .join(', ')}
+                                {renderEventList(runner.countingEvents, raceMetadata)}
                                 {runner.remainingEvents &&
-                                runner.remainingEvents.length > 0
-                                  ? ` (${runner.remainingEvents
-                                      .map(
-                                        (event) =>
-                                          `${event.raceId}: ${formatPoints(event.points)}`
-                                      )
-                                      .join(', ')})`
-                                  : ''}
+                                runner.remainingEvents.length > 0 ? (
+                                  <>
+                                    {' ('}
+                                    {renderEventList(runner.remainingEvents, raceMetadata)}
+                                    {')'}
+                                  </>
+                                ) : null}
                               </td>
                             </tr>
                           ))}
@@ -1430,29 +1464,22 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {runner.countingEvents
-                                  ?.map(
-                                    (event) =>
-                                      `${event.raceId}: ${formatPoints(event.points)}`
-                                  )
-                                  .join(', ')}
+                                {renderEventList(runner.countingEvents, raceMetadata)}
                                 {runner.remainingEvents &&
-                                runner.remainingEvents.length > 0
-                                  ? `${
-                                      runner.countingEvents &&
-                                      runner.countingEvents.length > 0
-                                        ? ' '
-                                        : ''
-                                    }(${runner.remainingEvents
-                                      .map(
-                                        (event) =>
-                                          `${event.raceId}: ${formatPoints(event.points)}`
-                                      )
-                                      .join(', ')})`
-                                  : ''}
-                                  {scoringRules?.minimum && (runner.countingEvents?.length ?? 0) < scoringRules.minimum
-                                   ? `; ${scoringRules.minimum - (runner.countingEvents?.length ?? 0)} more needed`
-                                   : ''}
+                                runner.remainingEvents.length > 0 ? (
+                                  <>
+                                    {runner.countingEvents &&
+                                    runner.countingEvents.length > 0
+                                      ? ' '
+                                      : ''}
+                                    {'('}
+                                    {renderEventList(runner.remainingEvents, raceMetadata)}
+                                    {')'}
+                                  </>
+                                ) : null}
+                                {scoringRules?.minimum && (runner.countingEvents?.length ?? 0) < scoringRules.minimum
+                                 ? `; ${scoringRules.minimum - (runner.countingEvents?.length ?? 0)} more needed`
+                                 : ''}
                               </td>
                             </tr>
                           ))}
