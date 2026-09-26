@@ -39,6 +39,7 @@ import ResultCorrectionDialog from '@/components/ResultCorrectionDialog';
 import ResultsSubmitDialog from '@/components/ResultsSubmitDialog';
 import { openPhotoSubmissionEmail } from '@/lib/photo-submission';
 import RaceInfoEditDialog from '@/components/RaceInfoEditDialog';
+import RouteSubmitDialog from '@/components/RouteSubmitDialog';
 import { CORRECTIONS_EMAIL, RESULTS_EMAIL, UPDATES_EMAIL } from '@/lib/site-config';
 import { cloudinaryUrl } from '@/lib/cloudinary';
 
@@ -144,6 +145,7 @@ export default function RaceDetailsTabs({
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [infoEditDialogOpen, setInfoEditDialogOpen] = useState(false);
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const hasRouteAssets = hasGpx || hasRaceMap;
   const hasGallery = galleryImages.length > 0;
@@ -505,6 +507,14 @@ export default function RaceDetailsTabs({
                   >
                     Share race photos
                   </button>
+                  {' / '}
+                  <button
+                    type="button"
+                    onClick={() => setRouteDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Submit a route
+                  </button>
                 </p>
               </div>
             )}
@@ -630,6 +640,21 @@ export default function RaceDetailsTabs({
                 />
               </div>
             )}
+            {UPDATES_EMAIL && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                <p className="mt-1">
+                  Have a GPX file for this race?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setRouteDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Submit a route
+                  </button>
+                  .
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -660,6 +685,14 @@ export default function RaceDetailsTabs({
           race={race}
           organiser={organiser}
           contents={contents}
+        />
+      )}
+      {UPDATES_EMAIL && (
+        <RouteSubmitDialog
+          open={routeDialogOpen}
+          onClose={() => setRouteDialogOpen(false)}
+          raceId={raceId}
+          raceTitle={race.title}
         />
       )}
     </section>
