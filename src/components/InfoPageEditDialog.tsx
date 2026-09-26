@@ -1,9 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
+
+function subscribeNoop() {
+  return () => {};
+}
+
+// Returns false during SSR and the client's first render, then true afterwards,
+// without triggering the "setState in effect" cascading-render lint warning.
+function useMounted() {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
+}
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -41,6 +55,10 @@ export default function InfoPageEditDialog({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [body, setBody] = useState(contents);
 
+  // Gate change-detection until after hydration so the submit button's
+  // `disabled` attribute always starts matching between server and client.
+  const mounted = useMounted();
+
   // Open / close the native dialog imperatively so the backdrop renders correctly.
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -71,7 +89,7 @@ export default function InfoPageEditDialog({
     if (e.target === dialogRef.current) onClose();
   }
 
-  const hasChanges = body.trim() !== contents.trim();
+  const hasChanges = mounted && body.trim() !== contents.trim();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

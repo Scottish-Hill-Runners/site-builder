@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getAllInfoItems } from '@/lib/info';
 import TaggedImage from '@/components/TaggedImage';
+import TaggedDocument, { MarkdownParagraph } from '@/components/TaggedDocument';
 import InfoPageEditSection from '@/components/InfoPageEditSection';
 
 export { getAllInfoItems };
@@ -51,7 +52,7 @@ export async function InfoPageContent({ slug = 'index' }: { slug?: string }) {
           <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              components={{ img: TaggedImage }}
+              components={{ img: TaggedImage, a: TaggedDocument, p: MarkdownParagraph }}
               urlTransform={(url) => url}
             >
               {infoPage.content.replace(/\u00a0/g, ' ')}

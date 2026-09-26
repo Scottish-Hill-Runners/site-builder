@@ -139,3 +139,13 @@ export function pickBestMatch(assets: AssetEntry[], tags: string[]): AssetEntry 
 
   return bestScore == 0 ? null : best;
 }
+
+export function assetName(asset: AssetEntry): string {
+  return asset.title ?? asset.description ?? asset.public_id;
+}
+
+export function pickAllMatches(assets: AssetEntry[], tags: string[]): AssetEntry[] {
+  return assets
+    .filter(asset => tagMatchCount(asset, tags) > 0)
+    .sort((a, b) => assetName(a).localeCompare(assetName(b)));
+}
