@@ -23,9 +23,11 @@ export type RouteGeoJsonResult = {
   pointsAfter: number;
 };
 
-/** Number of `<trkpt>` elements in a GPX file, for a quick "N points loaded" summary. */
+/** Number of `<trkpt>` (or `<rtept>` if no track points exist) elements, for a quick "N points loaded" summary. */
 export function countGpxTrackPoints(gpxText: string): number {
-  return (gpxText.match(/<trkpt\b/gi) ?? []).length;
+  const trkptCount = (gpxText.match(/<trkpt\b/gi) ?? []).length;
+  if (trkptCount > 0) return trkptCount;
+  return (gpxText.match(/<rtept\b/gi) ?? []).length;
 }
 
 /**
