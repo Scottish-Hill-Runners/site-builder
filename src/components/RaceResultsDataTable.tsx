@@ -62,6 +62,16 @@ function eraContainsYear(era: Era, year: number): boolean {
   return true;
 }
 
+// A results filename like "2026-3K.csv" is stored verbatim as `year`. The part
+// after the 4-digit year (if any) identifies a same-day race variant (e.g. a
+// shorter junior course). Returns '' for the main/standard race.
+function getYearVariant(year: string): string {
+  let suffix = year.substring(4);
+  if (suffix.endsWith('*')) suffix = suffix.slice(0, -1);
+  if (suffix.startsWith('-')) suffix = suffix.slice(1);
+  return suffix;
+}
+
 export default function RaceResultsDataTable({
   data,
   races,
@@ -117,6 +127,9 @@ export default function RaceResultsDataTable({
     category: initialCategoryFilter,
   });
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  // '' selects the main race; a suffix (e.g. "3K") selects that variant only.
+  // Main and variant courses are never shown combined.
+  const [selectedVariant, setSelectedVariant] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const lastFocusContextRef = useRef<ResultsFocusContext | null>(null);
@@ -138,6 +151,28 @@ export default function RaceResultsDataTable({
       showFilters ? 'true' : 'false'
     );
   }, [showFilters]);
+
+  // Distinct variant suffixes present in this race's results (e.g. "3K" for a
+  // shorter same-day course). Only offered when the data also contains plain
+  // main-race rows to switch back to — otherwise there's nothing to toggle,
+  // and selectedVariant must not filter out races that only have suffixed
+  // years (e.g. numbered legs with no plain-year file).
+  const availableVariants = useMemo(() => {
+    const variants = new Set<string>();
+    let hasMain = false;
+    for (const row of data) {
+      const variant = getYearVariant(row.year);
+      if (variant === '') hasMain = true;
+      else variants.add(variant);
+    }
+    return hasMain ? Array.from(variants).sort() : [];
+  }, [data]);
+
+  useEffect(() => {
+    if (selectedVariant !== '' && !availableVariants.includes(selectedVariant)) {
+      setSelectedVariant('');
+    }
+  }, [availableVariants, selectedVariant]);
 
   // Filter and sort data
   const processedData = useMemo(() => {
@@ -165,9 +200,13 @@ export default function RaceResultsDataTable({
           .includes(filters.raceTitle.toLowerCase());
       const raceMatch =
         !showRaceFilter || filters.raceId === '' || row.raceId === filters.raceId;
+      const variantMatch =
+        availableVariants.length === 0 ||
+        getYearVariant(row.year) === selectedVariant;
       return (
         yearMatch &&
         raceMatch &&
+        variantMatch &&
         (filters.name === '' ||
           row.name.toLowerCase().includes(filters.name.toLowerCase())) &&
         raceTitleMatch &&
@@ -237,6 +276,8 @@ export default function RaceResultsDataTable({
     showRaceFilter,
     races,
     eras,
+    selectedVariant,
+    availableVariants,
   ]);
   const effectiveSortColumn = sortColumn ?? 'year';
 
@@ -377,6 +418,7 @@ export default function RaceResultsDataTable({
       club: '',
       category: '',
     });
+    setSelectedVariant('');
     setSortColumn(showRaceColumn ? 'raceTitle' : 'year');
     setSortDirection(showRaceColumn ? 'asc' : 'desc');
   };
@@ -571,6 +613,7 @@ export default function RaceResultsDataTable({
                 filters.name ||
                 filters.club ||
                 filters.category ||
+                selectedVariant !== '' ||
                 sortColumn) && (
                 <button
                   onClick={clearFilters}
@@ -621,6 +664,36 @@ export default function RaceResultsDataTable({
                     ))
                   )}
                 </select>
+              )}
+              {availableVariants.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 dark:text-slate-400">
+                    Course:
+                  </span>
+                  {['', ...availableVariants].map((variant) => {
+                    const selected = selectedVariant === variant;
+                    return (
+                      <button
+                        key={variant || 'main'}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setSelectedVariant(variant)}
+                        title={
+                          variant === ''
+                            ? 'Show the main race results'
+                            : `Show only the "${variant}" variant results`
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          selected
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/60 dark:text-blue-300'
+                            : 'border-gray-300 bg-white text-gray-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400'
+                        }`}
+                      >
+                        {variant === '' ? 'Main' : variant}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
               {showRaceFilter && (
                 <select
