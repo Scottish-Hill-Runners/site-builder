@@ -477,10 +477,10 @@ function buildTeamStandings(
       }));
     if (teamRaceEvents.length === 0) continue;
 
-    const scoring = scoreRunnerEvents(rules, [], teamRaceEvents, {
+    const scoring = scoreRunnerEvents(rules, [selectedCategory], teamRaceEvents, {
       applyAdditionalRaceBonus: false,
     });
-    const isQualified = meetsMinimumRequirements(rules, [], teamRaceEvents);
+    const isQualified = meetsMinimumRequirements(rules, [selectedCategory], teamRaceEvents);
     rows.push({
       club,
       raceScores,
