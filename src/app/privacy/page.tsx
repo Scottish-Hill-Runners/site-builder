@@ -18,8 +18,12 @@ export default function PrivacyPage() {
   }, []);
 
   return (
-    <main className="prose prose-neutral mx-auto px-4 py-8 max-w-3xl">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <article className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+        <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        </div>
+      </article>
     </main>
   );
 }
