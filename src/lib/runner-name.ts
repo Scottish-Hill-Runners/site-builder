@@ -20,13 +20,23 @@ function normalizeNameToken(value: string): string {
 // Accent/case-insensitive identity key for a full name, used to group the
 // same person across spelling variants (e.g. "Véronica" vs "Veronica")
 // without altering the name as displayed anywhere.
+// Cached because callers (e.g. championship standings) re-normalize the
+// same names/clubs repeatedly across many sort comparisons.
+const normalizeFullNameCache = new Map<string, string>();
 export function normalizeFullName(name: string): string {
-  return name
+  const cached = normalizeFullNameCache.get(name);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = name
     .trim()
     .split(/\s+/)
     .map(normalizeNameToken)
     .filter(Boolean)
     .join(' ');
+  normalizeFullNameCache.set(name, result);
+  return result;
 }
 
 function splitRunnerName(name: string): { first: string; surname: string } {
