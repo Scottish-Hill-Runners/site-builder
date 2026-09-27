@@ -387,20 +387,18 @@ export default function ResultsSubmitDialog({
       const newsYear = now.getFullYear();
       const newsPath = `news/${newsYear}/${isoDate}-${secondsSinceMidnight(now)}.md`;
       const finalExcerpt = newsExcerpt.trim() || firstSentence(newsBody);
-      // Some email clients hard-wrap plain text at ~72 characters, which would
-      // otherwise corrupt long title/excerpt values mid-line. Rendering them as
-      // folded block scalars pre-wrapped well under that width means the email
-      // client has nothing left to wrap, so the YAML survives round-tripping.
+      // YAML's own line-folding depends on continuation lines staying
+      // indented, which some email clients strip (along with all other
+      // leading whitespace). Emitting plain, unwrapped scalars instead and
+      // relying solely on the caret-marker foldEmailBody() pass below - which
+      // doesn't care about leading OR trailing whitespace - keeps long
+      // title/excerpt values intact regardless of what the mail client does.
       const frontmatterDoc = new YAML.Document({
         title: newsTitle.trim(),
         excerpt: finalExcerpt,
         date: isoDate,
       });
-      for (const key of ['title', 'excerpt']) {
-        const node = frontmatterDoc.get(key, true);
-        if (node instanceof YAML.Scalar) node.type = YAML.Scalar.BLOCK_FOLDED;
-      }
-      const frontmatterBlock = frontmatterDoc.toString({ lineWidth: 60 }).trimEnd();
+      const frontmatterBlock = frontmatterDoc.toString({ lineWidth: 0 }).trimEnd();
 
       newsSection =
         `\n\n!-- PLEASE DO NOT EDIT BELOW THIS LINE\n` +
