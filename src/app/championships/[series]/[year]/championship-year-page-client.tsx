@@ -6,6 +6,7 @@ import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import type { ChampionshipYearPayload, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
 import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
+import { normalizeFullName } from '@/lib/runner-name';
 
 interface ChampionshipYearPageClientProps {
   series: string;
@@ -280,12 +281,12 @@ function buildRunnerResultsMap(
   grouping: RunnerGrouping
 ): Map<string, RaceResult> {
   const map = new Map<string, RaceResult>();
-  const normalizedSearchName = runnerName.toLowerCase();
-  const normalizedSearchClub = runnerClub.toLowerCase();
+  const normalizedSearchName = normalizeFullName(runnerName);
+  const normalizedSearchClub = normalizeFullName(runnerClub);
   rows.forEach((row) => {
     if (
-      row.name.toLowerCase() === normalizedSearchName &&
-      (grouping === 'name' || row.club.toLowerCase() === normalizedSearchClub)
+      normalizeFullName(row.name) === normalizedSearchName &&
+      (grouping === 'name' || normalizeFullName(row.club) === normalizedSearchClub)
     ) {
       const existing = map.get(row.raceId);
       if (!existing || row.position < existing.position) {
@@ -548,8 +549,8 @@ function buildStandings(
     const normalizedClub = row.club.trim();
     const groupKey =
       grouping === 'name'
-        ? normalizedName.toLowerCase()
-        : `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
+        ? normalizeFullName(normalizedName)
+        : `${normalizeFullName(normalizedName)}|${normalizeFullName(normalizedClub)}`;
     const racePoints = row.points ?? 0;
     const bucket = getDistanceBucket(raceMetadata[row.raceId]?.distance);
     const existing = grouped.get(groupKey);
@@ -855,8 +856,8 @@ export default function ChampionshipYearPageClient({
       const normalizedClub = row.club.trim();
       const groupKey =
         selectedGrouping === 'name'
-          ? normalizedName.toLowerCase()
-          : `${normalizedName.toLowerCase()}|${normalizedClub.toLowerCase()}`;
+          ? normalizeFullName(normalizedName)
+          : `${normalizeFullName(normalizedName)}|${normalizeFullName(normalizedClub)}`;
 
       const racePoints =
         row.categoryPoints

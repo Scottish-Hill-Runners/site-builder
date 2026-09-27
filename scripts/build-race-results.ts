@@ -5,7 +5,7 @@ import matter from 'gray-matter';
 import { writeGz, prebuildDir, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { buildElevationChartData } from './elevation-chart';
-import { surnameHash } from '@/lib/runner-name';
+import { surnameHash, normalizeFullName } from '@/lib/runner-name';
 import {
   ChampionshipYearPayload,
   DistanceSlotsRule,
@@ -745,12 +745,32 @@ function writeRunnerData(allResults: RaceResult[]) {
   allResults.forEach((r) => {
     runnerCounts.set(r.name, (runnerCounts.get(r.name) ?? 0) + 1);
   });
+
+  // Merge spelling variants (e.g. accents) into one suggestion entry, keeping
+  // the most-used spelling as the display name.
+  const merged = new Map<string, { name: string; count: number; bestCount: number }>();
+  Array.from(runnerCounts.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([name, count]) => {
+      const key = normalizeFullName(name);
+      const existing = merged.get(key);
+      if (!existing) {
+        merged.set(key, { name, count, bestCount: count });
+      } else {
+        existing.count += count;
+        if (count > existing.bestCount) {
+          existing.name = name;
+          existing.bestCount = count;
+        }
+      }
+    });
+
   writeGz(
     outputDir,
     'runners.json',
     JSON.stringify(
-      Array.from(runnerCounts.entries())
-        .map(([name, count]) => ({ name, count }))
+      Array.from(merged.values())
+        .map(({ name, count }) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
     )
   );

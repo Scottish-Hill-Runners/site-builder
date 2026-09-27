@@ -1,5 +1,7 @@
 export function surnameHash(name: string): number {
-  const m = name.match(/(\w+)$/);
+  // Strip diacritics so e.g. "Óldham" and "Oldham" hash to the same batch.
+  const stripped = name.toLowerCase().normalize('NFKD').replace(/[^a-z\s]/g, '');
+  const m = stripped.match(/(\w+)$/);
   const last = m ? m[1] : '';
   let h = 9;
   for (let i = 0; i < last.length; i++) {
@@ -13,6 +15,18 @@ function normalizeNameToken(value: string): string {
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[^a-z]/g, '');
+}
+
+// Accent/case-insensitive identity key for a full name, used to group the
+// same person across spelling variants (e.g. "Véronica" vs "Veronica")
+// without altering the name as displayed anywhere.
+export function normalizeFullName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map(normalizeNameToken)
+    .filter(Boolean)
+    .join(' ');
 }
 
 function splitRunnerName(name: string): { first: string; surname: string } {
