@@ -235,6 +235,13 @@ function normaliseRunnerName(rawName: unknown): string | null {
 
   const titleCaseSegment = (segment: string): string => {
     if (!segment) return segment;
+    // Preserve the runner's own capitalisation (e.g. "MacKenzie" vs "Mackenzie")
+    // unless the source was ALL CAPS, since then there's no signal to preserve
+    // and we have to guess a readable case.
+    const isAllUpperCase =
+      segment === segment.toUpperCase() && segment !== segment.toLowerCase();
+    if (!isAllUpperCase) return segment;
+
     const tc = segment[0].toUpperCase() + segment.slice(1).toLowerCase();
     return tc
       .replace(/^Mac([a-z])/, (_, c) => 'Mac' + c.toUpperCase())
