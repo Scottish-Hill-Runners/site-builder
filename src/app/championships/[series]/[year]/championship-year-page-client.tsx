@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import type { ChampionshipYearPayload, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
 import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
@@ -13,7 +12,7 @@ interface ChampionshipYearPageClientProps {
   year: string;
 }
 
-type ChampionshipTab = 'results' | 'standings' | 'teams';
+type ChampionshipTab = 'standings' | 'teams';
 
 type RunnerGrouping = 'name' | 'name-and-club';
 
@@ -664,13 +663,12 @@ export default function ChampionshipYearPageClient({
 }: ChampionshipYearPageClientProps) {
   const [results, setResults] = useState<RaceResult[] | null>(null);
   const [scoringRules, setScoringRules] = useState<ScoringRules | null>(null);
-  const [resultsFormat, setResultsFormat] = useState<'race-results' | 'standings'>('race-results');
   const [raceMetadata, setRaceMetadata] = useState<RaceMetadata>({});
   const [title, setTitle] = useState<string>(series);
   const [activeTab, setActiveTab] = useState<ChampionshipTab>(() => {
     try {
       const saved = window.localStorage.getItem(CHAMP_TAB_STORAGE_KEY);
-      if (saved === 'standings' || saved === 'results' || saved === 'teams') return saved;
+      if (saved === 'standings' || saved === 'teams') return saved;
     } catch {}
     return 'standings';
   });
@@ -680,7 +678,6 @@ export default function ChampionshipYearPageClient({
     } catch {}
   }, [activeTab]);
 
-  const [selectedRunnerName, setSelectedRunnerName] = useState('');
   const [selectedGrouping, setSelectedGrouping] = useState<RunnerGrouping>(() => {
     try {
       const saved = window.localStorage.getItem(CHAMP_GROUPING_STORAGE_KEY);
@@ -750,12 +747,9 @@ export default function ChampionshipYearPageClient({
   }, [availableCategoryPos, selectedCategoryPos]);
 
   // Derived display tab: falls back to 'standings' when a stale 'teams' tab
-  // is stored but this championship has no teams, or a stale 'results' tab is
-  // stored but this championship has no individual race results (avoids
-  // setState-in-effect).
+  // is stored but this championship has no teams (avoids setState-in-effect).
   const effectiveActiveTab =
-    (activeTab === 'teams' && scoringRules && !scoringRules.teamSize) ||
-    (activeTab === 'results' && resultsFormat === 'standings')
+    activeTab === 'teams' && scoringRules && !scoringRules.teamSize
       ? 'standings'
       : activeTab;
 
@@ -1035,12 +1029,6 @@ export default function ChampionshipYearPageClient({
     totalRaceCountForSelection,
   ]);
 
-  const handleRunnerClick = (runnerName: string) => {
-    if (resultsFormat === 'standings') return; // No individual race results to show.
-    setSelectedRunnerName(runnerName);
-    setActiveTab('results');
-  };
-
   useEffect(() => {
     let isCancelled = false;
 
@@ -1060,7 +1048,6 @@ export default function ChampionshipYearPageClient({
         if (!isCancelled) {
           if (result.status === 'ok') {
             setScoringRules(result.data.rules);
-            setResultsFormat(result.data.resultsFormat ?? 'race-results');
             setResults(result.data.results);
             setRaceSchedule(result.data.raceSchedule ?? []);
             setPrebuiltTeams(result.data.teams ?? null);
@@ -1183,40 +1170,25 @@ export default function ChampionshipYearPageClient({
           </div>
         ) : results ? (
           <div className="space-y-4">
-            <div
-              className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-              role="tablist"
-              aria-label="Championship view selector"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={effectiveActiveTab === 'standings'}
-                onClick={() => setActiveTab('standings')}
-                className={
-                  effectiveActiveTab === 'standings'
-                    ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
-                    : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
-                }
+            {scoringRules?.teamSize && (
+              <div
+                className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                role="tablist"
+                aria-label="Championship view selector"
               >
-                Standings
-              </button>
-              {resultsFormat !== 'standings' && (
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={effectiveActiveTab === 'results'}
-                  onClick={() => setActiveTab('results')}
+                  aria-selected={effectiveActiveTab === 'standings'}
+                  onClick={() => setActiveTab('standings')}
                   className={
-                    effectiveActiveTab === 'results'
+                    effectiveActiveTab === 'standings'
                       ? 'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white'
                       : 'rounded-md px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                   }
                 >
-                  Results
+                  Individual
                 </button>
-              )}
-              {scoringRules?.teamSize && (
                 <button
                   type="button"
                   role="tab"
@@ -1230,8 +1202,8 @@ export default function ChampionshipYearPageClient({
                 >
                   Teams
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {effectiveActiveTab === 'standings' ? (
               <div className="space-y-4">
@@ -1332,18 +1304,7 @@ export default function ChampionshipYearPageClient({
                           {qualifiedStandings.map((runner) => (
                             <tr
                               key={runner.key}
-                              tabIndex={0}
-                              onClick={() => handleRunnerClick(runner.name)}
-                              onKeyDown={(event) => {
-                                if (
-                                  event.key === 'Enter' ||
-                                  event.key === ' '
-                                ) {
-                                  event.preventDefault();
-                                  handleRunnerClick(runner.name);
-                                }
-                              }}
-                              className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
+                              className="bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/60"
                             >
                               <td className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                                 {runner.overallPosition}
@@ -1430,18 +1391,7 @@ export default function ChampionshipYearPageClient({
                           {unqualifiedStandings.map((runner) => (
                             <tr
                               key={runner.key}
-                              tabIndex={0}
-                              onClick={() => handleRunnerClick(runner.name)}
-                              onKeyDown={(event) => {
-                                if (
-                                  event.key === 'Enter' ||
-                                  event.key === ' '
-                                ) {
-                                  event.preventDefault();
-                                  handleRunnerClick(runner.name);
-                                }
-                              }}
-                              className="cursor-pointer bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:hover:bg-slate-800/60"
+                              className="bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/60"
                             >
                               <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
                                 {runner.name}
@@ -1499,15 +1449,6 @@ export default function ChampionshipYearPageClient({
                     </div>
                   )}
               </div>
-            ) : effectiveActiveTab === 'results' ? (
-              <RaceResultsDataTable
-                data={results}
-                races={raceMetadata}
-                showRaceColumn
-                showYearFilter={false}
-                initialNameFilter={selectedRunnerName}
-                showPointsColumn
-              />
             ) : (
               /* Teams tab */
               <div className="space-y-4">
