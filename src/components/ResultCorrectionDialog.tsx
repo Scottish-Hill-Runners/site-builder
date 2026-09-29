@@ -139,7 +139,7 @@ function ResultCorrectionForm({
     e.preventDefault();
     if (!CORRECTIONS_EMAIL) return;
 
-    const subject = `Results submission for ${raceTitle} (${raceId}) ${year}`;
+    const subject = `Results correction for ${raceTitle} (${raceId}) ${year}`;
     const body =
       `To ${toWhomItMayConcern()}:\n\n` +
       `I believe the result below is incorrect and should be corrected as indicated.\n\n` +

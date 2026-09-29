@@ -127,6 +127,17 @@ export default async function Home() {
           </section>
 
           <section className="w-full mt-8">
+            <div className="mt-6 text-right">
+              <Link
+                href="/changes"
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                Recent changes →
+              </Link>
+            </div>
+          </section>
+
+          <section className="w-full mt-8">
             <h2 className="mb-6 text-2xl font-bold text-gray-900 dark:text-slate-50">
               Recent News
             </h2>
