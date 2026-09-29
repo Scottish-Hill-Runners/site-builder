@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getRecentUpdates, type UpdateEntry } from '@/lib/updates';
+import { getRecentUpdates, updatePathToRoute, type UpdateEntry } from '@/lib/updates';
 
 export default function ChangesClient() {
   const [updates, setUpdates] = useState<UpdateEntry[] | null>(null);
@@ -37,25 +37,28 @@ export default function ChangesClient() {
 
   return (
     <ul className="w-full divide-y divide-zinc-200 dark:divide-slate-800">
-      {updates.map((update, index) => (
-        <li key={index} className="py-4">
-          <p className="text-sm text-zinc-500 dark:text-slate-400">
-            {new Date(update.created_at).toLocaleDateString()}
-          </p>
-          {update.path ? (
-            <Link
-              href={update.path}
-              className="text-lg font-medium text-black underline dark:text-slate-50"
-            >
-              {update.subject}
-            </Link>
-          ) : (
-            <p className="text-lg font-medium text-black dark:text-slate-50">
-              {update.subject}
+      {updates.map((update, index) => {
+        const route = update.path ? updatePathToRoute(update.path) : undefined;
+        return (
+          <li key={index} className="py-4">
+            <p className="text-sm text-zinc-500 dark:text-slate-400">
+              {new Date(update.created_at).toLocaleDateString()} {update.status && `- ${update.status}`}
             </p>
-          )}
-        </li>
-      ))}
+            {route ? (
+              <Link
+                href={route}
+                className="text-lg font-medium text-black underline dark:text-slate-50"
+              >
+                {update.subject}
+              </Link>
+            ) : (
+              <p className="text-lg font-medium text-black dark:text-slate-50">
+                {update.subject}
+              </p>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
