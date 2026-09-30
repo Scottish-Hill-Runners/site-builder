@@ -9,6 +9,7 @@ import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import UnitsProvider from '@/components/UnitsProvider';
 import PreferenceInitializer from '@/components/PreferenceInitializer';
+import SmartMailtoInitializer from '@/components/SmartMailtoInitializer';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <SmartMailtoInitializer />
         <PreferenceInitializer />
         <a href="#main-content" className={`${sharedStyles.srOnly}`}>
           Skip to content

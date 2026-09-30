@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@mdxeditor/editor": "^4.2.5",
+    "@smart-mailto/core": "^0.3.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.13.24",
     "@tmcw/togeojson": "^7.1.2",
