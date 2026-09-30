@@ -1873,6 +1873,55 @@ async function writeCalendarData(
   progress('Wrote calendar.json.gz');
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function writeGallus(
+  raceMap: Map<string, RaceEntry>,
+  calendarRows: CalendarSourceRow[]
+): void {
+  const todayIso = londonTodayIso();
+  const datesByRace = new Map<string, string[]>();
+  for (const row of calendarRows) {
+    if (!row.Race || !isIsoDate(row.Date)) continue;
+    if (!datesByRace.has(row.Race)) datesByRace.set(row.Race, []);
+    datesByRace.get(row.Race)!.push(row.Date);
+  }
+
+  const rows: string[] = [];
+  for (const [raceId, { meta }] of raceMap) {
+    const dates = (datesByRace.get(raceId) ?? []).sort();
+    // Prefer the next upcoming date; fall back to the most recent past date.
+    const eventDate = dates.find((date) => date >= todayIso) ?? dates[dates.length - 1];
+    if (!eventDate) continue;
+
+    const { info, latitude, longitude } = meta;
+    const length = Number.isFinite(info.distance) ? info.distance.toFixed(2) : '0.00';
+    const elevation = Number.isFinite(info.climb) ? (info.climb as number).toFixed(2) : '0.00';
+
+    rows.push(`\t<ROW>
+\t\t<shrid>${escapeXml(raceId)}</shrid>
+\t\t<name>${escapeXml(info.title ?? raceId)}</name>${
+      latitude !== undefined ? `\n\t\t<lat>${latitude}</lat>` : ''
+    }${longitude !== undefined ? `\n\t\t<lng>${longitude}</lng>` : ''}
+\t\t<eventdate>${eventDate} 00:00:00</eventdate>
+\t\t<length>${length}</length>
+\t\t<elevation>${elevation}</elevation>
+\t\t<location>${escapeXml(info.venue ?? '')}</location>
+\t</ROW>`);
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<DATA>\n${rows.join('\n')}\n</DATA>\n`;
+  fs.writeFileSync(path.join(prebuildDir, 'gallus.xml'), xml, 'utf-8');
+  progress('Wrote gallus.xml');
+}
+
 async function main() {
   progress(`Using content root: ${contentRoot()}`);
   const raceMap = await readResults();
@@ -1888,6 +1937,7 @@ async function main() {
   await writeChampionshipResultsData(allResults, championships, raceMap, calendarDates);
   writeChampionshipData(championships);
   await writeCalendarData(championships, raceMap, calendarRows);
+  writeGallus(raceMap, calendarRows);
 
   const routes: string[] = ['/calendar', '/welcome'];
   for (const race of raceMap.keys())
