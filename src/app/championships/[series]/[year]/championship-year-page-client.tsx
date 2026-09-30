@@ -372,6 +372,31 @@ function formatPoints(points: number): string {
   return String(Math.round(points));
 }
 
+// Under-23 age-group sets (e.g. F12, F14 ... F18) list oldest-first; other
+// sets (e.g. M, M40, M50) list youngest/open-first. Direction is decided for
+// the whole list rather than per-category, to avoid a mixed-up ordering.
+function sortCategoryPositions(categories: string[]): string[] {
+  const parse = (cat: string) => {
+    const match = cat.match(/^([A-Za-z]+)(\d+)?$/);
+    return {
+      cat,
+      prefix: match?.[1] ?? cat,
+      age: match?.[2] ? Number.parseInt(match[2], 10) : null,
+    };
+  };
+  const parsed = categories.map(parse);
+  const allUnder23 = parsed.every((c) => c.age !== null && c.age <= 23);
+  const dir = allUnder23 ? -1 : 1;
+
+  return parsed
+    .sort((a, b) => {
+      if (a.prefix !== b.prefix) return a.prefix.localeCompare(b.prefix);
+      if (a.age === null || b.age === null) return (a.age ?? -1) - (b.age ?? -1);
+      return dir * (a.age - b.age);
+    })
+    .map((c) => c.cat);
+}
+
 function EventLink({
   raceId,
   points,
@@ -734,7 +759,7 @@ export default function ChampionshipYearPageClient({
         if (ageCap === null || (categoryAge(cat) ?? 0) <= ageCap)
           categories.add(cat);
     });
-    return Array.from(categories).sort();
+    return sortCategoryPositions(Array.from(categories));
   }, [results, scoringRules]);
 
   // Derive the active category during render; falls back to the first available
