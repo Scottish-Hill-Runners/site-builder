@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import YAML from 'yaml';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
+import { navigateToMailto } from '@/lib/navigate-to-mailto';
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -24,12 +25,6 @@ export interface ChampionshipInfoEditDialogProps {
   slug: string;
   title: string;
   contents: string;
-}
-
-// Defined outside the component so the React Compiler doesn't treat this
-// navigation as a render-time mutation.
-function navigateToMailto(url: string) {
-  window.location.href = url;
 }
 
 const inputClass =

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
+import { navigateToMailto } from '@/lib/navigate-to-mailto';
 
 function subscribeNoop() {
   return () => {};
@@ -41,10 +42,6 @@ export interface InfoPageEditDialogProps {
 
 // Defined outside the component so the React Compiler doesn't treat this
 // navigation as a render-time mutation.
-function navigateToMailto(url: string) {
-  window.location.href = url;
-}
-
 export default function InfoPageEditDialog({
   open,
   onClose,

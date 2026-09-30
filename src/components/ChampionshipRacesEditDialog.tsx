@@ -5,6 +5,7 @@ import YAML from 'yaml';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
+import { navigateToMailto } from '@/lib/navigate-to-mailto';
 
 interface CalendarEntry {
   Date: string;
@@ -26,10 +27,6 @@ const raceIdPattern = /^[-\w]+$/;
 
 // Defined outside the component so the React Compiler doesn't treat this
 // navigation as a render-time mutation.
-function navigateToMailto(url: string) {
-  window.location.href = url;
-}
-
 const inputClass =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white';
 const labelClass = 'mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300';

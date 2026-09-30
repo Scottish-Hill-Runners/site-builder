@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 import { firstSentence } from '@/lib/news-excerpt';
+import { navigateToMailto } from '@/lib/navigate-to-mailto';
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -26,10 +27,6 @@ export interface NewsItemCreateDialogProps {
 
 // Defined outside the component so the React Compiler doesn't treat this
 // navigation as a render-time mutation.
-function navigateToMailto(url: string) {
-  window.location.href = url;
-}
-
 function pad(value: number, length: number) {
   return String(value).padStart(length, '0');
 }

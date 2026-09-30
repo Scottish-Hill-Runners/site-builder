@@ -1,5 +1,6 @@
 import { PHOTOS_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
+import { navigateToMailto } from '@/lib/navigate-to-mailto';
 
 /** Opens the user's email client to submit race photos, tagged with the current year only. */
 export function openPhotoSubmissionEmail(raceId: string, raceTitle: string) {
@@ -20,5 +21,7 @@ export function openPhotoSubmissionEmail(raceId: string, raceTitle: string) {
     `License: Licensed for display by SHR\n` +
     `!-- END OF SENSITIVE SECTION\n`;
 
-  window.location.href = `mailto:${PHOTOS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  navigateToMailto(
+    `mailto:${PHOTOS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  );
 }
