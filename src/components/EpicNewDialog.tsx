@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 import { slugify } from '@/lib/slugify';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -86,9 +86,7 @@ export default function EpicNewDialog({ open, onClose }: EpicNewDialogProps) {
       `${body.trim()}\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 
-    navigateToMailto(
-      `mailto:${UPDATES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`
-    );
+    sendMailto({ to: UPDATES_EMAIL, subject, body: emailBody });
     onClose();
   }
 

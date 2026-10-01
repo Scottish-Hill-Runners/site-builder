@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import YAML from 'yaml';
 import { RESULTS_EMAIL } from '@/lib/site-config';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { firstSentence } from '@/lib/news-excerpt';
 import { foldEmailBody } from '@/lib/email-line-fold';
@@ -421,9 +421,7 @@ export default function ResultsSubmitDialog({
       `!-- END OF SENSITIVE SECTION\n` +
       newsSection;
 
-    navigateToMailto(
-      `mailto:${RESULTS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(foldEmailBody(body))}`
-    );
+    sendMailto({ to: RESULTS_EMAIL, subject, body: foldEmailBody(body) });
     onClose();
   }
 

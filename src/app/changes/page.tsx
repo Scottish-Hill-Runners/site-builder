@@ -1,4 +1,5 @@
 import ChangesClient from '@/app/changes/changes-client';
+import SavedDraftsClient from '@/app/changes/saved-drafts-client';
 
 export default function ChangesPage() {
   return (
@@ -9,6 +10,8 @@ export default function ChangesPage() {
             Recent Changes
           </h1>
 
+          <SavedDraftsClient />
+
           <section className="w-full mt-8">
             <ChangesClient />
           </section>
@@ -17,3 +20,4 @@ export default function ChangesPage() {
     </div>
   );
 }
+

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RaceResult } from '@/types/datatable';
 import { CORRECTIONS_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 
 export interface ResultCorrectionDialogProps {
   open: boolean;
@@ -156,9 +156,7 @@ function ResultCorrectionForm({
       `!-- END OF SENSITIVE SECTION\n\n` +
       `${form.comments}\n`;
 
-    navigateToMailto(
-      `mailto:${CORRECTIONS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    );
+    sendMailto({ to: CORRECTIONS_EMAIL, subject, body });
     onClose();
   }
 

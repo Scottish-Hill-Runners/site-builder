@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 import { foldEmailBody } from '@/lib/email-line-fold';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 import {
   countGpxTrackPoints,
   gpxToRouteGeoJson,
@@ -151,9 +151,7 @@ export default function RouteSubmitDialog({ open, onClose, raceId, raceTitle }: 
       `${geojson}\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 
-    navigateToMailto(
-      `mailto:${UPDATES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(foldEmailBody(body))}`
-    );
+    sendMailto({ to: UPDATES_EMAIL, subject, body: foldEmailBody(body) });
     onClose();
   }
 

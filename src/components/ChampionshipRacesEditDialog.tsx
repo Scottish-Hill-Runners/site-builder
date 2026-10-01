@@ -5,7 +5,7 @@ import YAML from 'yaml';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 
 interface CalendarEntry {
   Date: string;
@@ -159,9 +159,7 @@ export default function ChampionshipRacesEditDialog({
       `---\n${frontmatterBlock}\n---\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 
-    navigateToMailto(
-      `mailto:${UPDATES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`
-    );
+    sendMailto({ to: UPDATES_EMAIL, subject, body: emailBody });
     onClose();
   }
 

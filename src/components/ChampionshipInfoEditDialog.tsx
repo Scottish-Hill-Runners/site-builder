@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import YAML from 'yaml';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -97,9 +97,7 @@ export default function ChampionshipInfoEditDialog({
       (bodyChanged ? `${body.trim()}\n` : '') +
       `!-- END OF SENSITIVE SECTION\n`;
 
-    navigateToMailto(
-      `mailto:${UPDATES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`
-    );
+    sendMailto({ to: UPDATES_EMAIL, subject, body: emailBody });
     onClose();
   }
 

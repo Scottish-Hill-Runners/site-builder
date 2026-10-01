@@ -8,6 +8,7 @@ export default function SmartMailtoInitializer() {
     initSmartMailto({
       theme: 'auto',
       autoDetectGeo: true,
+      includeNative: true,
     });
 
     return () => {

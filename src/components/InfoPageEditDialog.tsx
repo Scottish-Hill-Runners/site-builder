@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
-import { navigateToMailto } from '@/lib/navigate-to-mailto';
+import { sendMailto } from '@/lib/navigate-to-mailto';
 
 function subscribeNoop() {
   return () => {};
@@ -102,9 +102,7 @@ export default function InfoPageEditDialog({
       `${body.trim()}\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 
-    navigateToMailto(
-      `mailto:${UPDATES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`
-    );
+    sendMailto({ to: UPDATES_EMAIL, subject, body: emailBody });
     onClose();
   }
 
