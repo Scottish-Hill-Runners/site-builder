@@ -1914,6 +1914,7 @@ function writeGallus(
 \t\t<length>${length}</length>
 \t\t<elevation>${elevation}</elevation>
 \t\t<location>${escapeXml(info.venue ?? '')}</location>
+\t\t<description>${escapeXml(meta.content ?? '')}</description>
 \t</ROW>`);
   }
 
