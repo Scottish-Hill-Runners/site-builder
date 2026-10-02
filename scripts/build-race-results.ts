@@ -240,12 +240,12 @@ function normaliseRunnerName(rawName: unknown): string | null {
     // and we have to guess a readable case.
     const isAllUpperCase =
       segment === segment.toUpperCase() && segment !== segment.toLowerCase();
-    if (!isAllUpperCase) return segment;
+    const isAllLowerCase =
+      segment === segment.toLowerCase() && segment !== segment.toUpperCase();
+    if (!isAllUpperCase && !isAllLowerCase) return segment;
 
     const tc = segment[0].toUpperCase() + segment.slice(1).toLowerCase();
-    return tc
-      .replace(/^Mac([a-z])/, (_, c) => 'Mac' + c.toUpperCase())
-      .replace(/^Mc([a-z])/, (_, c) => 'Mc' + c.toUpperCase());
+    return tc.replace(/^(Ma?c)([a-z])/, (_, c, d) => c + d.toUpperCase());
   };
 
   const titleCaseName = (value: string): string =>
