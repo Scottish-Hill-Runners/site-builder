@@ -920,7 +920,15 @@ export default function ChampionshipYearPageClient({
       const sortedEvents = [...runner.events].sort((a, b) =>
         a.raceId.localeCompare(b.raceId)
       );
-      const scoring = scoreRunnerEvents(scoringRules!, runner.categories, runner.runnerEvents);
+      const scoring =
+        scoreRunnerEvents(
+          scoringRules!,
+          runner.categories,
+          runner.runnerEvents,
+        {
+          applyAdditionalRaceBonus: (categoryAge(effectiveCategoryPos) ?? 30) > 12,
+        }
+      );
       return {
         key: runner.key,
         name: runner.name,
