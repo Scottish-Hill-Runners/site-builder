@@ -15,10 +15,45 @@
  * number of trailing carets. That parity is what lets the unfold step
  * unambiguously tell a fold marker apart from real trailing carets, even
  * when a cut lands right next to one.
+ *
+ * An email body may contain several sensitive sections, each delimited by
+ * a pair of lines starting with `!--`. Only the lines within each matched
+ * pair (inclusive of the delimiters) are folded/escaped - everything else,
+ * including human-written prose between sections, is left untouched so it
+ * reads naturally in the recipient's mail client.
  */
 export function foldEmailBody(body: string, maxLineLength = 70): string {
-  const escaped = body.replace(/\r\n?/g, '\n').replace(/\^/g, '^^');
-  return escaped
+  const normalized = body.replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+
+  const tagged = lines.map((line) => ({ text: line, sensitive: false }));
+  let insideSection = false;
+  for (const line of tagged) {
+    if (line.text.trimStart().startsWith('!--')) {
+      // A delimiter line is always sensitive, whether it opens or closes a section.
+      line.sensitive = true;
+      insideSection = !insideSection;
+    } else {
+      line.sensitive = insideSection;
+    }
+  }
+
+  const runs: { lines: string[]; sensitive: boolean }[] = [];
+  for (const { text, sensitive } of tagged) {
+    const last = runs[runs.length - 1];
+    if (last && last.sensitive === sensitive) last.lines.push(text);
+    else runs.push({ lines: [text], sensitive });
+  }
+
+  return runs
+    .map((run) => (run.sensitive ? foldSensitiveLines(run.lines, maxLineLength) : run.lines.join('\n')))
+    .join('\n');
+}
+
+function foldSensitiveLines(lines: string[], maxLineLength: number): string {
+  return lines
+    .join('\n')
+    .replace(/\^/g, '^^')
     .split('\n')
     .map((line) => foldLine(line, maxLineLength))
     .join('\n');
