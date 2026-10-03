@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
-import { foldEmailBody } from '@/lib/email-line-fold';
 import { sendMailto } from '@/lib/navigate-to-mailto';
 import {
   countGpxTrackPoints,
@@ -151,7 +150,7 @@ export default function RouteSubmitDialog({ open, onClose, raceId, raceTitle }: 
       `${geojson}\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 
-    sendMailto({ to: UPDATES_EMAIL, subject, body: foldEmailBody(body) });
+    sendMailto({ to: UPDATES_EMAIL, subject, body });
     onClose();
   }
 

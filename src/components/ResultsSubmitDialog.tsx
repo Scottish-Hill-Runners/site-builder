@@ -7,7 +7,6 @@ import { RESULTS_EMAIL } from '@/lib/site-config';
 import { sendMailto } from '@/lib/navigate-to-mailto';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { firstSentence } from '@/lib/news-excerpt';
-import { foldEmailBody } from '@/lib/email-line-fold';
 import { buildResultsNewsPrefill } from '@/lib/results-news-template';
 import {
   applyInferredHeaders,
@@ -391,9 +390,9 @@ export default function ResultsSubmitDialog({
       // YAML's own line-folding depends on continuation lines staying
       // indented, which some email clients strip (along with all other
       // leading whitespace). Emitting plain, unwrapped scalars instead and
-      // relying solely on the caret-marker foldEmailBody() pass below - which
-      // doesn't care about leading OR trailing whitespace - keeps long
-      // title/excerpt values intact regardless of what the mail client does.
+      // relying solely on sendMailto's caret-marker folding - which doesn't
+      // care about leading OR trailing whitespace - keeps long title/excerpt
+      // values intact regardless of what the mail client does.
       const frontmatterDoc = new YAML.Document({
         title: newsTitle.trim(),
         excerpt: finalExcerpt,
@@ -421,7 +420,7 @@ export default function ResultsSubmitDialog({
       `!-- END OF SENSITIVE SECTION\n` +
       newsSection;
 
-    sendMailto({ to: RESULTS_EMAIL, subject, body: foldEmailBody(body) });
+    sendMailto({ to: RESULTS_EMAIL, subject, body });
     onClose();
   }
 
