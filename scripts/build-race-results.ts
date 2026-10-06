@@ -103,6 +103,7 @@ type ParsedRaceDateRule =
       kind: 'absolute';
       ordinal: number;
       month: number;
+      year?: number;
     };
 
 type RaceMeta = {
@@ -850,7 +851,7 @@ function parseRaceDateRule(raw: string): ParsedRaceDateRule | null {
   }
 
   const lastMatch = rule.match(
-    /^Last\s+(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\s+in\s+(January|February|March|April|May|June|July|August|September|October|November|December)$/i
+    /^Last (Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday) in (January|February|March|April|May|June|July|August|September|October|November|December)$/i
   );
   if (lastMatch) {
     const weekday = WEEKDAY_TO_INDEX[lastMatch[1].toLowerCase()];
@@ -861,22 +862,22 @@ function parseRaceDateRule(raw: string): ParsedRaceDateRule | null {
     return null;
   }
 
-  const dayAfterMatch = rule.match(/^Day after ([A-Za-z0-9_-]+)$/);
+  const dayAfterMatch = rule.match(/^Day after ([A-Za-z0-9_-]+)$/i);
   if (dayAfterMatch) {
     return { kind: 'day-after', raceId: dayAfterMatch[1] };
   }
 
-  const absoluteMatch = rule.match(/^(\d+)(st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December)$/);
+  const absoluteMatch = rule.match(/^(\d+)(st|nd|rd|th) (January|February|March|April|May|June|July|August|September|October|November|December) ?(\d{4})?$/i);
   if (absoluteMatch) {
     const ordinal = Number.parseInt(absoluteMatch[1], 10);
     const month = MONTH_TO_INDEX[absoluteMatch[3].toLowerCase()];
+    const year = absoluteMatch[4] ? Number.parseInt(absoluteMatch[4], 10) : undefined;
     if (Number.isInteger(ordinal) &&
       ordinal >= 1 &&
-      ordinal <= 5 &&
+      ordinal <= 31 &&
       month !== undefined
-    ) {
-      return { kind: 'absolute', ordinal, month };
-    }
+    )
+      return { kind: 'absolute', ordinal, month, year };
     return null;
   }
 
@@ -979,6 +980,9 @@ function resolveComputedRaceDatesForYear(
           isoDate = lastWeekdayOfMonthIso(year, rule.month, rule.weekday);
           break;
         case 'absolute':
+          if (rule.year !== undefined && rule.year !== year) {
+            continue;
+          }
           isoDate = formatIsoDateUtc(new Date(Date.UTC(year, rule.month, rule.ordinal)));
           break;
         case 'day-after':
@@ -1064,7 +1068,6 @@ async function buildMergedCalendarData(
     const haveRecentResults =
       raceEntry.results.find(
         (r) => r.year.startsWith(`${currentYear}`) || r.year.startsWith(`${previousYear}`));
-    if (!haveRecentResults) continue;
     const allRaceDates = raceDates ?? (raceDate ? [raceDate] : []);
     for (const raceDate of allRaceDates) {
       const parsed = parseRaceDateRule(raceDate);
@@ -1074,6 +1077,7 @@ async function buildMergedCalendarData(
         );
         continue;
       }
+      if (!haveRecentResults && (parsed.kind !== 'absolute' || parsed.year === undefined)) break;
       if (!parsedRules.has(raceId))
         parsedRules.set(raceId, []);
       parsedRules.get(raceId)!.push(parsed);
@@ -1089,31 +1093,31 @@ async function buildMergedCalendarData(
   let addedRows = 0;
   for (const raceId of parsedRules.keys()) {
     const currentYearDates = currentYearResolved.get(raceId);
-    if (!currentYearDates) continue;
-    for (const currentYearDate of currentYearDates) {
-      const yearsToAdd =
-        currentYearDate < todayIso ? [currentYear, nextYear] : [currentYear];
+    const nextYearDates = nextYearResolved.get(raceId);
 
-      for (const year of yearsToAdd) {
-          const key = `${year}/${raceId}`;
-          if (explicitKeys.has(key)) continue;
+    // Only roll over to next year's date if there's no current-year date at all
+    // (e.g. an absolute rule pinned to a future year), or the current-year date(s)
+    // have already passed.
+    const needsNextYear =
+      !currentYearDates || currentYearDates.every((date) => date < todayIso);
 
-          const dates =
-          year === currentYear
-            ? [currentYearDate]
-            : nextYearResolved.get(raceId);
-          if (!dates) continue;
+    const candidates: Array<{ year: number; date: string }> = [];
+    for (const date of currentYearDates ?? [])
+      candidates.push({ year: currentYear, date });
+    if (needsNextYear)
+      for (const date of nextYearDates ?? [])
+        candidates.push({ year: nextYear, date });
 
-          const existingDates = lookup.get(key) ?? [];
-          const seenDates = new Set(existingDates);
-          const newDates = dates.filter((date) => !seenDates.has(date));
-          if (newDates.length === 0) continue;
+    for (const { year, date } of candidates) {
+      const key = `${year}/${raceId}`;
+      if (explicitKeys.has(key)) continue;
 
-          lookup.set(key, [...existingDates, ...newDates]);
-          for (const date of newDates)
-            rows.push({ Date: date, Race: raceId });
-          addedRows += newDates.length;
-      }
+      const existingDates = lookup.get(key) ?? [];
+      if (existingDates.includes(date)) continue;
+
+      lookup.set(key, [...existingDates, date]);
+      rows.push({ Date: date, Race: raceId });
+      addedRows += 1;
     }
   }
 
