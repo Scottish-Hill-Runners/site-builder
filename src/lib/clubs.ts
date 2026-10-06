@@ -6,6 +6,7 @@ import { prebuildDir } from '../../scripts/write-gz-util';
 export interface ClubItem {
   slug: string;
   name: string;
+  aka?: string[];
   web?: string;
   contact?: string;
   content: string;

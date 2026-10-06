@@ -7,6 +7,7 @@ import type { ClubItem } from '@/lib/clubs';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 import { sendMailto } from '@/lib/navigate-to-mailto';
+import TagInput from '@/components/TagInput';
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -29,6 +30,7 @@ export interface ClubInfoEditDialogProps {
 
 interface FrontmatterFields {
   name: string;
+  aka: string[];
   web: string;
   contact: string;
 }
@@ -40,6 +42,7 @@ const labelClass = 'mb-1 block text-sm font-medium text-gray-700 dark:text-slate
 function toFields(club: ClubItem): FrontmatterFields {
   return {
     name: club.name ?? '',
+    aka: club.aka ?? [],
     web: club.web ?? '',
     contact: club.contact ?? '',
   };
@@ -86,15 +89,20 @@ export default function ClubInfoEditDialog({ open, onClose, slug, club }: ClubIn
     if (e.target === dialogRef.current) onClose();
   }
 
-  function updateField<K extends keyof FrontmatterFields>(key: K, value: string) {
+  function updateField<K extends keyof FrontmatterFields>(key: K, value: FrontmatterFields[K]) {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  const changedFrontmatter: Record<string, string> = {};
-  (Object.keys(fields) as Array<keyof FrontmatterFields>).forEach((key) => {
+  const changedFrontmatter: Record<string, string | string[]> = {};
+  (['name', 'web', 'contact'] as const).forEach((key) => {
     const value = fields[key].trim();
     if (value && value !== original[key].trim()) changedFrontmatter[key] = value;
   });
+  const trimmedAka = fields.aka.map((tag) => tag.trim()).filter(Boolean);
+  const trimmedOriginalAka = original.aka.map((tag) => tag.trim()).filter(Boolean);
+  if (JSON.stringify(trimmedAka) !== JSON.stringify(trimmedOriginalAka)) {
+    changedFrontmatter.aka = trimmedAka;
+  }
   const bodyChanged = body.trim() !== club.content.trim();
   const hasChanges = Object.keys(changedFrontmatter).length > 0 || bodyChanged;
 
@@ -147,6 +155,16 @@ export default function ClubInfoEditDialog({ open, onClose, slug, club }: ClubIn
               value={fields.name}
               onChange={(e) => updateField('name', e.target.value)}
               className={inputClass}
+            />
+          </div>
+
+          <div className="col-span-2">
+            <TagInput
+              id="ci-aka"
+              label="Also known as"
+              value={fields.aka}
+              onChange={(tags) => updateField('aka', tags)}
+              placeholder="Add an alias and press Enter"
             />
           </div>
 

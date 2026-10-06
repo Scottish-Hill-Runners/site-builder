@@ -1216,9 +1216,10 @@ function writeClubData(clubs: ClubInfo[], allResults: RaceResult[]): void {
       })
       .map((r) => r.club)
   );
-  const output = clubs.map(({ slug, name, web, contact, excludeFromChampionships, info }) => ({
+  const output = clubs.map(({ slug, name, aliases, web, contact, excludeFromChampionships, info }) => ({
     slug,
     name,
+    aka: aliases,
     web: normaliseWebUrl(web),
     contact,
     content: info,
