@@ -4,6 +4,15 @@ import matter from 'gray-matter';
 import { writeGz, prebuildDir, progress } from './write-gz-util';
 import { contentPath, contentRoot } from './content-paths';
 import { updateSitemap } from './update-sitemap';
+import { buildElevationChartData } from './elevation-chart';
+import type { GeoJSON } from 'geojson';
+
+function parseGeojson(geojsonStr: string): GeoJSON | undefined {
+  try {
+    return JSON.parse(geojsonStr) as GeoJSON;
+  } catch {}
+  return undefined;
+}
 
 function buildEpics(): string[] {
   const epicDir = contentPath('long-distance');
@@ -30,10 +39,22 @@ function buildEpics(): string[] {
     const { data, content } = matter(fileContent);
     const slug = file.replace('.md', '');
     routes.push(`/epics/${slug}`);
+
+    const geojsonPath = path.join(epicDir, `${slug}.geojson`);
+    const hasGpx = fs.existsSync(geojsonPath);
+    const geojsonStr = hasGpx ? fs.readFileSync(geojsonPath, 'utf-8') : '';
+    const routeGeojson = hasGpx ? parseGeojson(geojsonStr) : undefined;
+    const elevationChartData = hasGpx
+      ? buildElevationChartData(geojsonStr)
+      : null;
+
     return {
       slug,
       title: (data.title as string) || 'Untitled',
       content: content.replace(/\u00a0/g, ' '),
+      hasGpx,
+      routeGeojson,
+      elevationChartData: elevationChartData ?? undefined,
     };
   });
 

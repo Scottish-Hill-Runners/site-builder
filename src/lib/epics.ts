@@ -2,9 +2,15 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { type ContentItem } from '@/lib/info';
+import type { ElevationChartData } from '@/types/datatable';
+import type { GeoJSON } from 'geojson';
 import { prebuildDir } from '../../scripts/write-gz-util';
 
-export type EpicItem = ContentItem;
+export interface EpicItem extends ContentItem {
+  hasGpx: boolean;
+  routeGeojson?: GeoJSON;
+  elevationChartData?: ElevationChartData;
+}
 
 let cachedEpicItems: EpicItem[] | null = null;
 

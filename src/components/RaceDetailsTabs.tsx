@@ -691,8 +691,8 @@ export default function RaceDetailsTabs({
         <RouteSubmitDialog
           open={routeDialogOpen}
           onClose={() => setRouteDialogOpen(false)}
-          raceId={raceId}
-          raceTitle={race.title}
+          filePath={`races/${raceId}/route.geojson`}
+          itemTitle={race.title}
         />
       )}
     </section>

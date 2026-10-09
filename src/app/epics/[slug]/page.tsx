@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getEpicItems } from '@/app/epics/page';
 import EpicEditSection from '@/components/EpicEditSection';
+import EpicRouteSection from '@/components/EpicRouteSection';
 
 interface EpicSlugPageProps {
   params: Promise<{ slug: string }>;
@@ -58,6 +59,13 @@ export default async function EpicSlugPage({ params }: EpicSlugPageProps) {
               {epic.content.replace(/\u00a0/g, ' ')}
             </ReactMarkdown>
           </div>
+          <EpicRouteSection
+            slug={slug}
+            title={epic.title}
+            hasGpx={epic.hasGpx}
+            routeGeojson={epic.routeGeojson}
+            elevationChartData={epic.elevationChartData}
+          />
           <EpicEditSection slug={slug} title={epic.title} contents={epic.content} />
         </article>
       )}

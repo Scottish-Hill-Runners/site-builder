@@ -27,8 +27,9 @@ const MAX_GPX_BYTES = 20 * 1024 * 1024;
 export interface RouteSubmitDialogProps {
   open: boolean;
   onClose: () => void;
-  raceId: string;
-  raceTitle: string;
+  /** Repo-relative path the submitted route should be saved to, e.g. `races/{raceId}/route.geojson`. */
+  filePath: string;
+  itemTitle: string;
 }
 
 interface GpxInfo {
@@ -37,7 +38,7 @@ interface GpxInfo {
   pointCount: number;
 }
 
-export default function RouteSubmitDialog({ open, onClose, raceId, raceTitle }: RouteSubmitDialogProps) {
+export default function RouteSubmitDialog({ open, onClose, filePath, itemTitle }: RouteSubmitDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,15 +139,15 @@ export default function RouteSubmitDialog({ open, onClose, raceId, raceTitle }: 
       return;
     }
 
-    const subject = `Route submission for ${raceTitle} (${raceId})`;
+    const subject = `Route submission for ${itemTitle}`;
     const trimmedNotes = notes.trim();
     const body =
       `To ${toWhomItMayConcern()}:\n\n` +
-      `Please find below a route for ${raceTitle} (${raceId}).\n` +
+      `Please find below a route for ${itemTitle}.\n` +
       (trimmedNotes ? `\nAdditional notes:\n${trimmedNotes}\n` : '') +
       `\n---\n\n` +
       `!-- PLEASE DO NOT EDIT BELOW THIS LINE --\n` +
-      `File: races/${raceId}/route.geojson\n` +
+      `File: ${filePath}\n` +
       `${geojson}\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 
@@ -163,7 +164,7 @@ export default function RouteSubmitDialog({ open, onClose, raceId, raceTitle }: 
       className="m-auto w-full max-w-2xl rounded-xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-black/40 dark:border-slate-700 dark:bg-slate-900"
     >
       <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Submit a route for {raceTitle}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Submit a route for {itemTitle}</h2>
         <p className="text-sm text-gray-600 dark:text-slate-300">
           Upload a GPX file of the route, optionally mark checkpoints, then send it to us by
           email for review. The track will be smoothed automatically and timestamps or other
