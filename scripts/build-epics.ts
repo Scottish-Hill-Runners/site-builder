@@ -15,7 +15,7 @@ function parseGeojson(geojsonStr: string): GeoJSON | undefined {
 }
 
 function buildEpics(): string[] {
-  const epicDir = contentPath('long-distance');
+  const epicDir = contentPath('epics');
   const routes: string[] = [];
 
   if (!fs.existsSync(epicDir)) {

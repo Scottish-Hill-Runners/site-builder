@@ -82,7 +82,7 @@ export default function EpicInfoEditDialog({
       `To ${toWhomItMayConcern()}:\n\n` +
       `I would like to update the text for this article.\n\n` +
       `!-- IF YOU EDIT THE TEXT BELOW, PLEASE DO SO WITH CARE\n` +
-      `File: long-distance/${slug}.md\n` +
+      `File: epics/${slug}.md\n` +
       `${body.trim()}\n` +
       `!-- END OF SENSITIVE SECTION\n`;
 

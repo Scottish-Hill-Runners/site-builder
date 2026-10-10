@@ -70,7 +70,7 @@ export default function EpicRouteSection({
         <RouteSubmitDialog
           open={routeDialogOpen}
           onClose={() => setRouteDialogOpen(false)}
-          filePath={`long-distance/${slug}.geojson`}
+          filePath={`epics/${slug}.geojson`}
           itemTitle={title}
         />
       )}

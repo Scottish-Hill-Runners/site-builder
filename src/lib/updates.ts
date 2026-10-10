@@ -23,7 +23,7 @@ export async function getRecentUpdates(): Promise<UpdateEntry[]> {
   }
 }
 
-// Content-repo paths (e.g. `races/Tinto/2025.csv`, `long-distance/foo.md`)
+// Content-repo paths (e.g. `races/Tinto/2025.csv`, `epics/foo.md`)
 // don't line up with site routes 1:1; map the common shapes we know about.
 // Returns undefined for paths with no obvious page (e.g. blob-upload feeds).
 export function updatePathToRoute(path: string): string | undefined {
@@ -41,7 +41,7 @@ export function updatePathToRoute(path: string): string | undefined {
   match = path.match(/^clubs\/([-\w]+)(?:\/index)?\.md$/);
   if (match) return `/clubs/${match[1]}`;
 
-  match = path.match(/^long-distance\/([-\w]+)\.md$/);
+  match = path.match(/^epics\/([-\w]+)\.md$/);
   if (match) return `/epics/${match[1]}`;
 
   match = path.match(/^info\/(.+)\.md$/);

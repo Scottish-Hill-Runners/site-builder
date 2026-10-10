@@ -5,7 +5,7 @@
 This project can build from content stored in another repository.
 
 - `CONTENT_ROOT` controls where content folders are read from.
-- Supported content folders are `clubs`, `info`, `long-distance`, `news`, `championships`, and `races`.
+- Supported content folders are `clubs`, `info`, `epics`, `news`, `championships`, and `races`.
 
 Example workflow using a separate repository:
 

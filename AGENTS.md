@@ -48,7 +48,7 @@ organiser: Club Name <email@example.com>
 
 **Race results** — `content/races/{RaceName}/{YEAR}.csv` (Position, Name, Club, Category, Time). Multiple events per year: `{YEAR}-s.csv` / `{YEAR}-w.csv`. Time format is flexible: `1:25:34`, `85:34`, `85.34`, `1h25m34s`.
 
-Other content folders: `clubs/`, `championships/`, `news/`, `info/`, `long-distance/`, `committee/`.
+Other content folders: `clubs/`, `championships/`, `news/`, `info/`, `epics/`.
 
 ## Key conventions & gotchas
 

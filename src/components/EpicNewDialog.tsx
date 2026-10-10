@@ -79,7 +79,7 @@ export default function EpicNewDialog({ open, onClose }: EpicNewDialogProps) {
       `To ${toWhomItMayConcern()}:\n\n` +
       `I would like to add a new epic.\n\n` +
       `!-- IF YOU EDIT THE TEXT BELOW, PLEASE DO SO WITH CARE\n` +
-      `File: long-distance/${slug}.md\n` +
+      `File: epics/${slug}.md\n` +
       `---\n` +
       `title: ${title.trim()}\n` +
       `---\n` +
