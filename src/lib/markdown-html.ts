@@ -22,9 +22,18 @@ const allowedInlineHtmlTags = new Set([
 
 const htmlTagPattern = /<\/?([a-z][a-z0-9:-]*)\b[^>]*>/gi;
 
+// `document:`/`documents:` and `portrait:` are pseudo-protocols used by
+// TaggedDocument/TaggedImage to resolve Cloudinary assets by tag; the
+// sanitizer's default protocol allowlist would otherwise strip them from
+// `href`/`src`.
 const markdownInlineHtmlSchema = {
   ...defaultSchema,
   tagNames: [...(defaultSchema.tagNames ?? []), ...allowedInlineHtmlTags],
+  protocols: {
+    ...defaultSchema.protocols,
+    href: [...(defaultSchema.protocols?.href ?? []), 'document', 'documents'],
+    src: [...(defaultSchema.protocols?.src ?? []), 'portrait'],
+  },
 };
 
 function isAllowedInlineHtml(value: string): boolean {
