@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownRehypePlugins, remarkInlineHtmlOnly } from '@/lib/markdown-html';
 import { getClubItems } from '@/app/clubs/page';
 import ClubEditSection from '@/components/ClubEditSection';
 
@@ -71,7 +72,10 @@ export default async function ClubSlugPage({ params }: ClubSlugPageProps) {
           </p>
         ) : (
           <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkInlineHtmlOnly]}
+              rehypePlugins={markdownRehypePlugins}
+            >
               {club.content.replace(/\u00a0/g, ' ')}
             </ReactMarkdown>
           </div>

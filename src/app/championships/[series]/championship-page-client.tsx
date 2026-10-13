@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownRehypePlugins, remarkInlineHtmlOnly } from '@/lib/markdown-html';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import ChampionshipRacesEditDialog from '@/components/ChampionshipRacesEditDialog';
 import ChampionshipInfoEditDialog from '@/components/ChampionshipInfoEditDialog';
@@ -242,7 +243,10 @@ export default function ChampionshipPageClient({
                 ))}
             </div>
             <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkInlineHtmlOnly]}
+                rehypePlugins={markdownRehypePlugins}
+              >
                 {fillInSchedule(data, calendarDates, raceMap)}
               </ReactMarkdown>
             </div>

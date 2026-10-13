@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownRehypePlugins, remarkInlineHtmlOnly } from '@/lib/markdown-html';
 import { getEpicItems } from '@/app/epics/page';
 import EpicEditSection from '@/components/EpicEditSection';
 import EpicRouteSection from '@/components/EpicRouteSection';
@@ -55,7 +56,10 @@ export default async function EpicSlugPage({ params }: EpicSlugPageProps) {
             {epic.title}
           </h1>
           <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkInlineHtmlOnly]}
+              rehypePlugins={markdownRehypePlugins}
+            >
               {epic.content.replace(/\u00a0/g, ' ')}
             </ReactMarkdown>
           </div>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getAllInfoItems } from '@/lib/info';
+import { markdownRehypePlugins, remarkInlineHtmlOnly } from '@/lib/markdown-html';
 import TaggedImage from '@/components/TaggedImage';
 import TaggedDocument, { MarkdownParagraph } from '@/components/TaggedDocument';
 import InfoPageEditSection from '@/components/InfoPageEditSection';
@@ -51,7 +52,8 @@ export async function InfoPageContent({ slug = 'index' }: { slug?: string }) {
         <article className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 sm:p-8">
           <div className="prose prose-slate max-w-none prose-headings:font-semibold prose-li:marker:text-slate-500 dark:prose-invert dark:prose-headings:text-slate-50 dark:prose-li:marker:text-slate-400">
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
+              remarkPlugins={[remarkGfm, remarkInlineHtmlOnly]}
+              rehypePlugins={markdownRehypePlugins}
               components={{ img: TaggedImage, a: TaggedDocument, p: MarkdownParagraph }}
               urlTransform={(url) => url}
             >

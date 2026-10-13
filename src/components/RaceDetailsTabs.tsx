@@ -3,6 +3,8 @@ import type { AssetEntry } from '@/lib/assetCollections';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { markdownRehypePlugins, remarkInlineHtmlOnly } from '@/lib/markdown-html';
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), {
   ssr: false,
@@ -19,7 +21,6 @@ const ElevationProfile = dynamic(
     ssr: false,
   }
 );
-import remarkGfm from 'remark-gfm';
 import RaceResultsDataTable from '@/components/RaceResultsDataTable';
 import TeamResultsDataTable from '@/components/TeamResultsDataTable';
 import {
@@ -470,7 +471,10 @@ export default function RaceDetailsTabs({
             <div>
               {contents.trim() ? (
                 <div className="prose prose-slate max-w-none prose-headings:text-gray-900 dark:prose-invert dark:prose-headings:text-slate-100">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkInlineHtmlOnly]}
+                    rehypePlugins={markdownRehypePlugins}
+                  >
                     {contents}
                   </ReactMarkdown>
                 </div>
