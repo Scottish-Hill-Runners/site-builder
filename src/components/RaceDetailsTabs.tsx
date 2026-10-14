@@ -118,7 +118,7 @@ export default function RaceDetailsTabs({
     if (race.hasTeams || race.hasLegs) {
       try {
         const saved = window.localStorage.getItem(
-          `raceDetails.resultViewMode.${raceId}`
+          `raceDetails.resultViewMode`
         );
         if (saved === 'individual' || saved === 'team') return saved;
       } catch {}
@@ -136,11 +136,11 @@ export default function RaceDetailsTabs({
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        `raceDetails.resultViewMode.${raceId}`,
+        `raceDetails.resultViewMode`,
         viewMode
       );
     } catch {}
-  }, [viewMode, raceId]);
+  }, [viewMode]);
   const [focusedResultContext, setFocusedResultContext] =
     useState<ResultsFocusContext | null>(null);
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
