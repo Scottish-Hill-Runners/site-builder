@@ -37,6 +37,7 @@ export default function HomepageImageGrid() {
           <Image
             src={cloudinaryUrl(item, 'homepage')}
             alt={filenameToAltText(item.title ?? item.public_id)}
+            title={item.description ?? item.title ?? item.public_id}
             width={640}
             height={360}
             sizes="(min-width: 640px) 33vw, 50vw"
