@@ -31,7 +31,7 @@
     "csvtojson": "^2.0.14",
     "gray-matter": "^4.0.3",
     "maplibre-gl": "^6.10.0",
-    "markdown-it": "^14.2.0",
+    "markdown-it": "^14.3.3",
     "next": "^16.3.8",
     "papaparse": "^5.7.0",
     "react": "19.2.3",
