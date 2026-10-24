@@ -556,8 +556,10 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
         // Detect if race has team/leg data
         const hasTeams = results.some((r) => r.team !== undefined);
         const hasLegs = results.some((r) => r.leg !== undefined);
+        const hasClubs = results.some((r) => r.club !== undefined);
         if (hasTeams) info.hasTeams = true;
         if (hasLegs) info.hasLegs = true;
+        if (hasClubs) info.hasClubs = true;
 
         raceMap.set(raceId, { meta, results });
       })
@@ -597,7 +599,7 @@ function writeYearData(allResults: RaceResult[]) {
     const uniqueRunners = new Map<string, Set<string>>();
     for (const r of results) {
       uniqueRaces.add(r.raceId);
-      uniqueClubs.add(r.club);
+      if (r.club) uniqueClubs.add(r.club);
       const cat = likelySex(r.category) + (categoryAge(r.category) ?? '');
       const categorySet =
         uniqueRunners.get(cat) ||
@@ -1710,7 +1712,7 @@ async function writeChampionshipResultsData(
           const teamAccums = new Map<string, TeamAccum>();
 
           for (const row of raceResults) {
-            if (!includedClubs.has(row.club)) continue;
+            if (row.club && !includedClubs.has(row.club)) continue;
 
             for (const [cat, pos] of Object.entries(row.categoryPos)) {
               const size = teamSizeRules[cat] ?? teamSizeRules.default;
@@ -1719,7 +1721,7 @@ async function writeChampionshipResultsData(
               const key = `${row.club}|${cat}`;
               let accum = teamAccums.get(key);
               if (!accum) {
-                accum = { raceId, club: row.club, category: cat, runners: [] };
+                accum = { raceId, club: row.club ?? '', category: cat, runners: [] };
                 teamAccums.set(key, accum);
               }
               accum.runners.push({ name: row.name, time: row.time, position: pos });

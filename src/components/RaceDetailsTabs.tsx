@@ -21,7 +21,7 @@ const ElevationProfile = dynamic(
     ssr: false,
   }
 );
-import RaceResultsDataTable from '@/components/RaceResultsDataTable';
+import RaceResultsDataTable, { DisplayColumn, DisplayFilters } from '@/components/RaceResultsDataTable';
 import TeamResultsDataTable from '@/components/TeamResultsDataTable';
 import {
   getLatestResultYear,
@@ -167,6 +167,22 @@ export default function RaceDetailsTabs({
     [results]
   );
   const effectiveInitialYearFilter = initialYearFilter || pageDefaultYear || '';
+  const displayColumns = new Set<DisplayColumn>(['position', 'name', 'category', 'time']);
+  const displayFilters: DisplayFilters =
+    {year: effectiveInitialYearFilter, name: '', category: initialCategoryFilter}
+  if (race.hasLegs) {
+    displayColumns.add('leg');
+    displayFilters.leg = '';
+  }
+  if (race.hasTeams) {
+    displayColumns.add('team');
+    displayFilters.team = '';
+  }
+  if (race.hasClubs) {
+    displayColumns.add('club');
+    displayFilters.club = '';
+  }
+
   const latestCalendarYear = latestCalendarDate?.slice(0, 4);
   const isLatestCalendarEntryPast = Boolean(
     latestCalendarDate && latestCalendarDate < new Date().toISOString().slice(0, 10)
@@ -302,9 +318,9 @@ export default function RaceDetailsTabs({
                   <RaceResultsDataTable
                     data={results}
                     eras={race.eras}
+                    displayColumns={displayColumns}
+                    displayFilters={displayFilters}
                     enableRowFocus
-                    initialYearFilter={effectiveInitialYearFilter}
-                    initialCategoryFilter={initialCategoryFilter}
                     onFocusContextChange={setFocusedResultContext}
                   />
                 ) : (

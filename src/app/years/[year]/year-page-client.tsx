@@ -148,10 +148,8 @@ export default function YearPageClient({ year }: YearPageClientProps) {
             <RaceResultsDataTable
               data={results}
               races={races}
-              showRaceColumn
-              showRaceFilter
-              initialRaceFilter={initialRaceFilter}
-              showYearFilter={false}
+              displayColumns={new Set(['raceTitle', 'position', 'name', 'club', 'category', 'time'])}
+              displayFilters={{year: '', 'raceId': initialRaceFilter, club: '', category: '', name: ''}}
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />

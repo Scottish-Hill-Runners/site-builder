@@ -127,10 +127,10 @@ function ResultCorrectionForm({
           position: value,
           originalName: match.name,
           originalCategory: match.category,
-          originalClub: match.club,
+          originalClub: match.club ?? '',
           updatedName: match.name,
           updatedCategory: match.category,
-          updatedClub: match.club,
+          updatedClub: match.club ?? '',
         }));
       }
     }

@@ -12,6 +12,7 @@ import {
   sortAggregatedTeams,
   timeToSeconds,
 } from '@/lib/team-results-aggregator';
+import raceTitle from '@/lib/race-title';
 
 interface TeamResultsDataTableProps {
   data: Array<RaceResult>;
@@ -20,6 +21,7 @@ interface TeamResultsDataTableProps {
   initialRaceFilter?: string;
   showYearFilter?: boolean;
   initialYearFilter?: string;
+  showCategoryFilter?: boolean;
 }
 
 type SortColumn =
@@ -33,10 +35,18 @@ type SortDirection = 'asc' | 'desc';
 interface Filters {
   raceId: string;
   year: string;
+  team: string;
+  category: string;
 }
 
 const FILTER_VISIBILITY_STORAGE_KEY = 'teamResults.showFilters';
 const MOBILE_BREAKPOINT = 640;
+const FILTER_GRID_COLUMNS = [
+  'lg:grid-cols-1',
+  'lg:grid-cols-2',
+  'lg:grid-cols-3',
+  'lg:grid-cols-4',
+] as const;
 
 export default function TeamResultsDataTable({
   data,
@@ -45,8 +55,15 @@ export default function TeamResultsDataTable({
   initialRaceFilter = '',
   showYearFilter = true,
   initialYearFilter = '',
+  showCategoryFilter = true,
 }: TeamResultsDataTableProps) {
   'use no memo';
+  const filterCount =
+    Number(showYearFilter) +
+    Number(showRaceColumn) +
+    1 +
+    Number(showCategoryFilter);
+  const filterGridColumns = FILTER_GRID_COLUMNS[filterCount - 1];
 
   const [sortColumn, setSortColumn] = useState<SortColumn>('totalTime');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -60,6 +77,8 @@ export default function TeamResultsDataTable({
   const [filters, setFilters] = useState<Filters>({
     raceId: initialRaceFilter,
     year: initialYearFilter,
+    team: '',
+    category: '',
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(true);
@@ -71,6 +90,13 @@ export default function TeamResultsDataTable({
       if (result.team) years.add(result.year);
     }
     return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [data]);
+
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const result of data)
+      if (result.category) cats.add(result.category);
+    return Array.from(cats).sort();
   }, [data]);
 
   useEffect(() => {
@@ -93,7 +119,9 @@ export default function TeamResultsDataTable({
     const filteredData = data.filter((r) =>
       r.team !== undefined &&
       (!showRaceColumn || filters.raceId === '' || r.raceId === filters.raceId) &&
-      (!showYearFilter || filters.year === '' || r.year === filters.year)
+      (!showYearFilter || filters.year === '' || r.year === filters.year) &&
+      (!filters.category || r.category === filters.category) &&
+      (!filters.team || r.team.toLowerCase().includes(filters.team.toLowerCase()))
     );
 
     // Aggregate into teams
@@ -107,8 +135,8 @@ export default function TeamResultsDataTable({
       const primaryCol = sortColumn || 'totalTime';
 
       if (primaryCol === 'raceTitle') {
-        const aRace = a.runners[0] ? races?.[a.runners[0].raceId]?.title ?? a.runners[0].raceId : '';
-        const bRace = b.runners[0] ? races?.[b.runners[0].raceId]?.title ?? b.runners[0].raceId : '';
+        const aRace = a.runners[0] ? raceTitle(a.runners[0].raceId, races) : '';
+        const bRace = b.runners[0] ? raceTitle(b.runners[0].raceId, races) : '';
         comparison =
           sortDirection === 'asc'
             ? aRace.localeCompare(bRace)
@@ -167,10 +195,7 @@ export default function TeamResultsDataTable({
   };
 
   const clearFilters = () => {
-    setFilters({
-      raceId: '',
-      year: '',
-    });
+    setFilters({ raceId: '', year: '', team: '', category: '' });
   };
 
   function getSortIndicator(column: SortColumn): string {
@@ -241,9 +266,8 @@ export default function TeamResultsDataTable({
       }
     }
     return Array.from(legSet).sort((a, b) => {
-      const aNum = typeof a === 'number' ? a : NaN;
-      const bNum = typeof b === 'number' ? b : NaN;
-      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+      if (typeof a === 'number' && typeof b === 'number')
+        return a - b;
       return String(a).localeCompare(String(b));
     });
   }, [displayTeams]);
@@ -268,20 +292,35 @@ export default function TeamResultsDataTable({
       {/* Filter Controls */}
       <div className="rounded-lg bg-white p-4 shadow-md dark:bg-slate-900">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800 dark:text-slate-200">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">
               Team View
             </h3>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowFilters((prev) => !prev)}
+                aria-expanded={showFilters}
+                aria-controls="team-results-filter-controls"
+                className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                {showFilters ? 'Hide Filters' : 'Show Filters'}
+              </button>
+              {Object.values(filters).some(Boolean) && (
+                <button
+                  onClick={clearFilters}
+                  className="rounded bg-red-100 px-3 py-1 text-xs text-red-700 transition-colors hover:bg-red-200 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-950"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
           </div>
 
           {showFilters && (
-            <div className="space-y-3 border-t border-gray-300 pt-3 dark:border-slate-700">
+            <div
+              id="team-results-filter-controls"
+              className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${filterGridColumns}`}
+            >
               {showYearFilter && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -290,7 +329,8 @@ export default function TeamResultsDataTable({
                   <select
                     value={filters.year}
                     onChange={(e) => handleFilterChange('year', e.target.value)}
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    //"mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
                   >
                     <option value="">All team years</option>
                     {teamYears.map((year) => (
@@ -311,7 +351,7 @@ export default function TeamResultsDataTable({
                     onChange={(e) =>
                       handleFilterChange('raceId', e.target.value)
                     }
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   >
                     <option value="">All races</option>
                     {Object.entries(races ?? {}).map(([id, info]) => (
@@ -322,12 +362,35 @@ export default function TeamResultsDataTable({
                   </select>
                 </div>
               )}
-              <button
-                onClick={clearFilters}
-                className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Clear Filters
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                  Team
+                </label>
+                <input
+                  value={filters.team}
+                  onChange={(e) => handleFilterChange('team', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />  
+              </div>
+              {showCategoryFilter && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                    Category
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) => handleFilterChange('category', e.target.value)}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  >
+                    <option value="">All categories</option>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>

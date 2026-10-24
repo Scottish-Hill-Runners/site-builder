@@ -5,7 +5,7 @@ export interface RaceResult {
   year: string;
   position: number;
   name: string;
-  club: string;
+  club?: string;
   category: string;
   categoryPos: { [cat: string]: number };
   time: string;
@@ -46,6 +46,7 @@ export interface RaceInfo {
   hasTeams?: boolean;
   /** Whether this race has leg/relay entries (based on Leg column in CSV). */
   hasLegs?: boolean;
+  hasClubs?: boolean; // Sometimes, for relays, we don't get this information
 }
 
 export interface ElevationChartData {

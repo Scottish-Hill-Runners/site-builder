@@ -307,7 +307,8 @@ export default function RunnerPageClient({
             <RaceResultsDataTable
               data={results}
               races={races}
-              showRaceTitle
+              displayColumns={new Set(['raceTitle', 'year', 'position', 'club', 'category', 'time'])}
+              displayFilters={{year: '', club: '', category: ''}}
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />

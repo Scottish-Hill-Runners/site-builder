@@ -10,51 +10,55 @@ import {
   ResultsFocusContext,
 } from '@/types/datatable';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
+import raceTitle from '@/lib/race-title';
 
 interface DataTableProps {
   data: Array<RaceResult>;
   races?: { [raceId: string]: RaceInfo };
   eras?: Era[];
-  showRaceColumn?: boolean;
-  showRaceFilter?: boolean;
-  showRaceTitle?: boolean;
-  showYearFilter?: boolean;
-  initialNameFilter?: string;
-  initialRaceFilter?: string;
-  initialYearFilter?: string;
+  displayColumns: Set<DisplayColumn>;
+  displayFilters: DisplayFilters;
   enableRowFocus?: boolean;
   onFocusContextChange?: (context: ResultsFocusContext | null) => void;
-  showPointsColumn?: boolean;
-  initialCategoryFilter?: string;
 }
 
-type SortColumn =
+export type DisplayColumn =
   | 'raceTitle'
   | 'year'
   | 'position'
   | 'name'
   | 'club'
+  | 'team'
+  | 'leg'
   | 'category'
   | 'time'
-  | 'points'
-  | null;
+  | 'points';
+export type FilterColumn =
+  | 'raceId'
+  | 'year'
+  | 'name'
+  | 'club'
+  | 'team'
+  | 'leg'
+  | 'category';
 type SortDirection = 'asc' | 'desc';
-
+export type DisplayFilters = Partial<Record<FilterColumn, string>>;
 type YearVirtualItem =
   | { type: 'row'; data: RaceResult; dataIndex: number }
   | { type: 'year-header'; year: string; count: number };
 
-interface Filters {
-  year: string;
-  name: string;
-  raceId: string;
-  raceTitle: string;
-  club: string;
-  category: string;
-}
 
 const FILTER_VISIBILITY_STORAGE_KEY = 'raceResults.showFilters';
 const MOBILE_BREAKPOINT = 640;
+const FILTER_GRID_COLUMNS = [
+  'lg:grid-cols-1',
+  'lg:grid-cols-2',
+  'lg:grid-cols-3',
+  'lg:grid-cols-4',
+  'lg:grid-cols-5',
+  'lg:grid-cols-6',
+  'lg:grid-cols-7',
+] as const;
 
 function eraContainsYear(era: Era, year: number): boolean {
   if (era.from !== undefined && year < era.from) return false;
@@ -69,26 +73,28 @@ function getYearVariant(year: string): string {
   let suffix = year.substring(4);
   if (suffix.endsWith('*')) suffix = suffix.slice(0, -1);
   if (suffix.startsWith('-')) suffix = suffix.slice(1);
-  return suffix;
+  return suffix.length > 1 ? suffix : '';
 }
 
 export default function RaceResultsDataTable({
   data,
   races,
   eras,
-  showRaceColumn = false,
-  showRaceFilter = false,
-  showRaceTitle = false,
-  showYearFilter = true,
-  initialNameFilter = '',
-  initialRaceFilter = '',
-  initialYearFilter = '',
-  initialCategoryFilter = '',
+  displayColumns,
+  displayFilters,
   enableRowFocus = false,
   onFocusContextChange,
-  showPointsColumn = false,
 }: DataTableProps) {
   'use no memo';
+
+  const filterCount = Object.entries(displayFilters).filter(
+    ([filter, value]) =>
+      filter === 'year' ? Boolean(value) : value !== undefined
+  ).length;
+  const filterGridColumns =
+    FILTER_GRID_COLUMNS[
+      Math.min(Math.max(filterCount, 1), FILTER_GRID_COLUMNS.length) - 1
+    ];
   const [clubNameToSlug, setClubNameToSlug] = useState<Record<string, string>>(
     {}
   );
@@ -105,11 +111,11 @@ export default function RaceResultsDataTable({
       .catch(() => {});
   }, []);
 
-  const [sortColumn, setSortColumn] = useState<SortColumn>(
-    showRaceColumn ? 'raceTitle' : 'year'
+  const [sortColumn, setSortColumn] = useState<DisplayColumn | null>(
+    displayColumns.has('raceTitle') ? 'raceTitle' : 'year'
   );
   const [sortDirection, setSortDirection] = useState<SortDirection>(
-    showRaceColumn ? 'asc' : 'desc'
+    displayColumns.has('raceTitle') ? 'asc' : 'desc'
   );
   const [showFilters, setShowFilters] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -118,14 +124,7 @@ export default function RaceResultsDataTable({
     );
     return savedValue === 'true';
   });
-  const [filters, setFilters] = useState<Filters>({
-    year: initialYearFilter,
-    name: initialNameFilter,
-    raceId: initialRaceFilter,
-    raceTitle: '',
-    club: '',
-    category: initialCategoryFilter,
-  });
+  const [filters, setFilters] = useState<DisplayFilters>(displayFilters);
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   // '' selects the main race; a suffix (e.g. "3K") selects that variant only.
   // Main and variant courses are never shown combined.
@@ -162,8 +161,10 @@ export default function RaceResultsDataTable({
     let hasMain = false;
     for (const row of data) {
       const variant = getYearVariant(row.year);
-      if (variant === '') hasMain = true;
-      else variants.add(variant);
+      if (variant === '')
+        hasMain = true;
+      else
+        variants.add(variant);
     }
     return hasMain ? Array.from(variants).sort() : [];
   }, [data]);
@@ -180,39 +181,36 @@ export default function RaceResultsDataTable({
 
     // Apply filters
     const eraLabel =
-      showYearFilter && filters.year.startsWith('era:')
-        ? filters.year.slice(4)
+      displayColumns.has('year') && filters.year?.startsWith('era:')
+        ? filters.year!.slice(4)
         : null;
     const activeEra =
       eraLabel != null ? (eras ?? []).find((e) => e.label === eraLabel) : null;
     result = result.filter((row) => {
+      const raceMatch =
+        !filters.raceId || raceTitle(filters.raceId, races) === raceTitle(row.raceId, races);
       const yearNum = parseInt(row.year.substring(0, 4), 10);
       const yearMatch =
-        !showYearFilter || filters.year === ''
+        !filters.year
           ? true
           : activeEra != null
             ? eraContainsYear(activeEra, yearNum)
-            : row.year.toString().includes(filters.year);
-      const raceTitleMatch =
-        filters.raceTitle === '' ||
-        (races?.[row.raceId]?.title ?? row.raceId)
-          .toLowerCase()
-          .includes(filters.raceTitle.toLowerCase());
-      const raceMatch =
-        !showRaceFilter || filters.raceId === '' || row.raceId === filters.raceId;
-      const variantMatch =
-        availableVariants.length === 0 ||
-        getYearVariant(row.year) === selectedVariant;
+            : row.year.includes(filters.year ?? '');
+      const variantMatch = availableVariants.length === 0 || getYearVariant(row.year) === selectedVariant;
+      const nameMatch = !filters.name || row.name.toLowerCase().includes(filters.name!.toLowerCase());
+      const clubMatch = !filters.club || (row.club ?? "").toLowerCase().includes(filters.club.toLowerCase());
+      const teamMatch = !filters.team || (row.team ?? "").toLowerCase().includes(filters.team.toLowerCase());
+      const categoryMatch = !filters.category || filters.category in row.categoryPos;
+      const legsMatch = !filters.leg || filters.leg == row.leg;
       return (
-        yearMatch &&
         raceMatch &&
+        yearMatch &&
         variantMatch &&
-        (filters.name === '' ||
-          row.name.toLowerCase().includes(filters.name.toLowerCase())) &&
-        raceTitleMatch &&
-        (filters.club === '' ||
-          row.club.toLowerCase().includes(filters.club.toLowerCase())) &&
-        (filters.category === '' || filters.category in row.categoryPos)
+        nameMatch &&
+        clubMatch &&
+        teamMatch &&
+        categoryMatch &&
+        legsMatch
       );
     });
 
@@ -226,14 +224,14 @@ export default function RaceResultsDataTable({
       let bVal: string | number;
 
       if (primaryCol === 'raceTitle') {
-        aVal = races?.[a.raceId]?.title ?? a.raceId;
-        bVal = races?.[b.raceId]?.title ?? b.raceId;
-      } else if (primaryCol === 'points') {
-        aVal = a.points ?? 0;
-        bVal = b.points ?? 0;
+        aVal = raceTitle(a.raceId, races);
+        bVal = raceTitle(b.raceId, races);
+      } else if (typeof a[primaryCol] === 'number') {
+        aVal = a[primaryCol] ?? 0;
+        bVal = b[primaryCol] ?? 0;
       } else {
-        aVal = a[primaryCol];
-        bVal = b[primaryCol];
+        aVal = a[primaryCol] ?? "";
+        bVal = b[primaryCol] ?? "";
       }
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -248,20 +246,24 @@ export default function RaceResultsDataTable({
             : bVal.localeCompare(aVal);
       } else if (typeof aVal === 'number' && typeof bVal === 'number') {
         if (primaryCol === 'position' && filters.category !== '') {
-          aVal = a.categoryPos[filters.category];
-          bVal = b.categoryPos[filters.category];
+          aVal = a.categoryPos[filters.category!];
+          bVal = b.categoryPos[filters.category!];
         }
 
         comparison = sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
       }
 
-      // Secondary sort: by position if primary sort is by year and values are equal
-      if (comparison === 0 && primaryCol === 'year')
-        return a.position - b.position;
-
-      // Secondary sort: by year if primary sort is by something else and values are equal
-      if (comparison === 0 && primaryCol !== 'year')
+      if (comparison === 0) {
+        // Secondary sort: by position if primary sort is by year and values are equal
+        if (primaryCol === 'year')
+          return a.position - b.position;
+        if (primaryCol === 'position' && a.leg && b.leg)
+          return typeof a.leg === 'number' && typeof b.leg === 'number'
+            ? a.leg - b.leg
+            : String(a.leg).localeCompare(String(b.leg));
+        // Secondary sort: by year if primary sort is by something else and values are equal
         return a.year.localeCompare(b.year);
+      }
 
       return comparison;
     });
@@ -270,10 +272,9 @@ export default function RaceResultsDataTable({
   }, [
     data,
     filters,
+    displayColumns,
     sortColumn,
     sortDirection,
-    showYearFilter,
-    showRaceFilter,
     races,
     eras,
     selectedVariant,
@@ -299,13 +300,7 @@ export default function RaceResultsDataTable({
   );
 
   const isUnfilteredAllYearsMode =
-    showYearFilter &&
-    filters.year === '' &&
-    filters.name === '' &&
-    filters.club === '' &&
-    filters.category === '' &&
-    filters.raceId === '' &&
-    filters.raceTitle === '';
+    displayColumns.has('year') && !Object.keys(filters.year ?? {}).length;
 
   useEffect(() => {
     if (!isUnfilteredAllYearsMode) return;
@@ -313,12 +308,7 @@ export default function RaceResultsDataTable({
   }, [
     isUnfilteredAllYearsMode,
     capConfig.initial,
-    filters.year,
-    filters.name,
-    filters.club,
-    filters.category,
-    filters.raceId,
-    filters.raceTitle,
+    filters,
     sortColumn,
     sortDirection,
   ]);
@@ -393,7 +383,7 @@ export default function RaceResultsDataTable({
     scrollContainerRef.current?.scrollTo({ top: 0 });
   }, [processedData]);
 
-  const handleSort = (column: SortColumn) => {
+  const handleSort = (column: DisplayColumn | null) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -402,29 +392,22 @@ export default function RaceResultsDataTable({
     }
   };
 
-  const handleFilterChange = (field: keyof Filters, value: string) => {
+  const handleFilterChange = (field: keyof DisplayFilters, value: string) => {
     setFilters((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
-
+  
   const clearFilters = () => {
-    setFilters({
-      year: '',
-      name: '',
-      raceId: '',
-      raceTitle: '',
-      club: '',
-      category: '',
-    });
+    setFilters(displayFilters);
     setSelectedVariant('');
-    setSortColumn(showRaceColumn ? 'raceTitle' : 'year');
-    setSortDirection(showRaceColumn ? 'asc' : 'desc');
+    setSortColumn(displayColumns.has('raceTitle')  ? 'raceTitle' : 'year');
+    setSortDirection(displayColumns.has('raceTitle') ? 'asc' : 'desc');
   };
 
-  const getSortIndicator = (column: SortColumn) => {
-    if (sortColumn !== column) return ' ↕️';
+  const getSortIndicator = () => {
+    if (sortColumn === null) return ' ⇅';
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
@@ -434,8 +417,8 @@ export default function RaceResultsDataTable({
 
     // Apply all filters EXCEPT category
     const eraLabelCat =
-      showYearFilter && filters.year.startsWith('era:')
-        ? filters.year.slice(4)
+      filters.year?.startsWith('era:')
+        ? filters.year?.slice(4)
         : null;
     const activeEraCat =
       eraLabelCat != null
@@ -444,18 +427,18 @@ export default function RaceResultsDataTable({
     result = result.filter((row) => {
       const yearNum = parseInt(row.year.substring(0, 4), 10);
       const yearMatch =
-        !showYearFilter || filters.year === ''
+        !filters.year
           ? true
           : activeEraCat != null
             ? eraContainsYear(activeEraCat, yearNum)
-            : row.year.includes(filters.year);
+            : row.year.includes(filters.year ?? '');
       return (
         yearMatch &&
-        (filters.raceId === '' || row.raceId === filters.raceId) &&
-        (filters.name === '' ||
+        (!filters.raceId || row.raceId === filters.raceId) &&
+        (!filters.name ||
           row.name.toLowerCase().includes(filters.name.toLowerCase())) &&
-        (filters.club === '' ||
-          row.club.toLowerCase().includes(filters.club.toLowerCase()))
+        (!filters.club ||
+          (row.club ?? "").toLowerCase().includes(filters.club.toLowerCase()))
       );
     });
 
@@ -465,39 +448,33 @@ export default function RaceResultsDataTable({
       Object.keys(row.categoryPos).forEach((cat) => uniq.add(cat));
     });
     return Array.from(uniq).sort();
-  }, [
-    data,
-    filters.year,
-    filters.raceId,
-    filters.name,
-    filters.club,
-    showYearFilter,
-    eras,
-  ]);
+  }, [data, filters, eras]);
 
   const availableRaces = useMemo(() => {
-    const uniqueRaceIds = Array.from(new Set(data.map((row) => row.raceId)));
-    return uniqueRaceIds
-      .map((raceId) => ({
-        raceId,
-        title: races?.[raceId]?.title ?? raceId,
-      }))
-      .sort((a, b) => a.title.localeCompare(b.title));
+    return Array.from(new Set(data.map((row) => row.raceId)))
+      .sort((a, b) => raceTitle(a, races).localeCompare(raceTitle(b, races)));
   }, [data, races]);
 
-  useEffect(() => {
-    if (!showRaceFilter) return;
-    if (!initialRaceFilter) {
-      setFilters((prev) => ({ ...prev, raceId: '' }));
-      return;
-    }
+  const availableLegs = useMemo(() => {
+    const uniq = new Set<string | number>();
+    data.forEach((row) => {
+      if (row.leg != null) uniq.add(row.leg);
+    });
+    return Array.from(uniq).sort();
+  }, [data]);
 
-    const hasRace = data.some((row) => row.raceId === initialRaceFilter);
-    setFilters((prev) => ({
-      ...prev,
-      raceId: hasRace ? initialRaceFilter : '',
-    }));
-  }, [data, initialRaceFilter, showRaceFilter]);
+  // useEffect(() => {
+  //   if (filters.raceId) {
+  //     setFilters((prev) => ({ ...prev, raceId: '' }));
+  //     return;
+  //   }
+
+  //   const hasRace = data.some((row) => row.raceId === filters.raceId);
+  //   setFilters((prev) => ({
+  //     ...prev,
+  //     raceId: hasRace ? filters.raceId : '',
+  //   }));
+  // }, [data, filters]);
 
   // Get unique years from data, sorted in ascending order
   const availableYears = useMemo(() => {
@@ -514,17 +491,14 @@ export default function RaceResultsDataTable({
 
   const activeFocusContext = useMemo<ResultsFocusContext | null>(() => {
     if (!onFocusContextChange || !enableRowFocus) return null;
-
-    if (selectedRow) {
+    if (selectedRow)
       return {
         raceId: selectedRow.raceId,
         year: selectedRow.year,
       };
-    }
 
     const firstVisibleRow = displayData[0];
     if (!firstVisibleRow) return null;
-
     return {
       raceId: firstVisibleRow.raceId,
       year: firstVisibleRow.year,
@@ -608,11 +582,7 @@ export default function RaceResultsDataTable({
               >
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
               </button>
-              {((showYearFilter && filters.year) ||
-                (showRaceFilter && filters.raceId) ||
-                filters.name ||
-                filters.club ||
-                filters.category ||
+              {(Object.values(filters).some(Boolean) ||
                 selectedVariant !== '' ||
                 sortColumn) && (
                 <button
@@ -627,35 +597,35 @@ export default function RaceResultsDataTable({
           {showFilters && (
             <div
               id="results-filter-controls"
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+              className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${filterGridColumns}`}
             >
-              {showYearFilter && (
+              {displayFilters.year && (
                 <select
                   value={filters.year}
                   onChange={(e) => handleFilterChange('year', e.target.value)}
                   className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 >
                   <option value="">All Years</option>
-                  {eras && eras.length > 0 && (
-                    <optgroup label="Eras">
-                      {eras.map((era) => (
-                        <option
-                          key={`era:${era.label}`}
-                          value={`era:${era.label}`}
-                        >
-                          {era.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
                   {eras && eras.length > 0 ? (
-                    <optgroup label="Years">
-                      {availableYears.map((year) => (
-                        <option key={year} value={year.toString()}>
-                          {year}
-                        </option>
-                      ))}
-                    </optgroup>
+                    <>
+                      <optgroup label="Eras">
+                        {eras.map((era) => (
+                          <option
+                            key={`era:${era.label}`}
+                            value={`era:${era.label}`}
+                          >
+                            {era.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Years">
+                        {availableYears.map((year) => (
+                          <option key={year} value={year.toString()}>
+                            {year}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </>
                   ) : (
                     availableYears.map((year) => (
                       <option key={year} value={year.toString()}>
@@ -695,29 +665,21 @@ export default function RaceResultsDataTable({
                   })}
                 </div>
               )}
-              {showRaceFilter && (
+              {displayFilters.raceId !== undefined && (
                 <select
                   value={filters.raceId}
                   onChange={(e) => handleFilterChange('raceId', e.target.value)}
                   className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 >
                   <option value="">All Races</option>
-                  {availableRaces.map((race) => (
-                    <option key={race.raceId} value={race.raceId}>
-                      {race.title}
+                  {availableRaces.map(raceId => (
+                    <option key={raceId} value={raceId}>
+                      {raceTitle(raceId, races)}
                     </option>
                   ))}
                 </select>
               )}
-              {showRaceTitle ? (
-                <input
-                  type="text"
-                  placeholder="Filter by Race..."
-                  value={filters.raceTitle}
-                  onChange={(e) => handleFilterChange('raceTitle', e.target.value)}
-                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-              ) : (
+              {displayFilters.name !== undefined && (
                 <input
                   type="text"
                   placeholder="Filter by Name..."
@@ -726,25 +688,52 @@ export default function RaceResultsDataTable({
                   className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
               )}
-              <input
-                type="text"
-                placeholder="Filter by Club..."
-                value={filters.club}
-                onChange={(e) => handleFilterChange('club', e.target.value)}
-                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <select
-                value={filters.category}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              >
-                <option value="">All Categories</option>
-                {availableCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+              {displayFilters.club !== undefined && (
+                <input
+                  type="text"
+                  placeholder="Filter by Club..."
+                  value={filters.club}
+                  onChange={(e) => handleFilterChange('club', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              )}
+              {displayFilters.team !== undefined && (
+                <input
+                  type="text"
+                  placeholder="Filter by Team..."
+                  value={filters.team}
+                  onChange={(e) => handleFilterChange('team', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              )}
+              {displayFilters.leg !== undefined && (
+                <select
+                  value={filters.leg}
+                  onChange={(e) => handleFilterChange('leg', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  <option value="">All Legs</option>
+                  {availableLegs.map((leg) => (
+                    <option key={leg} value={leg}>
+                      Leg {leg}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {displayFilters.category !== undefined && (
+                <select
+                  value={filters.category}
+                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  <option value="">All Categories</option>
+                  {availableCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
         </div>
@@ -810,86 +799,84 @@ export default function RaceResultsDataTable({
             <table className="w-full border-collapse bg-white dark:bg-slate-900">
               <thead ref={theadRef}>
                 <tr className="sticky top-0 border-b-2 border-gray-300 bg-gray-100 dark:border-slate-700 dark:bg-slate-800">
-                  {showRaceColumn && (
+                  {(displayColumns.has('raceTitle')) && (
                     <th
                       onClick={() => handleSort('raceTitle')}
                       className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
-                      Race{' '}
-                      {getSortIndicator(
-                        sortColumn === 'raceTitle' ? 'raceTitle' : null
-                      )}
+                      Race {getSortIndicator()}
                     </th>
                   )}
-                  {!showRaceColumn && (
+                  {displayColumns.has('year') && (
                     <th
                       onClick={() => handleSort('year')}
                       className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
-                      Year{' '}
-                      {getSortIndicator(sortColumn === 'year' ? 'year' : null)}
+                      Year {getSortIndicator()}
                     </th>
                   )}
-                  <th
-                    onClick={() => handleSort('position')}
-                    className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
-                  >
-                    {filters.category === '' ? '' : 'Category '}Position{' '}
-                    {getSortIndicator(
-                      sortColumn === 'position' ? 'position' : null
-                    )}
-                  </th>
-                  {showRaceTitle ? (
+                  {displayColumns.has('position') && (
                     <th
-                      onClick={() => handleSort('raceTitle')}
+                      onClick={() => handleSort('position')}
                       className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
-                      Race{' '}
-                      {getSortIndicator(
-                        sortColumn === 'raceTitle' ? 'raceTitle' : null
-                      )}
+                      {filters.category ? 'Category ' : ''}Position {getSortIndicator()}
                     </th>
-                  ) : (
+                  )}
+                  {displayColumns.has('name') && (
                     <th
                       onClick={() => handleSort('name')}
                       className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
-                      Name{' '}
-                      {getSortIndicator(sortColumn === 'name' ? 'name' : null)}
+                      Name {getSortIndicator()}
                     </th>
                   )}
-                  <th
-                    onClick={() => handleSort('club')}
-                    className="hidden cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:table-cell sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
-                  >
-                    Club{' '}
-                    {getSortIndicator(sortColumn === 'club' ? 'club' : null)}
-                  </th>
-                  <th
-                    onClick={() => handleSort('category')}
-                    className="hidden cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 md:table-cell md:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
-                  >
-                    Category{' '}
-                    {getSortIndicator(
-                      sortColumn === 'category' ? 'category' : null
+                  {displayColumns.has('club') && (
+                    <th
+                      onClick={() => handleSort('club')}
+                      className="hidden cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:table-cell sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Club {getSortIndicator()}
+                    </th>
+                  )}
+                  {displayColumns.has('team') && (
+                    <th
+                      onClick={() => handleSort('team')}
+                      className="hidden cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:table-cell sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Team {getSortIndicator()}
+                    </th>
+                  )}
+                  {displayColumns.has('leg') && (
+                    <th
+                      onClick={() => handleSort('leg')}
+                      className="hidden cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:table-cell sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Leg {getSortIndicator()}
+                    </th>
                     )}
-                  </th>
-                  <th
-                    onClick={() => handleSort('time')}
-                    className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
-                  >
-                    Time{' '}
-                    {getSortIndicator(sortColumn === 'time' ? 'time' : null)}
-                  </th>
-                  {showPointsColumn && (
+                  {displayColumns.has('category') && (
+                    <th
+                      onClick={() => handleSort('category')}
+                      className="hidden cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 md:table-cell md:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Category {getSortIndicator()}
+                    </th>
+                  )}
+                  {displayColumns.has('time') && (
+                    <th
+                      onClick={() => handleSort('time')}
+                      className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Time {getSortIndicator()}
+                    </th>
+                  )}
+                  {displayColumns.has('points') && (
                     <th
                       onClick={() => handleSort('points')}
                       className="cursor-pointer px-2 py-3 text-left text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:px-6 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
-                      Points{' '}
-                      {getSortIndicator(
-                        sortColumn === 'points' ? 'points' : null
-                      )}
+                      Points {getSortIndicator()}
                     </th>
                   )}
                 </tr>
@@ -898,7 +885,7 @@ export default function RaceResultsDataTable({
                 {displayData.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={showPointsColumn ? 7 : 6}
+                      colSpan={displayColumns.size}
                       className="px-6 py-4 text-center text-sm text-gray-500 dark:text-slate-400"
                     >
                       No results match your filters
@@ -909,7 +896,7 @@ export default function RaceResultsDataTable({
                     {paddingTop > 0 && (
                       <tr>
                         <td
-                          colSpan={showPointsColumn ? 7 : 6}
+                          colSpan={displayColumns.size}
                           style={{ height: paddingTop }}
                         />
                       </tr>
@@ -923,7 +910,7 @@ export default function RaceResultsDataTable({
                             className="border-b-2 border-gray-300 bg-gray-100 dark:border-slate-700 dark:bg-slate-800"
                           >
                             <td
-                              colSpan={showPointsColumn ? 7 : 6}
+                              colSpan={displayColumns.size}
                               className="px-2 py-2 sm:px-6"
                             >
                               <span className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-slate-300">
@@ -967,18 +954,18 @@ export default function RaceResultsDataTable({
                               : `${zebraTone} hover:bg-blue-50 dark:hover:bg-slate-800`
                           }`}
                         >
-                          {showRaceColumn && (
+                          {displayColumns.has('raceTitle') && (
                             <td className="px-2 py-4 text-sm text-gray-800 sm:px-6 dark:text-slate-200">
                               <Link
                                 href={`/races/${encodeURIComponent(row.raceId)}?year=${encodeURIComponent(row.year)}`}
                                 className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                               >
-                                {races?.[row.raceId]?.title ?? row.raceId}
+                                {raceTitle(row.raceId, races)}
                                 {races?.[row.raceId]?.hasLegs && row.leg !== undefined && ` (Leg ${row.leg})`}
                               </Link>
                             </td>
                           )}
-                          {!showRaceColumn && (
+                          {displayColumns.has('year') && (
                             <td className="px-2 py-4 text-sm text-gray-800 sm:px-6 dark:text-slate-200">
                               <Link
                                 href={`/years/${encodeURIComponent(row.year.substring(0, 4))}?race=${encodeURIComponent(row.raceId)}`}
@@ -989,22 +976,14 @@ export default function RaceResultsDataTable({
                               </Link>
                             </td>
                           )}
-                          <td className="px-2 py-4 text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
-                            {filters.category === ''
-                              ? row.position
-                              : row.categoryPos[filters.category]}
-                          </td>
-                          {showRaceTitle ? (
-                            <td className="px-2 py-4 text-sm text-gray-800 sm:px-6 dark:text-slate-200">
-                              <Link
-                                href={`/races/${encodeURIComponent(row.raceId)}?year=${encodeURIComponent(row.year)}`}
-                                className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
-                              >
-                                {races?.[row.raceId]?.title ?? row.raceId}
-                                {races?.[row.raceId]?.hasLegs && row.leg !== undefined && ` (Leg ${row.leg})`}
-                              </Link>
+                          {displayColumns.has('position') && (
+                            <td className="px-2 py-4 text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
+                              {!filters.category
+                                ? row.position
+                                : row.categoryPos[filters.category]}
                             </td>
-                          ) : (
+                          )}
+                          {displayColumns.has('name') && (
                             <td className="px-2 py-4 text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
                               <Link
                                 href={`/runner?name=${encodeURIComponent(row.name)}`}
@@ -1014,29 +993,45 @@ export default function RaceResultsDataTable({
                               </Link>
                             </td>
                           )}
-                          <td className="hidden px-2 py-4 text-sm text-gray-800 sm:table-cell sm:px-6 dark:text-slate-200">
-                            {row.club ? (
-                              clubNameToSlug[row.club] ? (
-                                <Link
-                                  href={`/clubs/${encodeURIComponent(clubNameToSlug[row.club])}`}
-                                  className="text-blue-600 hover:underline dark:text-blue-400"
-                                >
-                                  {row.club}
-                                </Link>
-                              ) : (
-                                row.club
-                              )
-                            ) : null}
-                          </td>
-                          <td className="hidden px-2 py-4 text-sm text-gray-800 md:table-cell md:px-6 dark:text-slate-200">
-                            {row.category}
-                          </td>
-                          <td className="px-2 py-4 font-mono text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
-                            {row.time}
-                          </td>
-                          {showPointsColumn && (
+                          {displayColumns.has('club') && (
+                            <td className="hidden px-2 py-4 text-sm text-gray-800 sm:table-cell sm:px-6 dark:text-slate-200">
+                              {row.club ? (
+                                clubNameToSlug[row.club] ? (
+                                  <Link
+                                    href={`/clubs/${encodeURIComponent(clubNameToSlug[row.club])}`}
+                                    className="text-blue-600 hover:underline dark:text-blue-400"
+                                  >
+                                    {row.club}
+                                  </Link>
+                                ) : row.club
+                              ) : null}
+                              </td>
+                          )}
+                          {displayColumns.has('team') && (
+                            <td className="hidden px-2 py-4 text-sm text-gray-800 md:table-cell md:px-6 dark:text-slate-200">
+                              {row.team}
+                            </td>
+                          )}
+                          {displayColumns.has('leg') && (
+                            <td className="hidden px-2 py-4 text-sm text-gray-800 md:table-cell md:px-6 dark:text-slate-200">
+                              {row.leg}
+                            </td>
+                          )}
+                          {displayColumns.has('category') && (
+                            <td className="hidden px-2 py-4 text-sm text-gray-800 md:table-cell md:px-6 dark:text-slate-200">
+                              {row.category}
+                            </td>
+                          )}
+                          {displayColumns.has('time') && (
                             <td className="px-2 py-4 font-mono text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
-                              {(filters.category == 'All' ? row.points : row.categoryPoints?.[filters.category]) ?? '-'}
+                              {row.time}
+                            </td>
+                          )}
+                          {displayColumns.has('points') && (
+                            <td className="px-2 py-4 font-mono text-sm font-semibold text-gray-800 sm:px-6 dark:text-slate-200">
+                              {(filters.category == 'All'
+                                ? row.points
+                                : filters.category ? row.categoryPoints?.[filters.category] : '-') ?? '-'}
                             </td>
                           )}
                         </tr>
@@ -1045,7 +1040,7 @@ export default function RaceResultsDataTable({
                     {paddingBottom > 0 && (
                       <tr>
                         <td
-                          colSpan={showPointsColumn ? 7 : 6}
+                          colSpan={displayColumns.size}
                           style={{ height: paddingBottom }}
                         />
                       </tr>

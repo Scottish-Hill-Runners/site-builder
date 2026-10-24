@@ -205,7 +205,7 @@ export function aggregateTeamResults(
   for (const result of results) {
     if (!result.team) continue; // Skip non-team results
 
-    const teamKey = `${result.raceId}|${result.year}|${result.position}|${result.team}`;
+    const teamKey = `${result.raceId}|${result.year}|${result.team}`;
 
     if (!teamMap.has(teamKey)) {
       teamMap.set(teamKey, {
@@ -221,7 +221,6 @@ export function aggregateTeamResults(
 
     const teamResult = teamMap.get(teamKey)!;
     teamResult.runners.push(result);
-
     // Only build explicit leg columns when there is leg data in this race.
     if (hasAnyLegData) {
       const leg = result.leg ?? 'unknown';

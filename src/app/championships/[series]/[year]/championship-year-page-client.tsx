@@ -285,7 +285,7 @@ function buildRunnerResultsMap(
   rows.forEach((row) => {
     if (
       normalizeFullName(row.name) === normalizedSearchName &&
-      (grouping === 'name' || normalizeFullName(row.club) === normalizedSearchClub)
+      (grouping === 'name' || normalizeFullName(row.club ?? '') === normalizedSearchClub)
     ) {
       const existing = map.get(row.raceId);
       if (!existing || row.position < existing.position) {
@@ -570,7 +570,7 @@ function buildStandings(
 
   rows.forEach((row) => {
     const normalizedName = row.name.trim() || 'Unknown';
-    const normalizedClub = row.club.trim();
+    const normalizedClub = (row.club ?? '').trim();
     const groupKey =
       grouping === 'name'
         ? normalizeFullName(normalizedName)
@@ -872,7 +872,7 @@ export default function ChampionshipYearPageClient({
 
     filteredRows.forEach((row) => {
       const normalizedName = row.name.trim() || 'Unknown';
-      const normalizedClub = row.club.trim();
+      const normalizedClub = (row.club ?? '').trim();
       const groupKey =
         selectedGrouping === 'name'
           ? normalizeFullName(normalizedName)
