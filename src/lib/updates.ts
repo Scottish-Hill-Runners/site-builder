@@ -29,19 +29,16 @@ export async function getRecentUpdates(): Promise<UpdateEntry[]> {
 export function updatePathToRoute(path: string): string | undefined {
   if (path === 'calendar.csv') return '/calendar';
 
-  let match = path.match(/^races\/([-\w]+)\/index\.md$/);
-  if (match) return `/races/${match[1]}`;
-
-  match = path.match(/^races\/([-\w]+)\/(\d{4}(?:-\w+)?)\.csv$/);
+  let match = path.match(/^races\/([-\w]+)\/(\d{4}).*/);
   if (match) return `/races/${match[1]}?year=${match[2]}`;
 
-  match = path.match(/^races\/([-\w]+)\/[-\w]+\.geojson$/);
+  match = path.match(/^races\/([-\w]+)\/.*/);
   if (match) return `/races/${match[1]}`;
 
-  match = path.match(/^clubs\/([-\w]+)(?:\/index)?\.md$/);
+  match = path.match(/^clubs\/([-\w]+)\..*/);
   if (match) return `/clubs/${match[1]}`;
 
-  match = path.match(/^epics\/([-\w]+)\.md$/);
+  match = path.match(/^epics\/([-\w]+)\..*$/);
   if (match) return `/epics/${match[1]}`;
 
   match = path.match(/^info\/(.+)\.md$/);
