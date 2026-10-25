@@ -40,7 +40,8 @@ export type FilterColumn =
   | 'club'
   | 'team'
   | 'leg'
-  | 'category';
+  | 'category'
+  | 'variant';
 type SortDirection = 'asc' | 'desc';
 export type DisplayFilters = Partial<Record<FilterColumn, string>>;
 type YearVirtualItem =
@@ -50,15 +51,6 @@ type YearVirtualItem =
 
 const FILTER_VISIBILITY_STORAGE_KEY = 'raceResults.showFilters';
 const MOBILE_BREAKPOINT = 640;
-const FILTER_GRID_COLUMNS = [
-  'lg:grid-cols-1',
-  'lg:grid-cols-2',
-  'lg:grid-cols-3',
-  'lg:grid-cols-4',
-  'lg:grid-cols-5',
-  'lg:grid-cols-6',
-  'lg:grid-cols-7',
-] as const;
 
 function eraContainsYear(era: Era, year: number): boolean {
   if (era.from !== undefined && year < era.from) return false;
@@ -70,10 +62,8 @@ function eraContainsYear(era: Era, year: number): boolean {
 // after the 4-digit year (if any) identifies a same-day race variant (e.g. a
 // shorter junior course). Returns '' for the main/standard race.
 function getYearVariant(year: string): string {
-  let suffix = year.substring(4);
-  if (suffix.endsWith('*')) suffix = suffix.slice(0, -1);
-  if (suffix.startsWith('-')) suffix = suffix.slice(1);
-  return suffix.length > 1 ? suffix : '';
+  const match = year.match(/^\d{4}-(\w\w+)$/);
+  return match?.[1] ?? '';
 }
 
 export default function RaceResultsDataTable({
@@ -87,17 +77,8 @@ export default function RaceResultsDataTable({
 }: DataTableProps) {
   'use no memo';
 
-  const filterCount = Object.entries(displayFilters).filter(
-    ([filter, value]) =>
-      filter === 'year' ? Boolean(value) : value !== undefined
-  ).length;
-  const filterGridColumns =
-    FILTER_GRID_COLUMNS[
-      Math.min(Math.max(filterCount, 1), FILTER_GRID_COLUMNS.length) - 1
-    ];
-  const [clubNameToSlug, setClubNameToSlug] = useState<Record<string, string>>(
-    {}
-  );
+  const [clubNameToSlug, setClubNameToSlug] =
+    useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchGzipJson<Array<{ name: string; slug: string }>>('/clubs.json.gz')
@@ -126,9 +107,6 @@ export default function RaceResultsDataTable({
   });
   const [filters, setFilters] = useState<DisplayFilters>(displayFilters);
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
-  // '' selects the main race; a suffix (e.g. "3K") selects that variant only.
-  // Main and variant courses are never shown combined.
-  const [selectedVariant, setSelectedVariant] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const lastFocusContextRef = useRef<ResultsFocusContext | null>(null);
@@ -158,22 +136,23 @@ export default function RaceResultsDataTable({
   // years (e.g. numbered legs with no plain-year file).
   const availableVariants = useMemo(() => {
     const variants = new Set<string>();
-    let hasMain = false;
-    for (const row of data) {
-      const variant = getYearVariant(row.year);
-      if (variant === '')
-        hasMain = true;
-      else
-        variants.add(variant);
-    }
-    return hasMain ? Array.from(variants).sort() : [];
+    for (const row of data)
+      variants.add(getYearVariant(row.year));
+    return variants.size == 1 && variants.has('') ? [] : Array.from(variants).sort();
   }, [data]);
 
   useEffect(() => {
-    if (selectedVariant !== '' && !availableVariants.includes(selectedVariant)) {
-      setSelectedVariant('');
+    if (filters.variant !== undefined && !availableVariants.includes(filters.variant)) {
+      handleFilterChange('variant', '');
     }
-  }, [availableVariants, selectedVariant]);
+  }, [availableVariants, filters.variant]);
+
+  const filterGridColumns = useMemo(() => {
+    let filterCount = Object.entries(displayFilters).length;
+    if (displayFilters.variant !== undefined && availableVariants.length == 0)
+      filterCount -= 1;
+    return `lg:grid-cols-${Math.min(Math.max(filterCount, 1), 7)}`;
+  }, [displayFilters, availableVariants]);
 
   // Filter and sort data
   const processedData = useMemo(() => {
@@ -196,7 +175,7 @@ export default function RaceResultsDataTable({
           : activeEra != null
             ? eraContainsYear(activeEra, yearNum)
             : row.year.includes(filters.year ?? '');
-      const variantMatch = availableVariants.length === 0 || getYearVariant(row.year) === selectedVariant;
+      const variantMatch = !filters.variant || getYearVariant(row.year) === filters.variant;
       const nameMatch = !filters.name || row.name.toLowerCase().includes(filters.name!.toLowerCase());
       const clubMatch = !filters.club || (row.club ?? "").toLowerCase().includes(filters.club.toLowerCase());
       const teamMatch = !filters.team || (row.team ?? "").toLowerCase().includes(filters.team.toLowerCase());
@@ -277,8 +256,6 @@ export default function RaceResultsDataTable({
     sortDirection,
     races,
     eras,
-    selectedVariant,
-    availableVariants,
   ]);
   const effectiveSortColumn = sortColumn ?? 'year';
 
@@ -401,7 +378,6 @@ export default function RaceResultsDataTable({
   
   const clearFilters = () => {
     setFilters(displayFilters);
-    setSelectedVariant('');
     setSortColumn(displayColumns.has('raceTitle')  ? 'raceTitle' : 'year');
     setSortDirection(displayColumns.has('raceTitle') ? 'asc' : 'desc');
   };
@@ -582,9 +558,7 @@ export default function RaceResultsDataTable({
               >
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
               </button>
-              {(Object.values(filters).some(Boolean) ||
-                selectedVariant !== '' ||
-                sortColumn) && (
+              {(Object.values(filters).some(Boolean) || sortColumn) && (
                 <button
                   onClick={clearFilters}
                   className="rounded bg-red-100 px-3 py-1 text-xs text-red-700 transition-colors hover:bg-red-200 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-950"
@@ -599,7 +573,7 @@ export default function RaceResultsDataTable({
               id="results-filter-controls"
               className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${filterGridColumns}`}
             >
-              {displayFilters.year && (
+              {displayFilters.year !== undefined && (
                 <select
                   value={filters.year}
                   onChange={(e) => handleFilterChange('year', e.target.value)}
@@ -635,34 +609,20 @@ export default function RaceResultsDataTable({
                   )}
                 </select>
               )}
-              {availableVariants.length > 0 && (
+              {displayFilters.variant !== undefined && availableVariants.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-gray-500 dark:text-slate-400">
-                    Course:
-                  </span>
-                  {['', ...availableVariants].map((variant) => {
-                    const selected = selectedVariant === variant;
-                    return (
-                      <button
-                        key={variant || 'main'}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => setSelectedVariant(variant)}
-                        title={
-                          variant === ''
-                            ? 'Show the main race results'
-                            : `Show only the "${variant}" variant results`
-                        }
-                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                          selected
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/60 dark:text-blue-300'
-                            : 'border-gray-300 bg-white text-gray-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400'
-                        }`}
-                      >
-                        {variant === '' ? 'Main' : variant}
-                      </button>
-                    );
-                  })}
+                  <select
+                    value={filters.variant}
+                    onChange={(e) => handleFilterChange('variant', e.target.value)}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  >
+                    <option value="">All Courses</option>
+                    {availableVariants.map((variant) => (
+                      <option key={variant} value={variant}>
+                        {variant == '' ? 'Main' : variant}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
               {displayFilters.raceId !== undefined && (

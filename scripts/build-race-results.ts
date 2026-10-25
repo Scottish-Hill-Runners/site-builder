@@ -1526,22 +1526,21 @@ async function writeChampionshipResultsData(
           : null;
 
       const excludedClubs = new Set(
-        // *** Just for 2026, allow English runners in.
-        // clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name)
-      );
+        year === '2026' ? [] // *** Just for 2026, allow English runners in.
+        : clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name));
 
       const results =
         championship.resultsFormat === 'standings'
           ? (await readChampionshipStandingsCsv(championship.slug, year, raceIds)).filter(
               (result) =>
-                !excludedClubs.has(result.club) &&
+                !excludedClubs.has(result.club ?? '') &&
                 (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
             )
           : allResults.filter(
               (result) =>
                 result.year.startsWith(year) &&
                 raceSet.has(result.raceId) &&
-                !excludedClubs.has(result.club) &&
+                !excludedClubs.has(result.club ?? '') &&
                 (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
             );
 

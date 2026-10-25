@@ -41,12 +41,6 @@ interface Filters {
 
 const FILTER_VISIBILITY_STORAGE_KEY = 'teamResults.showFilters';
 const MOBILE_BREAKPOINT = 640;
-const FILTER_GRID_COLUMNS = [
-  'lg:grid-cols-1',
-  'lg:grid-cols-2',
-  'lg:grid-cols-3',
-  'lg:grid-cols-4',
-] as const;
 
 export default function TeamResultsDataTable({
   data,
@@ -61,9 +55,8 @@ export default function TeamResultsDataTable({
   const filterCount =
     Number(showYearFilter) +
     Number(showRaceColumn) +
-    1 +
-    Number(showCategoryFilter);
-  const filterGridColumns = FILTER_GRID_COLUMNS[filterCount - 1];
+    Number(showCategoryFilter) + 1;
+  const filterGridColumns = `lg:grid-cols-${filterCount}`;
 
   const [sortColumn, setSortColumn] = useState<SortColumn>('totalTime');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -294,7 +287,7 @@ export default function TeamResultsDataTable({
         <div className="flex flex-col gap-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-              Team View
+              Filters
             </h3>
             <div className="flex items-center gap-2">
               <button
@@ -323,9 +316,6 @@ export default function TeamResultsDataTable({
             >
               {showYearFilter && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-                    Year
-                  </label>
                   <select
                     value={filters.year}
                     onChange={(e) => handleFilterChange('year', e.target.value)}
@@ -343,9 +333,6 @@ export default function TeamResultsDataTable({
               )}
               {showRaceColumn && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-                    Race
-                  </label>
                   <select
                     value={filters.raceId}
                     onChange={(e) =>
@@ -363,20 +350,15 @@ export default function TeamResultsDataTable({
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-                  Team
-                </label>
                 <input
                   value={filters.team}
+                  placeholder="Filter by team"
                   onChange={(e) => handleFilterChange('team', e.target.value)}
                   className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />  
               </div>
               {showCategoryFilter && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-                    Category
-                  </label>
                   <select
                     value={filters.category}
                     onChange={(e) => handleFilterChange('category', e.target.value)}

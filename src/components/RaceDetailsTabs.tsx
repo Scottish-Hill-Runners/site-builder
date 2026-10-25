@@ -169,7 +169,7 @@ export default function RaceDetailsTabs({
   const effectiveInitialYearFilter = initialYearFilter || pageDefaultYear || '';
   const displayColumns = new Set<DisplayColumn>(['position', 'name', 'category', 'time']);
   const displayFilters: DisplayFilters =
-    {year: effectiveInitialYearFilter, name: '', category: initialCategoryFilter}
+    {year: effectiveInitialYearFilter, name: '', category: initialCategoryFilter, variant: ''}
   if (race.hasLegs) {
     displayColumns.add('leg');
     displayFilters.leg = '';
@@ -190,7 +190,7 @@ export default function RaceDetailsTabs({
   const missingResultsForLatestEntry =
     isLatestCalendarEntryPast &&
     Boolean(latestCalendarYear) &&
-    !results.some((r) => r.year === latestCalendarYear);
+    !results.some((r) => r.year.substring(0, 4) === latestCalendarYear);
   const latestCalendarDateLabel = latestCalendarDate
     ? new Date(`${latestCalendarDate}T00:00:00`).toLocaleDateString('en-GB', {
         day: 'numeric',
