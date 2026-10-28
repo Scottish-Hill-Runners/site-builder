@@ -35,17 +35,16 @@ function fillInSchedule(
   if (!data.contents.includes('@Schedule'))
     return data.contents;
 
-  const latestYear = Object.keys(data.years)
-    .filter((y) => data.years[y].length > 0)
-    .sort((a, b) => parseInt(b) - parseInt(a))[0];
+  const currentYear = new Date().getFullYear();
+  const scheduleYears = [String(currentYear + 1), String(currentYear)]
+    .filter((year) => data.years[year]?.length > 0);
   const hasDistanceSlots = !!(data.rules as ChampionshipData['rules'])
     ?.default?.distanceSlots;
-  let scheduleBlock = '';
-  if (latestYear) {
-    const raceIds = data.years[latestYear];
+  const scheduleBlock = scheduleYears.map((year) => {
+    const raceIds = data.years[year];
     const sortedRaceIds = [...raceIds].sort((a, b) => {
-      const dateA = calendarDates?.get(`${latestYear}/${a}`)?.[0];
-      const dateB = calendarDates?.get(`${latestYear}/${b}`)?.[0];
+      const dateA = calendarDates?.get(`${year}/${a}`)?.[0];
+      const dateB = calendarDates?.get(`${year}/${b}`)?.[0];
 
       if (dateA && dateB) return dateA.localeCompare(dateB);
       if (dateA) return -1;
@@ -67,13 +66,13 @@ function fillInSchedule(
           }
         }
 
-        const isoDate = calendarDates?.get(`${latestYear}/${raceId}`)?.[0];
+        const isoDate = calendarDates?.get(`${year}/${raceId}`)?.[0];
         const datePart = isoDate ? ` - ${formatCalendarDate(isoDate)}` : '';
         return `* [${title}](/races/${raceId})${distancePart}${datePart}`;
       })
       .join('\n');
-    scheduleBlock = `## ${latestYear} race schedule\n\nThe ${raceIds.length} races in the ${latestYear} ${data.title} series are:\n\n${items}`;
-  }
+    return `## ${year} race schedule\n\nThe ${raceIds.length} races in the ${year} ${data.title} series are:\n\n${items}`;
+  }).join('\n\n');
 
   return data.contents.replace('@Schedule', scheduleBlock);
 }
@@ -230,7 +229,7 @@ export default function ChampionshipPageClient({
             </h1>
             <div className="mb-6 flex flex-wrap gap-2">
               {Object.keys(data.years)
-                .filter((year) => data.yearHasData?.[year] ?? true)
+                .filter((year) => data.yearHasData?.[year] ?? false)
                 .sort((a, b) => Number(b) - Number(a))
                 .map((year) => (
                   <Link

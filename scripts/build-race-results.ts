@@ -1588,8 +1588,7 @@ async function writeChampionshipResultsData(
         });
       });
 
-      championship.yearHasData[year] =
-        raceIds.length > 0 || championshipResults.length > 0;
+      championship.yearHasData[year] = championshipResults.length > 0;
 
       const maxPatternPosition = Math.max(championshipResults.length, 1);
       const parsedPoints =
