@@ -173,17 +173,10 @@ function isAgeExempt(categories: string[], ageExemption?: number): boolean {
 }
 
 function getDistanceBucket(distance?: number): DistanceBucket {
-  if (typeof distance !== 'number' || Number.isNaN(distance)) {
+  if (typeof distance !== 'number' || Number.isNaN(distance))
     return 'unknown';
-  }
-
-  if (distance < 10) {
-    return 'short';
-  }
-  if (distance > 20) {
-    return 'long';
-  }
-  return 'medium';
+  const d = Math.round(distance);
+  return d < 10 ? 'short' : d >= 20 ? 'long' : 'medium';
 }
 
 function meetsMinimumRequirements(

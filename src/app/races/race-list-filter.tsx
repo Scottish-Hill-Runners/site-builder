@@ -37,10 +37,9 @@ function matchesHighlights(
   }
 
   const distKeys = [...active].filter((k) => k.startsWith('dist:'));
-  if (distKeys.length > 0) {
-    const d = entry.distance;
+  if (distKeys.length > 0 && entry.distance !== undefined) {
+    const d = Math.round(entry.distance);
     const matches = distKeys.some((k) => {
-      if (d === undefined) return false;
       const cat = k.slice(5);
       if (cat === 'S') return d < 10;
       if (cat === 'M') return d >= 10 && d < 20;

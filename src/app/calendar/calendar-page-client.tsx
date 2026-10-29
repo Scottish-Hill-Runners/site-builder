@@ -145,8 +145,8 @@ function matchesHighlights(
 
   // Distance group — OR within
   const distKeys = [...active].filter((k) => k.startsWith('dist:'));
-  if (distKeys.length > 0) {
-    const d = entry.distance;
+  if (distKeys.length > 0 && entry.distance !== undefined) {
+    const d = Math.round(entry.distance);
     const matches = distKeys.some((k) => {
       if (d === undefined) return false;
       const cat = k.slice(5);

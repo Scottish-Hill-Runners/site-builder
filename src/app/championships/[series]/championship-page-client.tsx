@@ -61,7 +61,7 @@ function fillInSchedule(
         if (hasDistanceSlots) {
           const distance = raceEntry?.distance;
           if (distance !== undefined && !Number.isNaN(distance)) {
-            const bucket = distance < 10 ? 'short' : distance > 20 ? 'long' : 'medium';
+            const bucket = distance < 10 ? 'short' : Math.round(distance) >= 20 ? 'long' : 'medium';
             distancePart = ` (${bucket})`;
           }
         }
