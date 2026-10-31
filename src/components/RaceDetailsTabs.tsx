@@ -167,7 +167,7 @@ export default function RaceDetailsTabs({
     [results]
   );
   const effectiveInitialYearFilter = initialYearFilter || pageDefaultYear || '';
-  const displayColumns = new Set<DisplayColumn>(['position', 'name', 'category', 'time']);
+  const displayColumns = new Set<DisplayColumn>(['year', 'position', 'name', 'category', 'time']);
   const displayFilters: DisplayFilters =
     {year: effectiveInitialYearFilter, name: '', category: initialCategoryFilter, variant: ''}
   if (race.hasLegs) {
