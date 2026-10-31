@@ -309,6 +309,8 @@ export default function RunnerPageClient({
               races={races}
               displayColumns={new Set(['raceTitle', 'year', 'position', 'club', 'category', 'time'])}
               displayFilters={{year: '', club: '', category: ''}}
+              initialSortColumn="year"
+              initialSortDirection="desc"
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />

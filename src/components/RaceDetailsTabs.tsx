@@ -320,6 +320,8 @@ export default function RaceDetailsTabs({
                     eras={race.eras}
                     displayColumns={displayColumns}
                     displayFilters={displayFilters}
+                    initialSortColumn="position"
+                    initialSortDirection="asc"
                     enableRowFocus
                     onFocusContextChange={setFocusedResultContext}
                   />

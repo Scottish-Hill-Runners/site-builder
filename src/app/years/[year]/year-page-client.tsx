@@ -149,7 +149,9 @@ export default function YearPageClient({ year }: YearPageClientProps) {
               data={results}
               races={races}
               displayColumns={new Set(['raceTitle', 'position', 'name', 'club', 'category', 'time'])}
-              displayFilters={{year: '', 'raceId': initialRaceFilter, club: '', category: '', name: ''}}
+              displayFilters={{'raceId': initialRaceFilter, club: '', category: '', name: ''}}
+              initialSortColumn="position"
+              initialSortDirection="asc"
               enableRowFocus
               onFocusContextChange={setFocusedResultContext}
             />

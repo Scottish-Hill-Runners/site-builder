@@ -18,6 +18,8 @@ interface DataTableProps {
   eras?: Era[];
   displayColumns: Set<DisplayColumn>;
   displayFilters: DisplayFilters;
+  initialSortColumn: DisplayColumn;
+  initialSortDirection: SortDirection;
   enableRowFocus?: boolean;
   onFocusContextChange?: (context: ResultsFocusContext | null) => void;
 }
@@ -72,6 +74,8 @@ export default function RaceResultsDataTable({
   eras,
   displayColumns,
   displayFilters,
+  initialSortColumn,
+  initialSortDirection,
   enableRowFocus = false,
   onFocusContextChange,
 }: DataTableProps) {
@@ -92,12 +96,8 @@ export default function RaceResultsDataTable({
       .catch(() => {});
   }, []);
 
-  const [sortColumn, setSortColumn] = useState<DisplayColumn | null>(
-    displayColumns.has('raceTitle') ? 'raceTitle' : 'year'
-  );
-  const [sortDirection, setSortDirection] = useState<SortDirection>(
-    displayColumns.has('raceTitle') ? 'asc' : 'desc'
-  );
+  const [sortColumn, setSortColumn] = useState<DisplayColumn | null>(initialSortColumn);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDirection);
   const [showFilters, setShowFilters] = useState(() => {
     if (typeof window === 'undefined') return true;
     const savedValue = window.localStorage.getItem(
