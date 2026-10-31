@@ -152,14 +152,39 @@ export interface TeamResult {
   points: number;
 }
 
+/** One row of a historic final-standings table (individual or team). */
+export interface HistoricStandingRow {
+  /** As published, e.g. "16="; empty if the CSV has no Position column. */
+  position: string;
+  name: string;
+  club: string;
+  category: string;
+  /** Points per race, aligned with `HistoricStandings.columns`; null if not scored. */
+  points: (number | null)[];
+  total: number | null;
+}
+
+/** A race column, or a published subtotal column such as "Total Short". */
+export interface HistoricColumn {
+  /** Race ID for races; the published header text for subtotals. */
+  id: string;
+  kind: 'race' | 'subtotal';
+}
+
+export interface HistoricStandings {
+  columns: HistoricColumn[];
+  individuals: HistoricStandingRow[];
+  teams: HistoricStandingRow[];
+}
+
 export interface ChampionshipYearPayload {
   title: string;
   /**
-   * 'standings' championships have no individual race results (position/time);
-   * `results` rows carry final per-race points read directly from a CSV.
+   * 'historic' years carry only final standings (`historic`), shown as published.
    */
-  resultsFormat?: 'race-results' | 'standings';
-  rules: ScoringRules;
+  resultsFormat?: 'race-results' | 'historic';
+  /** Absent for historic years, which are not scored using rules. */
+  rules?: ScoringRules;
   results: RaceResult[];
   /** Optional race-level participation bonuses (raceId -> bonus points). */
   participationBonusByRace?: Record<string, number>;
@@ -170,6 +195,7 @@ export interface ChampionshipYearPayload {
    */
   raceSchedule?: { raceId: string; date?: string }[];
   teams?: TeamResult[];
+  historic?: HistoricStandings;
 }
 
 export interface CalendarEntry {

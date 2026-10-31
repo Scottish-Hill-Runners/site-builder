@@ -3,9 +3,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
-import type { ChampionshipYearPayload, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
+import type { ChampionshipYearPayload, HistoricStandings, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
 import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
 import { normalizeFullName } from '@/lib/runner-name';
+import HistoricStandingsView from './historic-standings';
 
 interface ChampionshipYearPageClientProps {
   series: string;
@@ -394,17 +395,19 @@ function EventLink({
   raceId,
   points,
   raceMetadata,
+  year,
 }: {
   raceId: string;
   points: number;
   raceMetadata: RaceMetadata;
+  year: string;
 }) {
   const title = raceMetadata[raceId]?.title;
   return (
     <>
       {title ? (
         <Link
-          href={`/races/${encodeURIComponent(raceId)}`}
+          href={`/races/${encodeURIComponent(raceId)}?year=${encodeURIComponent(year)}`}
           className="text-blue-600 hover:underline dark:text-blue-400"
         >
           {title}
@@ -419,13 +422,14 @@ function EventLink({
 
 function renderEventList(
   events: Array<{ raceId: string; points: number }> | undefined,
-  raceMetadata: RaceMetadata
+  raceMetadata: RaceMetadata,
+  year: string
 ) {
   if (!events || events.length === 0) return null;
   return events.map((event, index) => (
     <Fragment key={`${event.raceId}-${index}`}>
       {index > 0 ? ', ' : ''}
-      <EventLink raceId={event.raceId} points={event.points} raceMetadata={raceMetadata} />
+      <EventLink raceId={event.raceId} points={event.points} raceMetadata={raceMetadata} year={year} />
     </Fragment>
   ));
 }
@@ -706,6 +710,7 @@ export default function ChampionshipYearPageClient({
   const [selectedCategoryPos, setSelectedCategoryPos] = useState<string>('');
   const [selectedClub, setSelectedClub] = useState<string>('All');
   const [raceSchedule, setRaceSchedule] = useState<RaceScheduleEntry[]>([]);
+  const [historic, setHistoric] = useState<HistoricStandings | null>(null);
   const [prebuiltTeams, setPrebuiltTeams] = useState<TeamResult[] | null>(null);
   const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>('');
   const [expandedTeamClub, setExpandedTeamClub] = useState<string | null>(null);
@@ -1073,13 +1078,15 @@ export default function ChampionshipYearPageClient({
 
         if (!isCancelled) {
           if (result.status === 'ok') {
-            setScoringRules(result.data.rules);
+            setScoringRules(result.data.rules ?? null);
+            setHistoric(result.data.historic ?? null);
             setResults(result.data.results);
             setRaceSchedule(result.data.raceSchedule ?? []);
             setPrebuiltTeams(result.data.teams ?? null);
             setTitle(result.data.title ?? series);
           } else if (result.status === 'not-found') {
             setIsNotFound(true);
+            setHistoric(null);
             setScoringRules(null);
             setResults(null);
             setRaceSchedule([]);
@@ -1105,6 +1112,7 @@ export default function ChampionshipYearPageClient({
             'Failed to load championship results. Please try again later.'
           );
           setScoringRules(null);
+          setHistoric(null);
           setResults(null);
           setPrebuiltTeams(null);
         }
@@ -1194,6 +1202,15 @@ export default function ChampionshipYearPageClient({
               Try again in a few minutes.
             </p>
           </div>
+        ) : historic ? (
+          <HistoricStandingsView
+            standings={historic}
+            year={year}
+            raceMetadata={raceMetadata}
+            clubSlugs={Object.fromEntries(
+              Object.entries(clubNameToInfo).map(([name, info]) => [name, info.slug])
+            )}
+          />
         ) : results ? (
           <div className="space-y-4">
             {scoringRules?.teamSize && (
@@ -1362,12 +1379,12 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {renderEventList(runner.countingEvents, raceMetadata)}
+                                {renderEventList(runner.countingEvents, raceMetadata, year)}
                                 {runner.remainingEvents &&
                                 runner.remainingEvents.length > 0 ? (
                                   <>
                                     {' ('}
-                                    {renderEventList(runner.remainingEvents, raceMetadata)}
+                                    {renderEventList(runner.remainingEvents, raceMetadata, year)}
                                     {')'}
                                   </>
                                 ) : null}
@@ -1441,7 +1458,7 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {renderEventList(runner.countingEvents, raceMetadata)}
+                                {renderEventList(runner.countingEvents, raceMetadata, year)}
                                 {runner.remainingEvents &&
                                 runner.remainingEvents.length > 0 ? (
                                   <>
@@ -1450,7 +1467,7 @@ export default function ChampionshipYearPageClient({
                                       ? ' '
                                       : ''}
                                     {'('}
-                                    {renderEventList(runner.remainingEvents, raceMetadata)}
+                                    {renderEventList(runner.remainingEvents, raceMetadata, year)}
                                     {')'}
                                   </>
                                 ) : null}
