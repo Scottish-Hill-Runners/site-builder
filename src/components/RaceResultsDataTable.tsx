@@ -21,6 +21,7 @@ interface DataTableProps {
   initialSortColumn: DisplayColumn;
   initialSortDirection: SortDirection;
   enableRowFocus?: boolean;
+  hideYearHeadersWhenRaceFiltered?: boolean;
   onFocusContextChange?: (context: ResultsFocusContext | null) => void;
 }
 
@@ -77,6 +78,7 @@ export default function RaceResultsDataTable({
   initialSortColumn,
   initialSortDirection,
   enableRowFocus = false,
+  hideYearHeadersWhenRaceFiltered = false,
   onFocusContextChange,
 }: DataTableProps) {
   'use no memo';
@@ -258,6 +260,9 @@ export default function RaceResultsDataTable({
     eras,
   ]);
   const effectiveSortColumn = sortColumn ?? 'year';
+  const showYearHeaders =
+    effectiveSortColumn === 'year' &&
+    !(hideYearHeadersWhenRaceFiltered && filters.raceId);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -309,7 +314,7 @@ export default function RaceResultsDataTable({
   );
 
   const virtualItemList = useMemo((): YearVirtualItem[] => {
-    if (effectiveSortColumn !== 'year') {
+    if (!showYearHeaders) {
       return displayData.map((data, dataIndex) => ({
         type: 'row' as const,
         data,
@@ -333,7 +338,7 @@ export default function RaceResultsDataTable({
       items.push({ type: 'row', data: row, dataIndex: i });
     }
     return items;
-  }, [displayData, effectiveSortColumn]);
+  }, [displayData, showYearHeaders]);
 
   // Pre-compute the scroll offset of each year-header so the scroll listener
   // can determine which year is currently "behind" the sticky column header.
@@ -734,7 +739,7 @@ export default function RaceResultsDataTable({
             className="max-h-screen overflow-y-auto"
             ref={scrollContainerRef}
           >
-            {stickyHeader !== null && (
+            {showYearHeaders && stickyHeader !== null && (
               <div
                 style={{
                   position: 'sticky',
