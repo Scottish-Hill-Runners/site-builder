@@ -2,10 +2,10 @@
 
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
-import type { HistoricColumn, HistoricStandingRow, HistoricStandings, RaceInfo } from '@/types/datatable';
+import type { OfficialColumn, OfficialStandingRow, OfficialStandings, RaceInfo } from '@/types/datatable';
 
-interface HistoricStandingsViewProps {
-  standings: HistoricStandings;
+interface OfficialStandingsViewProps {
+  standings: OfficialStandings;
   raceMetadata: Record<string, RaceInfo>;
   clubSlugs: Record<string, string>;
   year: string;
@@ -18,19 +18,19 @@ const TH = 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-6
 const TD = 'px-4 py-3 text-sm text-slate-700 dark:text-slate-200';
 
 /** Final standings exactly as published; nothing is recomputed. */
-export default function HistoricStandingsView({
+export default function OfficialStandingsView({
   standings,
   raceMetadata,
   clubSlugs,
   year,
-}: HistoricStandingsViewProps) {
+}: OfficialStandingsViewProps) {
   const { columns, individuals, teams } = standings;
   const [tab, setTab] = useState<'individuals' | 'teams'>('individuals');
   const [category, setCategory] = useState<string>('All');
 
   const showTeams = tab === 'teams' && teams.length > 0;
   const categories = Array.from(new Set(individuals.map((r) => r.category))).sort();
-  const rows: HistoricStandingRow[] = showTeams
+  const rows: OfficialStandingRow[] = showTeams
     ? teams
     : category === 'All'
       ? individuals
@@ -48,10 +48,10 @@ export default function HistoricStandingsView({
       club
     );
 
-  const renderEvents = (row: HistoricStandingRow) => {
+  const renderEvents = (row: OfficialStandingRow) => {
     const events = columns
       .map((column, i) => ({ column, points: row.points[i] }))
-      .filter((e): e is { column: HistoricColumn; points: number } => e.points !== null)
+      .filter((e): e is { column: OfficialColumn; points: number } => e.points !== null)
       .sort((a, b) => b.points - a.points);
     return events.map(({ column, points }, i) => {
       const title = column.kind === 'race' ? raceMetadata[column.id]?.title : undefined;
@@ -106,13 +106,13 @@ export default function HistoricStandingsView({
         {!showTeams && categories.length > 1 && (
           <div className="flex items-center gap-2">
             <label
-              htmlFor="historic-category-select"
+              htmlFor="official-category-select"
               className="text-sm font-semibold text-slate-700 dark:text-slate-200"
             >
               Category:
             </label>
             <select
-              id="historic-category-select"
+              id="official-category-select"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"

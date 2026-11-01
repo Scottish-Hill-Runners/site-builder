@@ -18,7 +18,7 @@ interface ChampionshipData {
   contents: string;
   years: { [year: string]: string[] };
   yearHasData?: { [year: string]: boolean };
-  historicYears?: string[];
+  officialYears?: string[];
   rules?: {
     default?: Partial<ScoringRules>;
     [year: string]: Partial<ScoringRules> | undefined;
@@ -230,19 +230,19 @@ export default function ChampionshipPageClient({
             </h1>
             <div className="mb-6 flex flex-wrap gap-2">
               {Object.keys(data.years)
-                .filter((year) => data.yearHasData?.[year] ?? false)
+                .filter((year) => data.yearHasData?.[year])
                 .sort((a, b) => Number(b) - Number(a))
                 .map((year) => {
-                  const isHistoric = data.historicYears?.includes(year) ?? false;
+                  const isOfficial = data.officialYears?.includes(year);
                   return (
                     <Link
                       key={year}
                       href={`/championships/${encodeURIComponent(series)}/${encodeURIComponent(year)}`}
-                      title={isHistoric ? 'Historic results (final standings only)' : undefined}
+                      title={isOfficial ? 'Official results' : 'Incomplete or provisional results'}
                       className={
-                        isHistoric
-                          ? 'inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900'
-                          : 'inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                        isOfficial
+                          ? 'inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                          : 'inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900'
                       }
                     >
                       {year}
@@ -250,11 +250,10 @@ export default function ChampionshipPageClient({
                   );
                 })}
             </div>
-            {data.historicYears && data.historicYears.length > 0 && (
+            {Object.keys(data.years).some((year) => data.yearHasData?.[year] && !data.officialYears?.includes(year)) && (
               <p className="-mt-3 mb-6 text-xs text-slate-500 dark:text-slate-400">
                 <span className="mr-1 inline-block size-2 rounded-sm border border-amber-300 bg-amber-50 align-baseline dark:border-amber-700 dark:bg-amber-950" />
-                Highlighted years show historic results (final standings only).
-                Note that final standings for other years may be incomplete or missing.
+                Highlighted years show incomplete or provisional results.
               </p>
             )}
             <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none">

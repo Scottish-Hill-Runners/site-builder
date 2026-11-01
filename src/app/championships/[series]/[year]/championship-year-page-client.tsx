@@ -3,10 +3,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
-import type { ChampionshipYearPayload, HistoricStandings, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
+import type { ChampionshipYearPayload, OfficialStandings, RaceInfo, RaceResult, ScoringRules, TeamResult } from '@/types/datatable';
 import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
 import { normalizeFullName } from '@/lib/runner-name';
-import HistoricStandingsView from './historic-standings';
+import OfficialStandingsView from './official-standings';
 
 interface ChampionshipYearPageClientProps {
   series: string;
@@ -710,7 +710,7 @@ export default function ChampionshipYearPageClient({
   const [selectedCategoryPos, setSelectedCategoryPos] = useState<string>('');
   const [selectedClub, setSelectedClub] = useState<string>('All');
   const [raceSchedule, setRaceSchedule] = useState<RaceScheduleEntry[]>([]);
-  const [historic, setHistoric] = useState<HistoricStandings | null>(null);
+  const [official, setOfficial] = useState<OfficialStandings | null>(null);
   const [prebuiltTeams, setPrebuiltTeams] = useState<TeamResult[] | null>(null);
   const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>('');
   const [expandedTeamClub, setExpandedTeamClub] = useState<string | null>(null);
@@ -1079,14 +1079,14 @@ export default function ChampionshipYearPageClient({
         if (!isCancelled) {
           if (result.status === 'ok') {
             setScoringRules(result.data.rules ?? null);
-            setHistoric(result.data.historic ?? null);
+            setOfficial(result.data.official ?? null);
             setResults(result.data.results);
             setRaceSchedule(result.data.raceSchedule ?? []);
             setPrebuiltTeams(result.data.teams ?? null);
             setTitle(result.data.title ?? series);
           } else if (result.status === 'not-found') {
             setIsNotFound(true);
-            setHistoric(null);
+            setOfficial(null);
             setScoringRules(null);
             setResults(null);
             setRaceSchedule([]);
@@ -1112,7 +1112,7 @@ export default function ChampionshipYearPageClient({
             'Failed to load championship results. Please try again later.'
           );
           setScoringRules(null);
-          setHistoric(null);
+          setOfficial(null);
           setResults(null);
           setPrebuiltTeams(null);
         }
@@ -1202,9 +1202,9 @@ export default function ChampionshipYearPageClient({
               Try again in a few minutes.
             </p>
           </div>
-        ) : historic ? (
-          <HistoricStandingsView
-            standings={historic}
+        ) : official ? (
+          <OfficialStandingsView
+            standings={official}
             year={year}
             raceMetadata={raceMetadata}
             clubSlugs={Object.fromEntries(

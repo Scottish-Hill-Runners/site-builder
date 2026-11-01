@@ -8,8 +8,8 @@ import { buildElevationChartData } from './elevation-chart';
 import { surnameHash, normalizeFullName } from '@/lib/runner-name';
 import {
   ChampionshipYearPayload,
-  HistoricColumn,
-  HistoricStandingRow,
+  OfficialColumn,
+  OfficialStandingRow,
   DistanceSlotsRule,
   ElevationChartData,
   Era,
@@ -62,7 +62,7 @@ type ChampionshipData = {
   };
   yearHasData?: { [year: string]: boolean };
   /** Years whose results come from a published {slug}/{year}.csv rather than computed standings. */
-  historicYears?: string[];
+  officialYears?: string[];
   rules?: {
     default?: Partial<ScoringRules>;
     [year: string]: Partial<ScoringRules> | undefined;
@@ -1434,17 +1434,17 @@ function resolveRules(data: ChampionshipData, year: string): ScoringRules {
 }
 
 /**
- * Reads a historic `{year}.csv`, which is always used in preference to computing
+ * Reads an official `{year}.csv`, which is always used in preference to computing
  * standings from race results. Columns are matched by header, in any order:
  * Position (optional), Name (or Runner), Club, Category, Total (or Points; computed
  * from the championship rules if absent) and one column per race. Rows whose Club
  * is "TEAM" are team results (the Name column holds the club name). Throws if the
  * file cannot be used, so that the build fails.
  */
-async function readHistoricStandingsCsv(
+async function readOfficialStandingsCsv(
   championship: ChampionshipData,
   year: string
-): Promise<{ columns: HistoricColumn[]; individuals: HistoricStandingRow[]; teams: HistoricStandingRow[] }> {
+): Promise<{ columns: OfficialColumn[]; individuals: OfficialStandingRow[]; teams: OfficialStandingRow[] }> {
   const slug = championship.slug;
   const where = `${slug}/${year}.csv`;
   const csvPath = path.join(contentPath('championships'), slug, `${year}.csv`);
@@ -1464,7 +1464,7 @@ async function readHistoricStandingsCsv(
 
   const fixed = new Set([positionKey, nameKey, clubKey, categoryKey, totalKey]);
   // "Total Short" etc. are published subtotals, not races.
-  const columns: HistoricColumn[] = keys
+  const columns: OfficialColumn[] = keys
     .filter((k) => !fixed.has(k))
     .map((k) => ({ id: k, kind: /^total\b/i.test(k.trim()) ? 'subtotal' : 'race' }));
   const raceColumns = columns.filter((c) => c.kind === 'race');
@@ -1498,8 +1498,8 @@ async function readHistoricStandingsCsv(
     return counted + extra * (rules!.additionalRaceBonus ?? 0);
   };
 
-  const individuals: HistoricStandingRow[] = [];
-  const teams: HistoricStandingRow[] = [];
+  const individuals: OfficialStandingRow[] = [];
+  const teams: OfficialStandingRow[] = [];
   for (const row of rows) {
     const rawName = (row[nameKey] ?? '').trim();
     if (!rawName) continue;
@@ -1548,25 +1548,25 @@ async function writeChampionshipResultsData(
 ): Promise<void> {
   for (const championship of championships) {
     championship.yearHasData = {};
-    championship.historicYears = [];
+    championship.officialYears = [];
 
     for (const [year, raceIds] of Object.entries(championship.years)) {
       if (fs.existsSync(path.join(contentPath('championships'), championship.slug, `${year}.csv`))) {
-        const historic = await readHistoricStandingsCsv(championship, year);
-        championship.historicYears!.push(year);
-        championship.yearHasData[year] = historic.individuals.length + historic.teams.length > 0;
+        const official = await readOfficialStandingsCsv(championship, year);
+        championship.officialYears!.push(year);
+        championship.yearHasData[year] = official.individuals.length + official.teams.length > 0;
         const payload: ChampionshipYearPayload = {
           title: championship.title,
-          resultsFormat: 'historic',
+          resultsFormat: 'official',
           results: [],
-          raceSchedule: historic.columns.filter((c) => c.kind === 'race').map(({ id: raceId }) => {
+          raceSchedule: official.columns.filter((c) => c.kind === 'race').map(({ id: raceId }) => {
             const date = calendarDates.get(`${year}/${raceId}`)?.[0];
             return date ? { raceId, date } : { raceId };
           }),
-          historic: {
-            columns: historic.columns,
-            individuals: historic.individuals,
-            teams: historic.teams,
+          official: {
+            columns: official.columns,
+            individuals: official.individuals,
+            teams: official.teams,
           },
         };
         writeGz(outputDir, `${championship.slug}-${year}.json`, JSON.stringify(payload));

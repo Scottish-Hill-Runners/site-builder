@@ -152,38 +152,38 @@ export interface TeamResult {
   points: number;
 }
 
-/** One row of a historic final-standings table (individual or team). */
-export interface HistoricStandingRow {
+/** One row of an official final-standings table (individual or team). */
+export interface OfficialStandingRow {
   /** As published, e.g. "16="; empty if the CSV has no Position column. */
   position: string;
   name: string;
   club: string;
   category: string;
-  /** Points per race, aligned with `HistoricStandings.columns`; null if not scored. */
+  /** Points per race, aligned with `OfficialStandings.columns`; null if not scored. */
   points: (number | null)[];
   total: number | null;
 }
 
 /** A race column, or a published subtotal column such as "Total Short". */
-export interface HistoricColumn {
+export interface OfficialColumn {
   /** Race ID for races; the published header text for subtotals. */
   id: string;
   kind: 'race' | 'subtotal';
 }
 
-export interface HistoricStandings {
-  columns: HistoricColumn[];
-  individuals: HistoricStandingRow[];
-  teams: HistoricStandingRow[];
+export interface OfficialStandings {
+  columns: OfficialColumn[];
+  individuals: OfficialStandingRow[];
+  teams: OfficialStandingRow[];
 }
 
 export interface ChampionshipYearPayload {
   title: string;
   /**
-   * 'historic' years carry only final standings (`historic`), shown as published.
+   * 'official' years carry final standings (`official`), shown as published.
    */
-  resultsFormat?: 'race-results' | 'historic';
-  /** Absent for historic years, which are not scored using rules. */
+  resultsFormat?: 'race-results' | 'official';
+  /** Absent for official years, which are not scored using rules. */
   rules?: ScoringRules;
   results: RaceResult[];
   /** Optional race-level participation bonuses (raceId -> bonus points). */
@@ -195,7 +195,7 @@ export interface ChampionshipYearPayload {
    */
   raceSchedule?: { raceId: string; date?: string }[];
   teams?: TeamResult[];
-  historic?: HistoricStandings;
+  official?: OfficialStandings;
 }
 
 export interface CalendarEntry {
