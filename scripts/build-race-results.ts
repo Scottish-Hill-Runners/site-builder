@@ -49,6 +49,43 @@ type NameChangeRule = {
   toYear?: number;
 };
 
+type RecordHistory = Record<string, Array<{ year: number; time: string }>>;
+
+// Accepts `- Race: [ {'2012': '3:07:19'}, ... ]` (and plain maps in place of lists).
+function parseRecordHistory(value: unknown): RecordHistory {
+  const history: RecordHistory = {};
+  const raceBlocks = Array.isArray(value) ? value : value ? [value] : [];
+  for (const block of raceBlocks) {
+    if (!block || typeof block !== 'object') continue;
+    for (const [raceId, entries] of Object.entries(block as Record<string, unknown>)) {
+      const list = Array.isArray(entries) ? entries : [entries];
+      for (const item of list) {
+        if (!item || typeof item !== 'object') continue;
+        for (const [yearKey, time] of Object.entries(item as Record<string, unknown>)) {
+          const year = Number.parseInt(yearKey, 10);
+          if (Number.isNaN(year) || (typeof time !== 'string' && typeof time !== 'number')) continue;
+          (history[raceId] ??= []).push({ year, time: String(time) });
+        }
+      }
+    }
+  }
+  for (const list of Object.values(history)) list.sort((a, b) => a.year - b.year);
+  return history;
+}
+
+// Latest record set in or before `year`, if any.
+function recordForYear(history: RecordHistory | undefined, raceId: string, year: string): string | undefined {
+  const y = Number.parseInt(year, 10);
+  let found: string | undefined;
+  for (const entry of history?.[raceId] ?? []) {
+    if (entry.year <= y)
+      found = entry.time;
+    else
+      break;
+  }
+  return found;
+}
+
 type ChampionshipData = {
   slug: string;
   title: string;
@@ -60,6 +97,9 @@ type ChampionshipData = {
       tieBreakRaceId?: string;
     };
   };
+  /** Per-race record history, sorted by year ascending: raceId -> [year, record time] */
+  maleRecords?: RecordHistory;
+  femaleRecords?: RecordHistory;
   yearHasData?: { [year: string]: boolean };
   /** Years whose results come from a published {slug}/{year}.csv rather than computed standings. */
   officialYears?: string[];
@@ -1200,6 +1240,8 @@ function readChampionships(): ChampionshipData[] {
       contents: content,
       years,
       yearScoring,
+      maleRecords: parseRecordHistory(data.maleRecords),
+      femaleRecords: parseRecordHistory(data.femaleRecords),
       rules: data.rules as ChampionshipData['rules'],
     });
   }
@@ -1662,9 +1704,15 @@ async function writeChampionshipResultsData(
             if (refMode === 'mf-record') {
               const raceEntry = raceMap.get(row.raceId);
               if (raceEntry) {
-                const mRec = extractRecord(raceEntry.meta.info.maleRecord);
+                const mRec = extractRecord(
+                  recordForYear(championship.maleRecords, row.raceId, year) ??
+                    raceEntry.meta.info.maleRecord
+                );
                 if (mRec) raceWinnerTimes.set('M', mRec);
-                const fRec = extractRecord(raceEntry.meta.info.femaleRecord);
+                const fRec = extractRecord(
+                  recordForYear(championship.femaleRecords, row.raceId, year) ??
+                    raceEntry.meta.info.femaleRecord
+                );
                 if (fRec) raceWinnerTimes.set('F', fRec);
               }
             }
