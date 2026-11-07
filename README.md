@@ -56,6 +56,10 @@ The pre-build step generates compressed JSON files.
 - `championships.json` contains an entry for each championship series.
 - Race reports are written separately to `public/reports/{raceId}.json.gz`.
 
+Race metadata can specify an absolute `raceDate`, such as `13th June 2027`
+or `Sunday 13th June 2027`. The weekday is optional and is ignored when
+calculating the date. The year is also optional for recurring dates.
+
 ```text
 ├── public/
 │   └── results/

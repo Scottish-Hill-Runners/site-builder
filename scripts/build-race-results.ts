@@ -911,7 +911,7 @@ function parseRaceDateRule(raw: string): ParsedRaceDateRule | null {
     return { kind: 'day-after', raceId: dayAfterMatch[1] };
   }
 
-  const absoluteMatch = rule.match(/^(\d+)(st|nd|rd|th) (January|February|March|April|May|June|July|August|September|October|November|December) ?(\d{4})?$/i);
+  const absoluteMatch = rule.match(/^(?:(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday) )?(\d+)(st|nd|rd|th) (January|February|March|April|May|June|July|August|September|October|November|December) ?(\d{4})?$/i);
   if (absoluteMatch) {
     const ordinal = Number.parseInt(absoluteMatch[1], 10);
     const month = MONTH_TO_INDEX[absoluteMatch[3].toLowerCase()];
