@@ -17,9 +17,10 @@ interface RacePageClientProps {
   raceId: string;
   hero?: AssetEntry;
   gallery: AssetEntry[];
+  hasReports: boolean;
 }
 
-export default function RacePageClient({ raceId, hero, gallery }: RacePageClientProps) {
+export default function RacePageClient({ raceId, hero, gallery, hasReports }: RacePageClientProps) {
   const searchParams = useSearchParams();
   const initialCategoryFilter = searchParams.get('category') ?? '';
   const initialYearFilter = searchParams.get('year') ?? '';
@@ -171,6 +172,7 @@ export default function RacePageClient({ raceId, hero, gallery }: RacePageClient
               resultsError={null}
               heroImage={hero}
               galleryImages={gallery}
+              hasReports={hasReports}
               initialTab={initialTab}
               initialYearFilter={initialYearFilter}
               initialCategoryFilter={initialCategoryFilter}

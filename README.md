@@ -54,6 +54,7 @@ The pre-build step generates compressed JSON files.
 - A `years.json` file gives statistics of the number of runners in each category for each year.
 - `races.json` contains an entry for each race, with race details and organiser contact information.
 - `championships.json` contains an entry for each championship series.
+- Race reports are written separately to `public/reports/{raceId}.json.gz`.
 
 ```text
 ├── public/
@@ -70,6 +71,36 @@ The pre-build step generates compressed JSON files.
 │       └── championships.json.gz
 └── ... other project files
 ```
+
+## Race reports
+
+Place reports in `content/races/{raceId}/{year}[-suffix].md`, alongside
+the race's `index.md` and results. The four-digit year identifies the report
+year; an optional non-empty suffix distinguishes multiple reports in that year.
+The report is Markdown and may have YAML frontmatter containing string fields
+`title`, `author`, and `excerpt`:
+
+```markdown
+---
+title: A day on the hill
+author: A Runner
+excerpt: A report from the race.
+---
+
+The report goes here.
+```
+
+The build writes one gzip-compressed JSON array per race with reports to
+`public/reports/{raceId}.json.gz`. Each entry contains `slug` (the filename
+without `.md`), numeric `year`, Markdown `content`, and any supplied metadata
+fields. Entries are ordered by year descending, then slug ascending. Races
+without reports have no file; obsolete report files are removed on rebuild.
+`CONTENT_ROOT` applies to these files as it does to other content.
+
+Visitors can use **Add a race report** on the race info or reports tab to
+compose a report and send it by email for review. The form requests a race year
+and report, with optional title, author, and excerpt. Each submission suggests
+a distinct year-prefixed filename so reports for the same year can coexist.
 
 ## CSV format
 

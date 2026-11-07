@@ -43,6 +43,8 @@ import RaceInfoEditDialog from '@/components/RaceInfoEditDialog';
 import RouteSubmitDialog from '@/components/RouteSubmitDialog';
 import { CORRECTIONS_EMAIL, RESULTS_EMAIL, UPDATES_EMAIL } from '@/lib/site-config';
 import { cloudinaryUrl } from '@/lib/cloudinary';
+import RaceReports from '@/components/RaceReports';
+import RaceReportCreateDialog from '@/components/RaceReportCreateDialog';
 
 interface RaceDetailsTabsProps {
   raceId: string;
@@ -56,6 +58,7 @@ interface RaceDetailsTabsProps {
   resultsError: string | null;
   heroImage?: AssetEntry;
   galleryImages: AssetEntry[];
+  hasReports: boolean;
   initialTab?: TabKey;
   initialYearFilter?: string;
   initialCategoryFilter?: string;
@@ -63,7 +66,7 @@ interface RaceDetailsTabsProps {
   latestCalendarDate?: string;
 }
 
-type TabKey = 'results' | 'info' | 'gpx' | 'gallery';
+type TabKey = 'results' | 'info' | 'gpx' | 'gallery' | 'reports';
 
 function filenameToAltText(sourcePath: string): string {
   const fileName = sourcePath.split('/').pop() ?? sourcePath;
@@ -85,6 +88,7 @@ export default function RaceDetailsTabs({
   resultsError,
   heroImage,
   galleryImages,
+  hasReports,
   initialTab,
   initialYearFilter = '',
   initialCategoryFilter = '',
@@ -96,7 +100,8 @@ export default function RaceDetailsTabs({
       initialTab === 'results' ||
       initialTab === 'info' ||
       initialTab === 'gpx' ||
-      initialTab === 'gallery'
+      initialTab === 'gallery' ||
+      (initialTab === 'reports' && hasReports)
     ) {
       return initialTab;
     }
@@ -107,7 +112,8 @@ export default function RaceDetailsTabs({
         saved === 'results' ||
         saved === 'info' ||
         saved === 'gpx' ||
-        saved === 'gallery'
+        saved === 'gallery' ||
+        (saved === 'reports' && hasReports)
       )
         return saved as TabKey;
     } catch {}
@@ -147,9 +153,11 @@ export default function RaceDetailsTabs({
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [infoEditDialogOpen, setInfoEditDialogOpen] = useState(false);
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const hasRouteAssets = hasGpx || hasRaceMap;
   const hasGallery = galleryImages.length > 0;
+  const visibleTab = activeTab === 'reports' && !hasReports ? 'info' : activeTab;
   const allTags = [
     ...new Set(galleryImages.flatMap((img) => img.tags ?? [])),
   ].sort();
@@ -220,6 +228,10 @@ export default function RaceDetailsTabs({
     tabs.push({ key: 'gallery', label: 'Gallery' });
   }
 
+  if (hasReports) {
+    tabs.push({ key: 'reports', label: 'Reports' });
+  }
+
   if (hasRouteAssets) {
     tabs.push({ key: 'gpx', label: 'Route' });
   }
@@ -232,7 +244,7 @@ export default function RaceDetailsTabs({
         className="flex flex-wrap gap-2 border-b border-gray-200 p-3 dark:border-slate-800"
       >
         {tabs.map((tab) => {
-          const isActive = activeTab === tab.key;
+          const isActive = visibleTab === tab.key;
           return (
             <button
               key={tab.key}
@@ -255,7 +267,7 @@ export default function RaceDetailsTabs({
       </div>
 
       <div className="p-4 sm:p-6">
-        {activeTab === 'results' && (
+        {visibleTab === 'results' && (
           <div
             role="tabpanel"
             id="race-tab-panel-results"
@@ -365,7 +377,7 @@ export default function RaceDetailsTabs({
           </div>
         )}
 
-        {activeTab === 'info' && (
+        {visibleTab === 'info' && (
           <div
             role="tabpanel"
             id="race-tab-panel-info"
@@ -537,13 +549,40 @@ export default function RaceDetailsTabs({
                   >
                     Submit a route
                   </button>
+                  {' / '}
+                  <button
+                    type="button"
+                    onClick={() => setReportDialogOpen(true)}
+                    className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                  >
+                    Add a race report
+                  </button>
                 </p>
               </div>
             )}
           </div>
         )}
 
-        {activeTab === 'gallery' && hasGallery && (
+        {visibleTab === 'reports' && hasReports && (
+          <div
+            role="tabpanel"
+            id="race-tab-panel-reports"
+            aria-labelledby="race-tab-reports"
+          >
+            <RaceReports key={raceId} raceId={raceId} />
+            {UPDATES_EMAIL && (
+              <button
+                type="button"
+                onClick={() => setReportDialogOpen(true)}
+                className="mt-4 text-sm font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+              >
+                Add a race report
+              </button>
+            )}
+          </div>
+        )}
+
+        {visibleTab === 'gallery' && hasGallery && (
           <div
             role="tabpanel"
             id="race-tab-panel-gallery"
@@ -707,6 +746,14 @@ export default function RaceDetailsTabs({
           race={race}
           organiser={organiser}
           contents={contents}
+        />
+      )}
+      {UPDATES_EMAIL && (
+        <RaceReportCreateDialog
+          open={reportDialogOpen}
+          onClose={() => setReportDialogOpen(false)}
+          raceId={raceId}
+          raceTitle={race.title}
         />
       )}
       {UPDATES_EMAIL && (

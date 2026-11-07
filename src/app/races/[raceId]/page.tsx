@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import RacePageClient from '@/app/races/[raceId]/race-page-client';
 import { getRaceImages } from '@/lib/assetCollections';
 import { cloudinaryUrl } from '@/lib/cloudinary';
-import { loadAllRaces, loadCalendar, loadRaceResults } from '@/lib/results-data';
+import { hasRaceReports, loadAllRaces, loadCalendar, loadRaceResults } from '@/lib/results-data';
 import type { AllRaceData, RaceData, RaceInfo } from '@/types/datatable';
 
 const SITE_URL = 'https://www.scottishhillrunners.uk';
@@ -133,10 +133,11 @@ export default async function RacePage({
   params: Promise<{ raceId: string }>;
 }) {
   const { raceId } = await params;
-  const [raceImages, raceData, calendarEntries] = await Promise.all([
+  const [raceImages, raceData, calendarEntries, reportsAvailable] = await Promise.all([
     getRaceImages(raceId),
     loadRaceResults(raceId),
     loadCalendar().catch(() => []),
+    hasRaceReports(raceId),
   ]);
 
   const eventDate = calendarEntries.find((entry) => entry.raceId === raceId)?.Date;
@@ -148,7 +149,7 @@ export default async function RacePage({
         {JSON.stringify(jsonLd)}
       </script>
       <Suspense fallback={null}>
-        <RacePageClient raceId={raceId} hero={raceImages?.hero} gallery={raceImages?.gallery ?? []} />
+        <RacePageClient raceId={raceId} hero={raceImages?.hero} gallery={raceImages?.gallery ?? []} hasReports={reportsAvailable} />
       </Suspense>
     </>
   );

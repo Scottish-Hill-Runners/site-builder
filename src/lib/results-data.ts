@@ -55,6 +55,20 @@ export async function loadRaceResults(raceId: string): Promise<RaceData> {
   return readJsonGzip<RaceData>(`${safeRaceId}.json.gz`);
 }
 
+export async function hasRaceReports(raceId: string): Promise<boolean> {
+  if (!raceId || raceId === '.' || raceId === '..' || /[/\\]/.test(raceId)) {
+    throw new Error('Invalid race id');
+  }
+  try {
+    await fs.access(path.join(prebuildDir, 'reports', `${raceId}.json.gz`));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+      return false;
+    throw error;
+  }
+}
+
 export async function loadAvailableYears(): Promise<string[]> {
   const files = await fs.readdir(resultsPath(''));
 
