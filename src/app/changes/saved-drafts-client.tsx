@@ -25,11 +25,15 @@ export default function SavedDraftsClient() {
 
   if (!drafts || drafts.length === 0) return null;
 
-  async function handleCopy(draft: SavedEmail) {
-    const text = `To: ${draft.to}\nSubject: ${draft.subject}\n\n${draft.body}`;
+  async function handleCopy(
+    draft: SavedEmail,
+    field: 'to' | 'subject' | 'body'
+  ) {
+    const text = draft[field];
     const ok = await copyToClipboard(text);
     if (ok) {
-      setCopiedId(draft.id);
+      const copiedKey = `${draft.id}:${field}`;
+      setCopiedId(copiedKey);
       setTimeout(() => setCopiedId(null), 2000);
     }
   }
@@ -52,8 +56,9 @@ export default function SavedDraftsClient() {
             Saved email drafts
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-slate-400">
-            Copies of emails you&apos;ve started sending from this device, saved here in case your
-            mail app didn&apos;t open correctly. These only exist in this browser.
+            Copies of emails you&apos;ve started sending from this device, saved
+            here in case your mail app didn&apos;t open correctly. These only
+            exist in this browser.
           </p>
         </div>
         <button
@@ -67,20 +72,43 @@ export default function SavedDraftsClient() {
 
       <ul className="mt-4 w-full divide-y divide-zinc-200 dark:divide-slate-800">
         {drafts.map((draft) => (
-          <li key={draft.id} className="flex items-start justify-between gap-4 py-3">
+          <li
+            key={draft.id}
+            className="flex items-start justify-between gap-4 py-3"
+          >
             <div>
               <p className="text-sm text-zinc-500 dark:text-slate-400">
                 {new Date(draft.createdAt).toLocaleString()}
               </p>
-              <p className="font-medium text-black dark:text-slate-50">{draft.subject}</p>
+              <p className="font-medium text-black dark:text-slate-50">
+                {draft.subject}
+              </p>
             </div>
-            <div className="flex shrink-0 gap-3">
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
               <button
                 type="button"
-                onClick={() => handleCopy(draft)}
+                onClick={() => handleCopy(draft, 'to')}
                 className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                {copiedId === draft.id ? 'Copied!' : 'Copy email text'}
+                {copiedId === `${draft.id}:to` ? 'Copied!' : 'Copy To:'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopy(draft, 'subject')}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                {copiedId === `${draft.id}:subject`
+                  ? 'Copied!'
+                  : 'Copy Subject:'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopy(draft, 'body')}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                {copiedId === `${draft.id}:body`
+                  ? 'Copied!'
+                  : 'Copy email body'}
               </button>
               <button
                 type="button"
