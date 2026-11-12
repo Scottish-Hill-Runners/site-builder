@@ -29,17 +29,24 @@ export default function RacePageClient({ raceId, hero, gallery, hasReports }: Ra
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
-  const [latestCalendarDate, setLatestCalendarDate] = useState<string | undefined>();
+  const [calendarDates, setCalendarDates] = useState<{
+    latestCurrentYear?: string;
+    latest?: string;
+  }>({});
 
   useEffect(() => {
     let isCancelled = false;
 
     fetchGzipJson<CalendarEntry[]>('/calendar.json.gz').then((result) => {
       if (isCancelled || result.status !== 'ok') return;
-      const latest = result.data
+      const currentYear = new Date().toISOString().slice(0, 4);
+      const entries = result.data
         .filter((entry) => entry.raceId === raceId)
-        .sort((a, b) => b.Date.localeCompare(a.Date))[0];
-      setLatestCalendarDate(latest?.Date);
+        .sort((a, b) => b.Date.localeCompare(a.Date));
+      setCalendarDates({
+        latestCurrentYear: entries.find((entry) => entry.Date.slice(0, 4) === currentYear)?.Date,
+        latest: entries[0]?.Date,
+      });
     });
 
     return () => {
@@ -176,7 +183,8 @@ export default function RacePageClient({ raceId, hero, gallery, hasReports }: Ra
               initialTab={initialTab}
               initialYearFilter={initialYearFilter}
               initialCategoryFilter={initialCategoryFilter}
-              latestCalendarDate={latestCalendarDate}
+              latestCalendarDate={calendarDates.latestCurrentYear}
+              nextRaceDate={calendarDates.latest}
             />
           </>
         ) : (

@@ -28,7 +28,7 @@ export function suggestCanonicalCategory(rawCategory: string): string | null {
   const raw = rawCategory.trim();
   if (!raw) return null;
 
-  const sex = likelySex(raw);
+  const sex = /^open\b/i.test(raw) ? 'M' : likelySex(raw);
   const digitMatch = raw.match(/(\d+)/);
   if (digitMatch) return `${sex}${digitMatch[1]}`;
 

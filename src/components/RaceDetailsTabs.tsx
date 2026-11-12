@@ -62,8 +62,10 @@ interface RaceDetailsTabsProps {
   initialTab?: TabKey;
   initialYearFilter?: string;
   initialCategoryFilter?: string;
-  /** ISO date (YYYY-MM-DD) of the most recent calendar occurrence for this race, if any. */
+  /** Latest calendar occurrence in the current year, in ISO date format. */
   latestCalendarDate?: string;
+  /** Latest calendar occurrence, used to display the next race date. */
+  nextRaceDate?: string;
 }
 
 type TabKey = 'results' | 'info' | 'gpx' | 'gallery' | 'reports';
@@ -93,6 +95,7 @@ export default function RaceDetailsTabs({
   initialYearFilter = '',
   initialCategoryFilter = '',
   latestCalendarDate,
+  nextRaceDate,
 }: RaceDetailsTabsProps) {
   const { imperial } = useUnits();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
@@ -201,6 +204,13 @@ export default function RaceDetailsTabs({
     !results.some((r) => r.year.substring(0, 4) === latestCalendarYear);
   const latestCalendarDateLabel = latestCalendarDate
     ? new Date(`${latestCalendarDate}T00:00:00`).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
+  const nextRaceDateLabel = nextRaceDate
+    ? new Date(`${nextRaceDate}T00:00:00`).toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
@@ -488,12 +498,12 @@ export default function RaceDetailsTabs({
                   )}
                 </p>
               )}
-              {latestCalendarDate && !isLatestCalendarEntryPast && (
+              {nextRaceDate && nextRaceDate >= new Date().toISOString().slice(0, 10) && (
                 <p>
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
                     Next race date:
                   </span>{' '}
-                  {latestCalendarDateLabel}
+                  {nextRaceDateLabel}
                 </p>
               )}
             </div>
