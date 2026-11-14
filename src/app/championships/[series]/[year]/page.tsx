@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { prebuildDir } from '../../../../../scripts/write-gz-util';
+import { championshipSeasonSlug } from '@/lib/championship-season';
 
 type ChampionshipData = {
   slug: string;
@@ -25,7 +26,7 @@ export async function generateStaticParams() {
       .filter((year) => championship.yearHasData?.[year] ?? true)
       .map((year) => ({
         series: championship.slug,
-        year,
+        year: championshipSeasonSlug(year),
       }))
   );
 }
@@ -36,5 +37,5 @@ export default async function ChampionshipYearPage({
   params: Promise<{ series: string; year: string }>;
 }) {
   const { series, year } = await params;
-  return <ChampionshipYearPageClient series={series} year={year} />;
+  return <ChampionshipYearPageClient series={series} year={year.replace('-', '/')} />;
 }

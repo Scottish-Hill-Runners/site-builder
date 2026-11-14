@@ -22,6 +22,8 @@ import {
 import type { GeoJSON } from 'geojson';
 import { updateSitemap, writeRobotsTxt } from './update-sitemap';
 import { categoryAge, likelySex, parseEligibilityAgeCap } from '@/lib/category';
+import { coordinatesFromVenue } from './plus-code';
+import { championshipSeasonDate, championshipSeasonSlug, championshipSeasonYears } from '@/lib/championship-season';
 
 type YearInfo = {
   year: string;
@@ -567,6 +569,9 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
         const gpxPoint = routeGeojson
           ? geojsonFirstPoint(routeGeojson)
           : undefined;
+        const plusCodePoint = gpxPoint
+          ? undefined
+          : coordinatesFromVenue(data.venue);
         const meta: RaceMeta = {
           info,
           content,
@@ -581,9 +586,11 @@ async function readResults(): Promise<Map<string, RaceEntry>> {
           active: data.active !== false,
           latitude:
             gpxPoint?.latitude ??
+            plusCodePoint?.latitude ??
             (data.latitude !== undefined ? parseFloat(data.latitude) : undefined),
           longitude:
             gpxPoint?.longitude ??
+            plusCodePoint?.longitude ??
             (data.longitude !== undefined
               ? parseFloat(data.longitude)
               : undefined),
@@ -1084,7 +1091,8 @@ function resolveComputedRaceDatesForYear(
 }
 
 async function buildMergedCalendarData(
-  raceMap: Map<string, RaceEntry>
+  raceMap: Map<string, RaceEntry>,
+  championships: ChampionshipData[]
 ): Promise<{ rows: CalendarSourceRow[]; lookup: Map<string, string[]> }> {
   const rows = await readCalendarCsvRows();
   const lookup = new Map<string, string[]>();
@@ -1104,6 +1112,14 @@ async function buildMergedCalendarData(
   const currentYear = Number.parseInt(todayIso.slice(0, 4), 10);
   const previousYear = currentYear - 1;
   const nextYear = currentYear + 1;
+  const winterRaces = new Set(championships.flatMap((championship) =>
+    Object.entries(championship.years)
+      .filter(([season]) => {
+        const years = championshipSeasonYears(season);
+        return years.length === 2 && years[0] === currentYear;
+      })
+      .flatMap(([, races]) => races)
+  ));
   const parsedRules = new Map<string, ParsedRaceDateRule[]>();
   for (const [raceId, raceEntry] of raceMap.entries()) {
     const { active, raceDate, raceDates } = raceEntry.meta;
@@ -1148,7 +1164,7 @@ async function buildMergedCalendarData(
     const candidates: Array<{ year: number; date: string }> = [];
     for (const date of currentYearDates ?? [])
       candidates.push({ year: currentYear, date });
-    if (needsNextYear)
+    if (needsNextYear || winterRaces.has(raceId))
       for (const date of nextYearDates ?? [])
         candidates.push({ year: nextYear, date });
 
@@ -1193,7 +1209,7 @@ function readChampionships(): ChampionshipData[] {
 
     // Extract year data from frontmatter
     for (const [key, value] of Object.entries(data)) {
-      if (/^\d{4}$/.test(key)) {
+      if (championshipSeasonYears(key).length > 0) {
         const raceEntries = parseChampionshipRaceEntries(value);
         years[key] = raceEntries.map((entry) => entry.raceId);
 
@@ -1229,8 +1245,8 @@ function readChampionships(): ChampionshipData[] {
     const seriesDir = path.join(champDir, slug);
     if (fs.existsSync(seriesDir)) {
       for (const file of fs.readdirSync(seriesDir)) {
-        const year = /^(\d{4})\.csv$/.exec(file)?.[1];
-        if (year && !(year in years)) years[year] = [];
+        const year = /^(\d{4}(?:-(?:\d{2}|\d{4}))?)\.csv$/.exec(file)?.[1]?.replace('-', '/');
+        if (year && championshipSeasonYears(year).length > 0 && !(year in years)) years[year] = [];
       }
     }
 
@@ -1488,8 +1504,8 @@ async function readOfficialStandingsCsv(
   year: string
 ): Promise<{ columns: OfficialColumn[]; individuals: OfficialStandingRow[]; teams: OfficialStandingRow[] }> {
   const slug = championship.slug;
-  const where = `${slug}/${year}.csv`;
-  const csvPath = path.join(contentPath('championships'), slug, `${year}.csv`);
+  const where = `${slug}/${championshipSeasonSlug(year)}.csv`;
+  const csvPath = path.join(contentPath('championships'), slug, `${championshipSeasonSlug(year)}.csv`);
   const rows = (await csv().fromFile(csvPath)) as Record<string, string>[];
   if (rows.length === 0) throw new Error(`${where} has no rows`);
 
@@ -1593,7 +1609,7 @@ async function writeChampionshipResultsData(
     championship.officialYears = [];
 
     for (const [year, raceIds] of Object.entries(championship.years)) {
-      if (fs.existsSync(path.join(contentPath('championships'), championship.slug, `${year}.csv`))) {
+      if (fs.existsSync(path.join(contentPath('championships'), championship.slug, `${championshipSeasonSlug(year)}.csv`))) {
         const official = await readOfficialStandingsCsv(championship, year);
         championship.officialYears!.push(year);
         championship.yearHasData[year] = official.individuals.length + official.teams.length > 0;
@@ -1602,7 +1618,7 @@ async function writeChampionshipResultsData(
           resultsFormat: 'official',
           results: [],
           raceSchedule: official.columns.filter((c) => c.kind === 'race').map(({ id: raceId }) => {
-            const date = calendarDates.get(`${year}/${raceId}`)?.[0];
+            const date = championshipSeasonDate(year, raceId, calendarDates);
             return date ? { raceId, date } : { raceId };
           }),
           official: {
@@ -1611,7 +1627,7 @@ async function writeChampionshipResultsData(
             teams: official.teams,
           },
         };
-        writeGz(outputDir, `${championship.slug}-${year}.json`, JSON.stringify(payload));
+        writeGz(outputDir, `${championship.slug}-${championshipSeasonSlug(year)}.json`, JSON.stringify(payload));
         continue;
       }
 
@@ -1628,16 +1644,22 @@ async function writeChampionshipResultsData(
           : null;
 
       const excludedClubs = new Set(
-        year === '2026' ? [] // *** Just for 2026, allow English runners in.
-        : clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name));
+        clubs.filter((c) => c.excludeFromChampionships).map((c) => c.name));
 
+      const seasonYears = championshipSeasonYears(year);
       const results =
         allResults.filter(
-          (result) =>
-            result.year.startsWith(year) &&
-            raceSet.has(result.raceId) &&
-            !excludedClubs.has(result.club ?? '') &&
-            (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap))
+          (result) => {
+            const date = seasonYears.length === 2
+              ? championshipSeasonDate(year, result.raceId, calendarDates)
+              : undefined;
+            return raceSet.has(result.raceId) &&
+            seasonYears.some((seasonYear) => result.year.startsWith(String(seasonYear))) &&
+            (!date || result.year.startsWith(date.slice(0, 4))) &&
+            // The 2026 exception applies to the race year, including within a winter season.
+            (result.year.startsWith('2026') || !excludedClubs.has(result.club ?? '')) &&
+            (eligibilityAgeCap === null || isEligibleResult(result, eligibilityAgeCap));
+          }
         );
 
       const championshipResults = results.map((r) => ({ ...r }));
@@ -1705,12 +1727,12 @@ async function writeChampionshipResultsData(
               const raceEntry = raceMap.get(row.raceId);
               if (raceEntry) {
                 const mRec = extractRecord(
-                  recordForYear(championship.maleRecords, row.raceId, year) ??
+                  recordForYear(championship.maleRecords, row.raceId, row.year) ??
                     raceEntry.meta.info.maleRecord
                 );
                 if (mRec) raceWinnerTimes.set('M', mRec);
                 const fRec = extractRecord(
-                  recordForYear(championship.femaleRecords, row.raceId, year) ??
+                  recordForYear(championship.femaleRecords, row.raceId, row.year) ??
                     raceEntry.meta.info.femaleRecord
                 );
                 if (fRec) raceWinnerTimes.set('F', fRec);
@@ -1768,15 +1790,15 @@ async function writeChampionshipResultsData(
       // Build raceSchedule: all scheduled races sorted by calendar date.
       const raceSchedule = [...raceIds]
         .sort((a, b) => {
-          const dateA = calendarDates.get(`${year}/${a}`)?.[0];
-          const dateB = calendarDates.get(`${year}/${b}`)?.[0];
+          const dateA = championshipSeasonDate(year, a, calendarDates);
+          const dateB = championshipSeasonDate(year, b, calendarDates);
           if (dateA && dateB) return dateA.localeCompare(dateB);
           if (dateA) return -1;
           if (dateB) return 1;
           return a.localeCompare(b);
         })
         .map((raceId) => {
-          const date = calendarDates.get(`${year}/${raceId}`)?.[0];
+          const date = championshipSeasonDate(year, raceId, calendarDates);
           return date ? { raceId, date } : { raceId };
         });
 
@@ -1879,7 +1901,7 @@ async function writeChampionshipResultsData(
       };
       writeGz(
         outputDir,
-        `${championship.slug}-${year}.json`,
+        `${championship.slug}-${championshipSeasonSlug(year)}.json`,
         JSON.stringify(payload)
       );
     }
@@ -1891,7 +1913,8 @@ async function writeChampionshipResultsData(
 async function writeCalendarData(
   championships: ChampionshipData[],
   raceMap: Map<string, RaceEntry>,
-  calendarRows: CalendarSourceRow[]
+  calendarRows: CalendarSourceRow[],
+  calendarDates: Map<string, string[]>
 ): Promise<void> {
   // Build championship lookup: "year/raceId" -> { [slug]: title }
   const champLookup = new Map<string, { [slug: string]: string }>();
@@ -1899,7 +1922,10 @@ async function writeCalendarData(
     for (const [year, raceIds] of Object.entries(champ.years)) {
       for (const raceId of raceIds) {
         if (!raceId || raceId.startsWith('no-slug(')) continue;
-        const key = `${year}/${raceId}`;
+        const selectedDate = championshipSeasonDate(year, raceId, calendarDates);
+        const keyDate = championshipSeasonYears(year).length === 1 ? year : selectedDate;
+        if (!keyDate) continue;
+        const key = `${keyDate}/${raceId}`;
         const existing = champLookup.get(key) ?? {};
         existing[champ.slug] = champ.title;
         champLookup.set(key, existing);
@@ -1933,8 +1959,10 @@ async function writeCalendarData(
       if (latitude !== undefined) entry.latitude = latitude;
       if (longitude !== undefined) entry.longitude = longitude;
 
-      const year = entry.Date.slice(0, 4);
-      const champMap = champLookup.get(`${year}/${raceId}`);
+      const champMap = {
+        ...champLookup.get(`${entry.Date.slice(0, 4)}/${raceId}`),
+        ...champLookup.get(`${entry.Date}/${raceId}`),
+      };
       if (champMap && Object.keys(champMap).length > 0) {
         entry.championships = champMap;
       }
@@ -2020,10 +2048,10 @@ function writeGallus(
 async function main() {
   progress(`Using content root: ${contentRoot()}`);
   const raceMap = await readResults();
-  const { rows: calendarRows, lookup: calendarDates } =
-    await buildMergedCalendarData(raceMap);
-  const allResults = [...raceMap.values()].flatMap((e) => e.results);
   const championships = readChampionships();
+  const { rows: calendarRows, lookup: calendarDates } =
+    await buildMergedCalendarData(raceMap, championships);
+  const allResults = [...raceMap.values()].flatMap((e) => e.results);
   writeClubData(clubs, allResults);
   writeYearData(allResults);
   writeRaceData(raceMap);
@@ -2031,7 +2059,7 @@ async function main() {
   summariseCategories(allResults);
   await writeChampionshipResultsData(allResults, championships, raceMap, calendarDates);
   writeChampionshipData(championships);
-  await writeCalendarData(championships, raceMap, calendarRows);
+  await writeCalendarData(championships, raceMap, calendarRows, calendarDates);
   writeGallus(raceMap, calendarRows);
 
   const routes: string[] = ['/calendar', '/welcome'];

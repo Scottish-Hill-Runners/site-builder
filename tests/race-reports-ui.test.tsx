@@ -26,8 +26,8 @@ const reports = [
   { slug: '2024-a', year: 2024, content: 'Another report' },
 ];
 
-function tabs(raceId: string, hasReports: boolean) {
-  return <RaceDetailsTabs raceId={raceId} race={race} contents="" hasGpx={false}
+function tabs(raceId: string, hasReports: boolean, venue = race.venue) {
+  return <RaceDetailsTabs raceId={raceId} race={{ ...race, venue }} contents="" hasGpx={false}
     hasRaceMap={false} results={[]} resultsError={null} galleryImages={[]} hasReports={hasReports} />;
 }
 
@@ -36,6 +36,34 @@ function button(container: HTMLElement, label: string): HTMLButtonElement {
   assert.ok(found, `Missing button: ${label}`);
   return found;
 }
+
+test('links Plus Code venues to Google Maps directions', async () => {
+  dom.window.localStorage.clear();
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    for (const venue of ['V4FH+4G Castle Douglas', '849VCWC8+R9']) {
+      await act(async () => root.render(tabs('TestRace', false, venue)));
+      const link = container.querySelector<HTMLAnchorElement>('#race-tab-panel-info a');
+      assert.ok(link);
+      assert.equal(link.textContent, venue);
+      const url = new URL(link.href);
+      assert.equal(url.origin + url.pathname, 'https://www.google.com/maps/dir/');
+      assert.equal(url.searchParams.get('api'), '1');
+      assert.equal(url.searchParams.get('destination'), venue);
+      assert.equal(url.searchParams.has('origin'), false);
+      assert.match(link.getAttribute('aria-label') ?? '', /directions in Google Maps/);
+    }
+
+    await act(async () => root.render(tabs('TestRace', false, 'Local start area')));
+    assert.equal(container.querySelector('#race-tab-panel-info a'), null);
+    assert.match(container.querySelector('#race-tab-panel-info')?.textContent ?? '', /Local start area/);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
 
 test('reports tab is conditional, lazy-loaded, sorted and expandable', async () => {
   const urls: string[] = [];

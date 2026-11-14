@@ -6,6 +6,7 @@ import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 import { sendMailto } from '@/lib/navigate-to-mailto';
+import { championshipSeasonYears } from '@/lib/championship-season';
 
 interface CalendarEntry {
   Date: string;
@@ -85,7 +86,9 @@ export default function ChampionshipRacesEditDialog({
       const entries = result.data
         .filter(
           (entry): entry is CalendarEntry & { raceId: string } =>
-            Boolean(entry.raceId) && entry.Date.startsWith(`${selectedYear}-`)
+            Boolean(entry.raceId) && championshipSeasonYears(selectedYear).some(
+              (year) => entry.Date.startsWith(`${year}-`)
+            )
         )
         .sort((a, b) => a.Date.localeCompare(b.Date));
       // The calendar can list the same race more than once (e.g. reschedules);

@@ -11,6 +11,7 @@ import ChampionshipRacesEditDialog from '@/components/ChampionshipRacesEditDialo
 import ChampionshipInfoEditDialog from '@/components/ChampionshipInfoEditDialog';
 import { CalendarEntry, RaceInfo, ScoringRules } from '@/types/datatable';
 import { formatCalendarDate } from '@/lib/dates';
+import { championshipSeasonDate, championshipSeasonSlug, championshipSeasonYears } from '@/lib/championship-season';
 
 interface ChampionshipData {
   slug: string;
@@ -37,15 +38,20 @@ function fillInSchedule(
     return data.contents;
 
   const currentYear = new Date().getFullYear();
-  const scheduleYears = [String(currentYear + 1), String(currentYear)]
-    .filter((year) => data.years[year]?.length > 0);
+  const scheduleYears = Object.keys(data.years)
+    .filter((year) => {
+      const years = championshipSeasonYears(year);
+      return data.years[year]?.length > 0 && years.length > 0 &&
+        years[0] <= currentYear + 1 && years[years.length - 1] >= currentYear;
+    })
+    .sort((a, b) => championshipSeasonYears(b)[0] - championshipSeasonYears(a)[0]);
   const hasDistanceSlots = !!(data.rules as ChampionshipData['rules'])
     ?.default?.distanceSlots;
   const scheduleBlock = scheduleYears.map((year) => {
     const raceIds = data.years[year];
     const sortedRaceIds = [...raceIds].sort((a, b) => {
-      const dateA = calendarDates?.get(`${year}/${a}`)?.[0];
-      const dateB = calendarDates?.get(`${year}/${b}`)?.[0];
+      const dateA = calendarDates && championshipSeasonDate(year, a, calendarDates);
+      const dateB = calendarDates && championshipSeasonDate(year, b, calendarDates);
 
       if (dateA && dateB) return dateA.localeCompare(dateB);
       if (dateA) return -1;
@@ -67,7 +73,7 @@ function fillInSchedule(
           }
         }
 
-        const isoDate = calendarDates?.get(`${year}/${raceId}`)?.[0];
+        const isoDate = calendarDates && championshipSeasonDate(year, raceId, calendarDates);
         const datePart = isoDate ? ` - ${formatCalendarDate(isoDate)}` : '';
         return `* [${title}](/races/${raceId})${distancePart}${datePart}`;
       })
@@ -106,9 +112,15 @@ export default function ChampionshipPageClient({
         ]);
 
         if (!isCancelled) {
-          if (calendarDates.status === 'ok')
-            setCalendarDates(new Map(calendarDates.data.map(entry => [`${entry.Date.substring(0, 4)}/${entry.raceId}`, [entry.Date]])));
-          else
+          if (calendarDates.status === 'ok') {
+            const dates = new Map<string, string[]>();
+            for (const entry of calendarDates.data) {
+              if (!entry.raceId) continue;
+              const key = `${entry.Date.substring(0, 4)}/${entry.raceId}`;
+              dates.set(key, [entry.Date, ...(dates.get(key) ?? [])]);
+            }
+            setCalendarDates(dates);
+          } else
             throw new Error('Failed to load calendar dates');
 
           if (raceMap.status === 'ok')
@@ -146,11 +158,17 @@ export default function ChampionshipPageClient({
   // frontmatter yet) are the only years editable via the schedule dialog.
   const latestYear = data
     ? Object.keys(data.years)
-        .filter((year) => /^\d{4}$/.test(year))
-        .sort((a, b) => Number(a) - Number(b))
+        .filter((year) => championshipSeasonYears(year).length > 0)
+        .sort((a, b) => championshipSeasonYears(a)[0] - championshipSeasonYears(b)[0])
         .at(-1)
     : undefined;
-  const nextYear = latestYear ? String(Number(latestYear) + 1) : undefined;
+  const nextYear = latestYear
+    ? championshipSeasonYears(latestYear).length === 2
+      ? `${championshipSeasonYears(latestYear)[1]}/${latestYear.split('/')[1].length === 2
+        ? String(championshipSeasonYears(latestYear)[1] + 1).slice(-2)
+        : championshipSeasonYears(latestYear)[1] + 1}`
+      : String(Number(latestYear) + 1)
+    : undefined;
   const editableYears = [latestYear, nextYear].filter((year): year is string => Boolean(year));
   const raceIdsByYear: { [year: string]: string[] } = {};
   for (const year of editableYears) {
@@ -231,13 +249,13 @@ export default function ChampionshipPageClient({
             <div className="mb-6 flex flex-wrap gap-2">
               {Object.keys(data.years)
                 .filter((year) => data.yearHasData?.[year])
-                .sort((a, b) => Number(b) - Number(a))
+                .sort((a, b) => championshipSeasonYears(b)[0] - championshipSeasonYears(a)[0])
                 .map((year) => {
                   const isOfficial = data.officialYears?.includes(year);
                   return (
                     <Link
                       key={year}
-                      href={`/championships/${encodeURIComponent(series)}/${encodeURIComponent(year)}`}
+                      href={`/championships/${encodeURIComponent(series)}/${championshipSeasonSlug(year)}`}
                       title={isOfficial ? 'Official results' : 'Incomplete or provisional results'}
                       className={
                         isOfficial

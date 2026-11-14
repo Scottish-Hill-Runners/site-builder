@@ -15,6 +15,7 @@ interface OfficialStandingsViewProps {
   raceMetadata: Record<string, RaceInfo>;
   clubSlugs: Record<string, string>;
   year: string;
+  raceSchedule: { raceId: string; date?: string }[];
 }
 
 const TAB_BASE = 'rounded-md px-4 py-2 text-sm font-semibold';
@@ -29,6 +30,7 @@ export default function OfficialStandingsView({
   raceMetadata,
   clubSlugs,
   year,
+  raceSchedule,
 }: OfficialStandingsViewProps) {
   const { columns, individuals, teams } = standings;
   const [tab, setTab] = useState<'individuals' | 'teams'>('individuals');
@@ -123,12 +125,15 @@ export default function OfficialStandingsView({
       .sort((a, b) => b.points - a.points);
     return events.map(({ column, points }, i) => {
       const title = column.kind === 'race' ? raceMetadata[column.id]?.title : undefined;
+      const raceYear = year.includes('/')
+        ? raceSchedule.find((race) => race.raceId === column.id)?.date?.slice(0, 4)
+        : year;
       return (
         <Fragment key={column.id}>
           {i > 0 ? ', ' : ''}
           {title ? (
             <Link
-              href={`/races/${encodeURIComponent(column.id)}?year=${encodeURIComponent(year)}`}
+              href={`/races/${encodeURIComponent(column.id)}${raceYear ? `?year=${encodeURIComponent(raceYear)}` : ''}`}
               className="text-blue-600 hover:underline dark:text-blue-400"
             >
               {title}

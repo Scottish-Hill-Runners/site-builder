@@ -60,6 +60,13 @@ Race metadata can specify an absolute `raceDate`, such as `13th June 2027`
 or `Sunday 13th June 2027`. The weekday is optional and is ignored when
 calculating the date. The year is also optional for recurring dates.
 
+Championship frontmatter can use a quoted consecutive-year season such as
+`'2026/27'` or `'2026/2027'` instead of a single year. For each race, the
+schedule uses the calendar date closest to 1 January of the second year;
+ties go to the earlier date. Results are taken from the year of that date.
+If there is no calendar date, results from either year are included. Official
+standings CSVs use a hyphen in place of the slash, e.g. `2026-27.csv`.
+
 ```text
 ├── public/
 │   └── results/
@@ -75,6 +82,47 @@ calculating the date. The year is also optional for recurring dates.
 │       └── championships.json.gz
 └── ... other project files
 ```
+
+### Race venue Plus Codes
+
+The build decodes Plus Codes in a race's `venue` for calendar coordinates.
+The first point of `route.geojson` takes precedence, followed by the venue
+Plus Code, then the legacy `latitude` and `longitude` fields. Full Plus Codes
+are decoded offline. Short codes, such as `V4FH+4G Castle Douglas`, need a
+nearby locality reference from `LOCALITY_REFERENCES` in
+[`scripts/plus-code.ts`](scripts/plus-code.ts). An unknown locality causes the
+build to fail; no online lookup is made during the build.
+
+To investigate an unknown locality using Google's Geocoding API:
+
+1. Enable the [Geocoding API](https://developers.google.com/maps/documentation/geocoding/start)
+   in a Google Cloud project with billing enabled. Create a suitably restricted
+   API key and set it locally as `GOOGLE_MAPS_API_KEY`; do not commit the key.
+2. Query the short code and locality, adding country or region if needed:
+
+   ```sh
+   curl --get 'https://maps.googleapis.com/maps/api/geocode/json' \
+     --data-urlencode 'address=V4FH+4G Castle Douglas, Scotland, UK' \
+     --data-urlencode "key=$GOOGLE_MAPS_API_KEY"
+   ```
+
+   `--data-urlencode` ensures the `+` is encoded correctly. Check that the
+   response `status` is `OK`, inspect `results`, and confirm the location is
+   the intended one. The result's `geometry.location` contains `lat` and `lng`.
+   A query for just the locality can instead provide a nearby reference.
+3. Before storing or using Google results, review the
+   [Geocoding API policies](https://developers.google.com/maps/documentation/geocoding/policies)
+   and applicable terms. Google limits coordinate caching and restricts use of
+   its content outside its services; **do not commit API-derived coordinates**
+   to this repository without confirming permission. Use a suitably licensed
+   independent source for a persistent locality reference if necessary.
+4. Add the independently sourced locality coordinates and a case-insensitive
+   matching `pattern` to `LOCALITY_REFERENCES`. The coordinates should identify
+   the locality, not the race start: the build uses them to recover the full
+   code and decodes that code to the race coordinates. Check that the locality
+   name is unambiguous and close enough to recover the intended code.
+5. Run `npm run prebuild` against the relevant content and verify the resulting
+   calendar coordinates. Commit the reference update separately from secrets.
 
 ## Race reports
 

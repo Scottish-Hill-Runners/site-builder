@@ -7,6 +7,7 @@ import type { ChampionshipYearPayload, OfficialStandings, RaceInfo, RaceResult, 
 import { categoryAge, parseEligibilityAgeCap } from '@/lib/category';
 import { normalizeFullName } from '@/lib/runner-name';
 import OfficialStandingsView from './official-standings';
+import { championshipSeasonSlug } from '@/lib/championship-season';
 
 interface ChampionshipYearPageClientProps {
   series: string;
@@ -400,14 +401,14 @@ function EventLink({
   raceId: string;
   points: number;
   raceMetadata: RaceMetadata;
-  year: string;
+  year?: string;
 }) {
   const title = raceMetadata[raceId]?.title;
   return (
     <>
       {title ? (
         <Link
-          href={`/races/${encodeURIComponent(raceId)}?year=${encodeURIComponent(year)}`}
+          href={`/races/${encodeURIComponent(raceId)}${year ? `?year=${encodeURIComponent(year)}` : ''}`}
           className="text-blue-600 hover:underline dark:text-blue-400"
         >
           {title}
@@ -423,13 +424,15 @@ function EventLink({
 function renderEventList(
   events: Array<{ raceId: string; points: number }> | undefined,
   raceMetadata: RaceMetadata,
-  year: string
+  year: string,
+  raceSchedule: RaceScheduleEntry[]
 ) {
   if (!events || events.length === 0) return null;
   return events.map((event, index) => (
     <Fragment key={`${event.raceId}-${index}`}>
       {index > 0 ? ', ' : ''}
-      <EventLink raceId={event.raceId} points={event.points} raceMetadata={raceMetadata} year={year} />
+      <EventLink raceId={event.raceId} points={event.points} raceMetadata={raceMetadata}
+        year={year.includes('/') ? raceSchedule.find((race) => race.raceId === event.raceId)?.date?.slice(0, 4) : year} />
     </Fragment>
   ));
 }
@@ -1071,7 +1074,7 @@ export default function ChampionshipYearPageClient({
       try {
         const [result, racesResult] = await Promise.all([
           fetchGzipJson<ChampionshipYearPayload>(
-            `/results/${encodeURIComponent(series)}-${encodeURIComponent(year)}.json.gz`
+            `/results/${encodeURIComponent(series)}-${championshipSeasonSlug(year)}.json.gz`
           ),
           fetchGzipJson<RaceMetadata>('/results/races.json.gz'),
         ]);
@@ -1206,6 +1209,7 @@ export default function ChampionshipYearPageClient({
           <OfficialStandingsView
             standings={official}
             year={year}
+            raceSchedule={raceSchedule}
             raceMetadata={raceMetadata}
             clubSlugs={Object.fromEntries(
               Object.entries(clubNameToInfo).map(([name, info]) => [name, info.slug])
@@ -1379,12 +1383,12 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {renderEventList(runner.countingEvents, raceMetadata, year)}
+                                {renderEventList(runner.countingEvents, raceMetadata, year, raceSchedule)}
                                 {runner.remainingEvents &&
                                 runner.remainingEvents.length > 0 ? (
                                   <>
                                     {' ('}
-                                    {renderEventList(runner.remainingEvents, raceMetadata, year)}
+                                    {renderEventList(runner.remainingEvents, raceMetadata, year, raceSchedule)}
                                     {')'}
                                   </>
                                 ) : null}
@@ -1458,7 +1462,7 @@ export default function ChampionshipYearPageClient({
                                 {formatPoints(runner.points)}
                               </td>
                               <td className="hidden px-4 py-3 text-sm text-slate-700 sm:table-cell dark:text-slate-200">
-                                {renderEventList(runner.countingEvents, raceMetadata, year)}
+                                {renderEventList(runner.countingEvents, raceMetadata, year, raceSchedule)}
                                 {runner.remainingEvents &&
                                 runner.remainingEvents.length > 0 ? (
                                   <>
@@ -1467,7 +1471,7 @@ export default function ChampionshipYearPageClient({
                                       ? ' '
                                       : ''}
                                     {'('}
-                                    {renderEventList(runner.remainingEvents, raceMetadata, year)}
+                                    {renderEventList(runner.remainingEvents, raceMetadata, year, raceSchedule)}
                                     {')'}
                                   </>
                                 ) : null}

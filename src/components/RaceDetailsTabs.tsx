@@ -45,6 +45,7 @@ import { CORRECTIONS_EMAIL, RESULTS_EMAIL, UPDATES_EMAIL } from '@/lib/site-conf
 import { cloudinaryUrl } from '@/lib/cloudinary';
 import RaceReports from '@/components/RaceReports';
 import RaceReportCreateDialog from '@/components/RaceReportCreateDialog';
+import { matchVenuePlusCode } from '@/lib/plus-code';
 
 interface RaceDetailsTabsProps {
   raceId: string;
@@ -415,7 +416,19 @@ export default function RaceDetailsTabs({
                 <span className="font-semibold text-slate-900 dark:text-slate-100">
                   Venue:
                 </span>{' '}
-                {race.venue}
+                {race.venue && matchVenuePlusCode(race.venue) ? (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(race.venue)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${race.venue} - directions in Google Maps (opens in a new tab)`}
+                    className="text-blue-600 underline underline-offset-2 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
+                  >
+                    {race.venue}
+                  </a>
+                ) : (
+                  race.venue
+                )}
               </p>
               <p>
                 <span className="font-semibold text-gray-900 dark:text-slate-100">

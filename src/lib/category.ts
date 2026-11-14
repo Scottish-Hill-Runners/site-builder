@@ -16,7 +16,7 @@ export function parseEligibilityAgeCap(eligibility: string): number | null {
 
 export function likelySex(category: string): string {
   if (/W(OM[EA]N)?|F(EMALE)?|L(ADY)?|G(IRL)?/i.test(category)) return 'F';
-  if (/(A|NB?|NON[-\s]?BINARY)/i.test(category)) return 'NB';
+  if (/(\bA\b|\bNB?\b|NON[-\s]?BINARY)/i.test(category)) return 'NB';
   return 'M';
 }
 
@@ -28,7 +28,7 @@ export function suggestCanonicalCategory(rawCategory: string): string | null {
   const raw = rawCategory.trim();
   if (!raw) return null;
 
-  const sex = /^open\b/i.test(raw) ? 'M' : likelySex(raw);
+  const sex = likelySex(raw);
   const digitMatch = raw.match(/(\d+)/);
   if (digitMatch) return `${sex}${digitMatch[1]}`;
 
