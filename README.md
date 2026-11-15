@@ -26,8 +26,8 @@ npm run validate:results:content
 
 The homepage loads the public feed from `${NEXT_PUBLIC_ADMIN_HOST}/api/facebook-feed`
 (defaulting to the admin2 deployment). It does not contact Facebook; photographs
-are served from Cloudinary. Feed refresh and storage run in admin2, independently
-of this site's static build.
+are served from Cloudinary. Posts appear alongside recent news in date order.
+Feed refresh and storage run in admin2, independently of this site's static build.
 
 Configure admin2's server-side `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`,
 Blob and Cloudinary credentials. Set `FACEBOOK_APP_SECRET` too if the Meta app

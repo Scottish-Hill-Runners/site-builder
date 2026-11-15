@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import NewsList from '@/components/NewsList';
 import AddNewsItemSection from '@/components/AddNewsItemSection';
 import HomepageImageGrid from '@/components/HomepageImageGrid';
-import FacebookFeed from '@/components/FacebookFeed';
+import RecentUpdates from '@/components/RecentUpdates';
 import { getRecentNewsItems } from '@/lib/news';
 
 export default async function Home() {
@@ -140,9 +139,9 @@ export default async function Home() {
 
           <section className="w-full mt-8">
             <h2 className="mb-6 text-2xl font-bold text-gray-900 dark:text-slate-50">
-              Recent News
+              Latest from SHR
             </h2>
-            <NewsList items={newsItems} />
+            <RecentUpdates newsItems={newsItems} />
             <AddNewsItemSection />
             <div className="mt-6 text-right">
               <Link
@@ -153,7 +152,6 @@ export default async function Home() {
               </Link>
             </div>
           </section>
-          <FacebookFeed />
         </div>
       </main>
     </div>
