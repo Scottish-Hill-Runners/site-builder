@@ -140,3 +140,58 @@ test('the news archive still expands only one story at a time', async () => {
     container.remove();
   }
 });
+
+test('links Facebook post URLs while preserving plain text and punctuation', async () => {
+  const message = 'Results: https://www.sportident.co.uk/results/StrathearnHarriers/2026/.\n' +
+    'More at (https://example.com/a_(b)?x=1&y=2)! **Not markdown** <script>alert(1)</script>';
+  Object.defineProperty(globalThis, 'fetch', {
+    configurable: true,
+    value: async () => Response.json({
+      posts: [{ id: 'post', createdTime: '2026-01-05T12:00:00Z', message, images: [] }],
+    }),
+  });
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(<RecentUpdates newsItems={[]} />);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    const paragraph = container.querySelector('article p');
+    assert.ok(paragraph);
+    assert.equal(paragraph.textContent, message);
+    const links = paragraph.querySelectorAll('a');
+    assert.equal(links.length, 2);
+    assert.equal(links[0].getAttribute('href'), 'https://www.sportident.co.uk/results/StrathearnHarriers/2026/');
+    assert.equal(links[1].getAttribute('href'), 'https://example.com/a_(b)?x=1&y=2');
+    assert.equal(paragraph.querySelector('strong, script'), null);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
+test('expanded news links bare URLs and preserves Markdown links', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const item = {
+    ...news[0],
+    content: 'Results: https://example.com/results.\n\n[Race details](https://example.com/race)',
+  };
+  try {
+    await act(async () => root.render(<NewsList items={[item]} />));
+    const button = container.querySelector<HTMLButtonElement>('article button');
+    assert.ok(button);
+    await act(async () => button.click());
+    const links = container.querySelectorAll('article a');
+    assert.equal(links.length, 2);
+    assert.equal(links[0].getAttribute('href'), 'https://example.com/results');
+    assert.equal(links[1].getAttribute('href'), 'https://example.com/race');
+    assert.equal(links[1].textContent, 'Race details');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});

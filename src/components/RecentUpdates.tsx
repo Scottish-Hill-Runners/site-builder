@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import MarkdownIt from 'markdown-it';
 import { ADMIN_HOST } from '@/lib/site-config';
 import type { NewsItem } from '@/lib/news';
 import { NewsCard } from '@/components/NewsList';
@@ -11,6 +12,27 @@ type Post = {
   message: string;
   images: { url: string; description?: string }[];
 };
+
+const linkify = new MarkdownIt().linkify;
+
+function linkifyMessage(message: string): ReactNode {
+  const links = linkify.match(message);
+  if (!links) return message;
+
+  const parts: ReactNode[] = [];
+  let end = 0;
+  for (const link of links) {
+    parts.push(message.slice(end, link.index));
+    parts.push(
+      <a key={link.index} href={link.url} className="break-all text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">
+        {message.slice(link.index, link.lastIndex)}
+      </a>,
+    );
+    end = link.lastIndex;
+  }
+  parts.push(message.slice(end));
+  return parts;
+}
 
 function isPost(value: unknown): value is Post {
   if (!value || typeof value !== 'object') return false;
@@ -93,7 +115,7 @@ export default function RecentUpdates({ newsItems }: { newsItems: NewsItem[] }) 
               </time>
               <span className="text-xs font-medium text-gray-500 dark:text-slate-400">Facebook</span>
             </div>
-            {entry.item.message && <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800 dark:text-slate-200">{entry.item.message}</p>}
+            {entry.item.message && <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800 dark:text-slate-200">{linkifyMessage(entry.item.message)}</p>}
             {entry.item.images.length > 0 && <div className="mt-3 grid grid-cols-2 gap-2">
               {entry.item.images.map((image, index) => (
                 // Cloudinary serves these directly; the static export has no Next.js image optimizer.
