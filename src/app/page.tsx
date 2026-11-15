@@ -2,6 +2,7 @@ import Link from 'next/link';
 import NewsList from '@/components/NewsList';
 import AddNewsItemSection from '@/components/AddNewsItemSection';
 import HomepageImageGrid from '@/components/HomepageImageGrid';
+import FacebookFeed from '@/components/FacebookFeed';
 import { getRecentNewsItems } from '@/lib/news';
 
 export default async function Home() {
@@ -152,6 +153,7 @@ export default async function Home() {
               </Link>
             </div>
           </section>
+          <FacebookFeed />
         </div>
       </main>
     </div>

@@ -22,6 +22,42 @@ Validation against synced content:
 npm run validate:results:content
 ```
 
+## Facebook feed
+
+The homepage loads the public feed from `${NEXT_PUBLIC_ADMIN_HOST}/api/facebook-feed`
+(defaulting to the admin2 deployment). It does not contact Facebook; photographs
+are served from Cloudinary. Feed refresh and storage run in admin2, independently
+of this site's static build.
+
+Configure admin2's server-side `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`,
+Blob and Cloudinary credentials. Set `FACEBOOK_APP_SECRET` too if the Meta app
+requires app-secret proof. Never use `NEXT_PUBLIC_` for these secrets.
+The [Meta Pages API](https://developers.facebook.com/docs/graph-api/reference/page/feed/)
+documents the Page tasks, permissions and app-review requirements. To create a
+long-lived Page token, follow [Meta's token guide](https://developers.facebook.com/documentation/facebook-login/guides/access-tokens/get-long-lived.md)
+and verify the resulting token in Meta's debugger. Tokens can be revoked even
+when they have no scheduled expiry; regenerate and redeploy if needed.
+If `/me/accounts` omits SHR, try requesting `/{page-id}?fields=access_token`
+with the long-lived user token and verify the returned Page token's expiry.
+
+An authenticated admin uses **Facebook feed → Refresh feed** in admin2.
+Only published Page-owned text and photo posts are imported; shared posts and
+videos are excluded. Meta's feed is ranked and may not expose every post, so the
+30 retained entries are the newest eligible entries returned by the API, not
+a guaranteed complete Facebook archive. Each successful refresh removes
+superseded feed-owned Cloudinary photos. Failed deletions are retried on later
+refreshes; interrupted upload journals become eligible for cleanup after 24
+hours. No scheduled refresh or cleanup runs without an admin refresh.
+Very large photo feeds can exceed the hosting platform's function timeout; the
+previous feed remains available and an interrupted upload is cleaned up later.
+
+If Meta cannot establish whether a previously imported post is still available,
+the existing copy is retained and flagged for admin review. An admin can remove
+it from the feed; it remains suppressed while it is among the latest 30 eligible
+posts. A refresh publishes a new snapshot only after its photos are uploaded;
+if a write times out, check the feed and logs to establish the outcome. Confirm that SHR
+has permission to republish photos and comply with Meta's platform terms.
+
 ## Overview
 
 The `build-race-results.js` script transforms raw race results from CSV files into compressed JSON format that the application uses.
