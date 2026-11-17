@@ -32,6 +32,87 @@ Object.defineProperties(globalThis, {
 dom.window.HTMLElement.prototype.scrollTo = () => {};
 after(() => dom.window.close());
 
+test('calendar PDF selection applies year, remaining dates, and race filters', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-01T12:00:00') });
+  const calendar = [
+    { Date: '2025-01-01', raceName: 'Previous Race', distance: 5 },
+    { Date: '2027-01-01', raceName: 'Next Race', distance: 5 },
+    { Date: '2026-05-01', raceName: 'Past Race', distance: 5, climb: 150 },
+    { Date: '2026-10-01', raceName: 'Today Race', distance: 5, climb: 300, championships: { test: 'Test Series' } },
+    { Date: '2026-10-02', raceName: 'Long Race', distance: 30, climb: 1800 },
+    { Date: '2026-10-03', raceName: 'Missing Distance' },
+    { Date: '2028-02-31', raceName: 'Invalid Date' },
+  ];
+  Object.defineProperty(globalThis, 'fetch', {
+    configurable: true,
+    value: async (url: string) => {
+      if (url === '/asset-manifest.json') return Response.json({ files: {} });
+      if (url === '/calendar.json.gz') return new Response(gzipSync(JSON.stringify(calendar)));
+      return new Response(null, { status: 404 });
+    },
+  });
+  const { default: CalendarPageClient } = await import('../src/app/calendar/calendar-page-client');
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<CalendarPageClient />));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    const selects = [...container.querySelectorAll('select')];
+    assert.deepEqual([...selects[0].options].map((option) => option.value), ['2025', '2026', '2027']);
+    const section = container.querySelector('[aria-labelledby="pdf-heading"]');
+    assert.ok(section);
+    const setSelect = (select: HTMLSelectElement, value: string) => {
+      act(() => {
+        select.value = value;
+        select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      });
+    };
+    const clickChip = (title: string) => {
+      const chip = container.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+      assert.ok(chip);
+      act(() => chip.click());
+    };
+    assert.match(section.textContent ?? '', /4 races selected/);
+    assert.equal(selects[1].disabled, false);
+    clickChip('Short (< 10 km)');
+    assert.match(section.textContent ?? '', /2 races selected/);
+    setSelect(selects[1], 'remaining');
+    assert.match(section.textContent ?? '', /1 race selected/);
+    clickChip('Category A (≥ 50 m/km)');
+    assert.match(section.textContent ?? '', /1 race selected/);
+    setSelect(selects[0], '2027');
+    assert.equal(selects[1].value, 'year');
+    assert.equal(selects[1].disabled, true);
+    assert.match(section.textContent ?? '', /0 races selected/);
+    assert.equal(section.querySelector<HTMLButtonElement>('button')?.disabled, true);
+    clickChip('Category A (≥ 50 m/km)');
+    assert.match(section.textContent ?? '', /1 race selected/);
+    setSelect(selects[0], '2026');
+    assert.equal(selects[1].disabled, false);
+    assert.equal(selects[1].value, 'year');
+    assert.match(section.textContent ?? '', /2 races selected/);
+    setSelect(selects[1], 'remaining');
+    assert.match(section.textContent ?? '', /1 race selected/);
+    setSelect(selects[0], '2025');
+    assert.equal(selects[1].disabled, true);
+    assert.equal(selects[1].value, 'year');
+    assert.match(section.textContent ?? '', /1 race selected/);
+    setSelect(selects[0], '2026');
+    setSelect(selects[1], 'remaining');
+    t.mock.timers.setTime(new Date('2027-01-01T12:00:00').getTime());
+    clickChip('Category A (≥ 50 m/km)');
+    assert.equal(selects[1].disabled, true);
+    assert.equal(selects[1].value, 'year');
+    setSelect(selects[0], '2027');
+    assert.equal(selects[1].disabled, false);
+    assert.equal(selects[1].value, 'year');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
 test('race results check uses the latest current-year date without hiding the next race', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-01T12:00:00Z') });
   const originalDomain = process.env.NEXT_PUBLIC_CORRECTIONS_EMAIL_DOMAIN;

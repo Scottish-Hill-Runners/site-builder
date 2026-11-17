@@ -93,6 +93,20 @@ The pre-build step generates compressed JSON files.
 - `championships.json` contains an entry for each championship series.
 - Race reports are written separately to `public/reports/{raceId}.json.gz`.
 
+Visitors can download a printable PDF from the calendar page. It is generated
+in the browser for the chosen year. The current year can include either the
+whole year or the remaining races; other years always include the whole year.
+The PDF includes only races matching the selected championship, distance
+and ascent filters. It includes the race venue, distance, ascent, organiser,
+website, men's and women's records, and championship series when available.
+Categories are estimates based on the site's rounded distance bands
+(short < 10 km, medium < 20 km, long otherwise) and ascent per km
+(A >= 50 m, B >= 25 m, C >= 20 m); they are not official classifications.
+Dates and details should be confirmed with the organiser. Records are the
+current records in the race data, not historical records for the selected year.
+Organiser contact details included in the public race data are also printed in
+the PDFs.
+
 Race metadata can specify an absolute `raceDate`, such as `13th June 2027`
 or `Sunday 13th June 2027`. The weekday is optional and is ignored when
 calculating the date. The year is also optional for recurring dates.

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { fetchGzipJson } from '@/lib/client-results-fetch';
 import { useUnits } from '@/components/UnitsProvider';
 import { formatDistance, formatClimb } from '@/lib/units';
+import type { AllRaceData } from '@/types/datatable';
 import HighlightBar from './HighlightBar';
 
 type CalendarEntry = {
@@ -145,10 +146,10 @@ function matchesHighlights(
 
   // Distance group — OR within
   const distKeys = [...active].filter((k) => k.startsWith('dist:'));
-  if (distKeys.length > 0 && entry.distance !== undefined) {
+  if (distKeys.length > 0) {
+    if (entry.distance === undefined || !Number.isFinite(entry.distance)) return false;
     const d = Math.round(entry.distance);
     const matches = distKeys.some((k) => {
-      if (d === undefined) return false;
       const cat = k.slice(5);
       if (cat === 'S') return d < 10;
       if (cat === 'M') return d >= 10 && d < 20;
@@ -181,6 +182,21 @@ function matchesHighlights(
   return true;
 }
 
+function getDownloadEntries(
+  entries: CalendarEntry[],
+  year: string | undefined,
+  range: 'year' | 'remaining',
+  active: Set<string>,
+  today: Date,
+): CalendarEntry[] {
+  return entries.filter((entry) => {
+    if (!entry.Date.startsWith(`${year}-`)) return false;
+    const date = parseRaceDate(entry.Date);
+    if (!date || getMonthKey(date) !== entry.Date.slice(0, 7) || date.getDate() !== Number(entry.Date.slice(8))) return false;
+    return (range === 'year' || date >= today) && matchesHighlights(entry, active);
+  }).sort((a, b) => a.Date.localeCompare(b.Date) || a.raceName.localeCompare(b.raceName));
+}
+
 function getDayMatchColor(
   entries: CalendarEntry[],
   day: number,
@@ -208,6 +224,10 @@ export default function CalendarPageClient() {
   const [activeHighlights, setActiveHighlights] = useState<Set<string>>(
     () => new Set(),
   );
+  const [downloadYear, setDownloadYear] = useState('');
+  const [downloadRange, setDownloadRange] = useState<'year' | 'remaining'>('year');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const toggleHighlight = (key: string) => {
     setActiveHighlights((prev) => {
@@ -234,6 +254,79 @@ export default function CalendarPageClient() {
   const monthGroups = useMemo(() => {
     return entries ? buildMonthGroups(entries) : [];
   }, [entries]);
+
+  const downloadYears = [...new Set(
+    (entries ?? []).flatMap((entry) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.Date)) return [];
+      const date = new Date(`${entry.Date}T00:00:00Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === entry.Date
+        ? [entry.Date.slice(0, 4)]
+        : [];
+    })
+  )].sort();
+  const selectedDownloadYear = downloadYears.includes(downloadYear)
+    ? downloadYear
+    : downloadYears.find((year) => Number(year) >= new Date().getFullYear()) ?? downloadYears[0];
+  const today = startOfToday();
+  const isCurrentDownloadYear = selectedDownloadYear === String(today.getFullYear());
+  const effectiveDownloadRange = isCurrentDownloadYear ? downloadRange : 'year';
+  const downloadEntries = getDownloadEntries(entries ?? [], selectedDownloadYear, effectiveDownloadRange, activeHighlights, today);
+
+  async function downloadPdf() {
+    if (!selectedDownloadYear || downloadEntries.length === 0 || isGeneratingPdf) return;
+    const downloadToday = startOfToday();
+    const range = selectedDownloadYear === String(downloadToday.getFullYear()) ? effectiveDownloadRange : 'year';
+    const selectedEntries = getDownloadEntries(entries ?? [], selectedDownloadYear, range, activeHighlights, downloadToday);
+    if (selectedEntries.length === 0) {
+      setPdfError('No races match this selection. Please update the filters or date range.');
+      return;
+    }
+    setIsGeneratingPdf(true);
+    setPdfError(null);
+    try {
+      const [raceResult, logoModule, pdfModule] = await Promise.all([
+        fetchGzipJson<AllRaceData>('/results/races.json.gz'),
+        import('./shr-logo.jpg'),
+        import('./calendar-pdf'),
+      ]);
+      if (raceResult.status === 'not-found') throw new Error('Race details not found');
+      if (raceResult.status === 'error') throw raceResult.error;
+      const logoResponse = await fetch(logoModule.default.src);
+      if (!logoResponse.ok) throw new Error(`Logo request failed with status ${logoResponse.status}`);
+      const logoBlob = await logoResponse.blob();
+      const logo = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string'
+          ? resolve(reader.result) : reject(new Error('Could not read the logo'));
+        reader.onerror = () => reject(reader.error ?? new Error('Could not read the logo'));
+        reader.readAsDataURL(logoBlob);
+      });
+      const filterLabels = [...activeHighlights].map((key) => {
+        if (key.startsWith('champ:')) {
+          return availableChampionships.find((champ) => champ.slug === key.slice(6))?.title ?? key.slice(6);
+        }
+        return key.startsWith('dist:') ? `Distance ${key.slice(5)}` : `Ascent ${key.slice(4)}`;
+      });
+      const rangeLabel = range === 'year'
+        ? 'Whole year'
+        : `From ${downloadToday.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      const selection = `${rangeLabel} | Filters: ${filterLabels.length ? filterLabels.join(', ') : 'None'}`;
+      const pdf = await pdfModule.renderCalendar(selectedDownloadYear, selectedEntries, raceResult.data, logo, selection);
+      const url = URL.createObjectURL(pdf);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `shr-calendar-${selectedDownloadYear}${range === 'remaining' ? '-remaining' : ''}.pdf`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      console.error('Failed to generate calendar PDF:', error);
+      setPdfError('Could not generate the calendar PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }
 
   // Derive the active month during render instead of syncing via an effect;
   // falls back to today's month / next upcoming month when there's no valid explicit selection.
@@ -620,6 +713,42 @@ export default function CalendarPageClient() {
                 </p>
               )}
             </section>
+            {downloadYears.length > 0 && (
+              <section aria-labelledby="pdf-heading" className="rounded-lg border border-blue-100 bg-white p-4 shadow-md dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+                <h2 id="pdf-heading" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Download calendar
+                </h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  The PDF includes races matching the filters above, across the selected year.
+                </p>
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Year
+                    <select value={selectedDownloadYear} onChange={(event) => {
+                      setDownloadYear(event.target.value);
+                      setDownloadRange('year');
+                    }} disabled={isGeneratingPdf} className="rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950">
+                      {downloadYears.map((year) => <option key={year} value={year}>{year}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Date range
+                    <select value={effectiveDownloadRange} onChange={(event) => setDownloadRange(event.target.value === 'remaining' ? 'remaining' : 'year')} disabled={isGeneratingPdf || !isCurrentDownloadYear} className="rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950">
+                      <option value="year">Whole year</option>
+                      <option value="remaining">Remaining races</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={downloadPdf} disabled={isGeneratingPdf || downloadEntries.length === 0} className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF'}
+                  </button>
+                  <span className="pb-2 text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
+                    {downloadEntries.length} {downloadEntries.length === 1 ? 'race' : 'races'} selected
+                  </span>
+                </div>
+                {!isCurrentDownloadYear && <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Remaining races is only available for the current year.</p>}
+                {pdfError && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{pdfError}</p>}
+              </section>
+            )}
           </div>
         ) : (
           <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-slate-900">
