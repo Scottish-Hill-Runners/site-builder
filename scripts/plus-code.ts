@@ -17,6 +17,11 @@ const LOCALITY_REFERENCES: Array<{
     latitude: 54.9579,
     longitude: -4.4849,
   },
+  {
+    pattern: /\bbanchory\b/i,
+    latitude: 57.053750,
+    longitude: -2.491250
+  }
 ];
 
 type Coordinates = { latitude: number; longitude: number };
