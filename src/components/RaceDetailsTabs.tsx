@@ -65,7 +65,7 @@ interface RaceDetailsTabsProps {
   initialCategoryFilter?: string;
   /** Latest calendar occurrence in the current year, in ISO date format. */
   latestCalendarDate?: string;
-  /** Latest calendar occurrence, used to display the next race date. */
+  /** Earliest calendar occurrence on or after today, in ISO date format. */
   nextRaceDate?: string;
 }
 

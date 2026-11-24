@@ -174,6 +174,27 @@ test('race results check uses the latest current-year date without hiding the ne
     await resetPage();
     calendar = [
       { Date: '2027-05-01', raceId: 'TestRace' },
+      { Date: '2026-12-01', raceId: 'TestRace' },
+      { Date: '2026-10-15', raceId: 'TestRace' },
+      { Date: '2026-10-02', raceId: 'AnotherRace' },
+      { Date: '2026-05-01', raceId: 'TestRace' },
+    ];
+    await renderPage();
+    assert.match(container.textContent ?? '', /Next race date:\s*15 October 2026/);
+
+    await resetPage();
+    calendar = [
+      { Date: '2027-05-01', raceId: 'TestRace' },
+      { Date: '2026-10-01', raceId: 'TestRace' },
+      { Date: '2026-09-01', raceId: 'TestRace' },
+    ];
+    await renderPage();
+    assert.match(container.textContent ?? '', /Next race date:\s*1 October 2026/);
+
+    await resetPage();
+    calendar = [
+      { Date: '2028-05-01', raceId: 'TestRace' },
+      { Date: '2027-05-01', raceId: 'TestRace' },
       { Date: '2025-05-01', raceId: 'TestRace' },
     ];
     await renderPage();
@@ -192,6 +213,7 @@ test('race results check uses the latest current-year date without hiding the ne
     calendar = [{ Date: '2026-05-01', raceId: 'TestRace' }];
     results = [{ raceId: 'TestRace', year: '2026', position: 1, name: 'Runner', category: 'M', categoryPos: {}, time: '30:00' }];
     await renderPage();
+    assert.doesNotMatch(container.textContent ?? '', /Next race date:/);
     clickTab('Results');
     assert.doesNotMatch(container.textContent ?? '', /have not been uploaded yet/);
   } finally {
