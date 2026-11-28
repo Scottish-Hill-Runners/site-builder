@@ -34,7 +34,7 @@ export default async function Home() {
                   Info
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Membership and guidance
+                  SHR Info and membership
                 </p>
               </Link>
               <Link
@@ -115,12 +115,12 @@ export default async function Home() {
                 </p>
               </Link>
               <Link
-                href="https://www.sientries.co.uk/event_series.php?series_id=601"
+                href="/info/organisers"
                 className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
               >
-                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Join now!</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-slate-50">Race organisers</h3>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Become a member of SHR
+                  Information for race organisers
                 </p>
               </Link>
             </div>
