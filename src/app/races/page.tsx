@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { loadAllRaces, loadCalendar } from '@/lib/results-data';
 import RaceListFilter from '@/app/races/race-list-filter';
+import { RaceInfoCreateLink } from '@/components/RaceInfoCreateDialog';
 import type { RaceInfo } from '@/types/datatable';
 
 export default async function RaceListPage() {
@@ -56,6 +57,7 @@ export default async function RaceListPage() {
         ) : (
           <RaceListFilter races={races} calendar={calendar} />
         )}
+        <RaceInfoCreateLink />
       </div>
     </main>
   );

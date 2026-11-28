@@ -86,37 +86,44 @@ project-root/
 
 The pre-build step generates compressed JSON files.
 
-- Each race has a `.json` file containing the extracted contents of `index.md` and all the results for the race.
-- A set of files `R-0` to `R-99` contain individual results, grouped by a hash of the runner surname.
-- A `years.json` file gives statistics of the number of runners in each category for each year.
-- `races.json` contains an entry for each race, with race details and organiser contact information.
+- Each race has a `.json` file containing the extracted contents of `index.md`
+  and all the results for the race.
+- A set of files `R-0` to `R-99` contain individual results, grouped by a hash
+  of the runner surname.
+- A `years.json` file gives statistics of the number of runners in each category
+  for each year.
+- `races.json` contains an entry for each race, with race details and organiser
+  contact information.
+- `race-ids.json` lists all race directories, including those without an
+  `index.md`, for checking new race IDs. Requests are emailed for review; the
+  reviewer must recheck availability against current content before creating a
+  race.
 - `championships.json` contains an entry for each championship series.
 - Race reports are written separately to `public/reports/{raceId}.json.gz`.
 
-Visitors can download a printable PDF from the calendar page. It is generated
-in the browser for the chosen year. The current year can include either the
-whole year or the remaining races; other years always include the whole year.
-The PDF includes only races matching the selected championship, distance
-and ascent filters. It includes the race venue, distance, ascent, organiser,
-website, men's and women's records, and championship series when available.
-Categories are estimates based on the site's rounded distance bands
-(short < 10 km, medium < 20 km, long otherwise) and ascent per km
-(A >= 50 m, B >= 25 m, C >= 20 m); they are not official classifications.
-Dates and details should be confirmed with the organiser. Records are the
-current records in the race data, not historical records for the selected year.
-Organiser contact details included in the public race data are also printed in
-the PDFs.
+Visitors can download a printable PDF from the calendar page. It is generated in
+the browser for the chosen year. The current year can include either the whole
+year or the remaining races; other years always include the whole year. The PDF
+includes only races matching the selected championship, distance and ascent
+filters. It includes the race venue, distance, ascent, organiser, website, men's
+and women's records, and championship series when available. Categories are
+estimates based on the site's rounded distance bands (short < 10 km, medium < 20
+km, long otherwise) and ascent per km (A >= 50 m, B >= 25 m, C >= 20 m); they
+are not official classifications. Dates and details should be confirmed with the
+organiser. Records are the current records in the race data, not historical
+records for the selected year. Organiser contact details included in the public
+race data are also printed in the PDFs.
 
-Race metadata can specify an absolute `raceDate`, such as `13th June 2027`
-or `Sunday 13th June 2027`. The weekday is optional and is ignored when
-calculating the date. The year is also optional for recurring dates.
+Race metadata can specify an absolute `raceDate`, such as `13th June 2027` or
+`Sunday 13th June 2027`. The weekday is optional and is ignored when calculating
+the date. The year is also optional for recurring dates.
 
 Championship frontmatter can use a quoted consecutive-year season such as
 `'2026/27'` or `'2026/2027'` instead of a single year. For each race, the
-schedule uses the calendar date closest to 1 January of the second year;
-ties go to the earlier date. Results are taken from the year of that date.
-If there is no calendar date, results from either year are included. Official
-standings CSVs use a hyphen in place of the slash, e.g. `2026-27.csv`.
+schedule uses the calendar date closest to 1 January of the second year; ties go
+to the earlier date. Results are taken from the year of that date. If there is
+no calendar date, results from either year are included. Official standings CSVs
+use a hyphen in place of the slash, e.g. `2026-27.csv`.
 
 ```text
 ├── public/

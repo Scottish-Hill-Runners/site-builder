@@ -7,6 +7,7 @@ import type { RaceInfo } from '@/types/datatable';
 import { UPDATES_EMAIL } from '@/lib/site-config';
 import { toWhomItMayConcern } from '@/lib/to-whom-it-may-concern';
 import { sendMailto } from '@/lib/navigate-to-mailto';
+import { createRaceInfoEmail, raceIdError, suggestRaceId } from '@/lib/race-info-creation';
 
 const MdxEditorClient = dynamic(
   () => import('@/components/mdx-editor-client').then((mod) => mod.MdxEditorClient),
@@ -33,6 +34,7 @@ export interface RaceInfoEditDialogProps {
 
 interface FrontmatterFields {
   title: string;
+  venue: string;
   distance: string;
   climb: string;
   maleRecord: string;
@@ -49,6 +51,7 @@ const labelClass = 'mb-1 block text-sm font-medium text-gray-700 dark:text-slate
 function toFields(race: RaceInfo, organiser: string | null): FrontmatterFields {
   return {
     title: race.title ?? '',
+    venue: race.venue ?? '',
     distance: race.distance !== undefined && race.distance !== null ? String(race.distance) : '',
     climb: race.climb !== undefined && race.climb !== null ? String(race.climb) : '',
     maleRecord: race.maleRecord ?? '',
@@ -59,19 +62,40 @@ function toFields(race: RaceInfo, organiser: string | null): FrontmatterFields {
   };
 }
 
-export default function RaceInfoEditDialog({
-  open,
-  onClose,
-  raceId,
-  raceTitle,
-  race,
-  organiser,
-  contents,
-}: RaceInfoEditDialogProps) {
+type RaceInfoDialogProps = RaceInfoEditDialogProps | {
+  open: boolean;
+  onClose: () => void;
+  mode: 'create';
+  existingIds: string[] | null;
+  idsLoading: boolean;
+};
+
+const emptyFields: FrontmatterFields = {
+  title: '', venue: '', distance: '', climb: '', maleRecord: '', femaleRecord: '',
+  raceDate: '', web: '', organiser: '',
+};
+
+export default function RaceInfoEditDialog(props: RaceInfoEditDialogProps) {
+  return <RaceInfoDialog {...props} />;
+}
+
+export function RaceInfoDialog(props: RaceInfoDialogProps) {
+  const creating = 'mode' in props;
+  const { open, onClose } = props;
+  const contents = creating ? '' : props.contents;
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [original, setOriginal] = useState<FrontmatterFields>(() => toFields(race, organiser));
+  const [original, setOriginal] = useState<FrontmatterFields>(() =>
+    creating ? emptyFields : toFields(props.race, props.organiser)
+  );
   const [fields, setFields] = useState<FrontmatterFields>(original);
   const [body, setBody] = useState(contents);
+  const [newRaceId, setNewRaceId] = useState('');
+  const [idEdited, setIdEdited] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const formId = creating ? 'race-create' : 'ri';
+  const effectiveRaceId = creating && !idEdited
+    ? suggestRaceId(fields.title, props.existingIds ?? [])
+    : newRaceId;
 
   // Open / close the native dialog imperatively so the backdrop renders correctly.
   useEffect(() => {
@@ -87,10 +111,13 @@ export default function RaceInfoEditDialog({
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
-      const freshFields = toFields(race, organiser);
+      const freshFields = creating ? emptyFields : toFields(props.race, props.organiser);
       setOriginal(freshFields);
       setFields(freshFields);
       setBody(contents);
+      setNewRaceId('');
+      setIdEdited(false);
+      setSubmitError(null);
     }
   }
 
@@ -110,10 +137,12 @@ export default function RaceInfoEditDialog({
 
   function updateField<K extends keyof FrontmatterFields>(key: K, value: string) {
     setFields((prev) => ({ ...prev, [key]: value }));
+    setSubmitError(null);
   }
 
   const changedFrontmatter: Record<string, string | number | string[]> = {};
   (Object.keys(fields) as Array<keyof FrontmatterFields>).forEach((key) => {
+    if (key === 'venue' && !creating) return;
     const value = fields[key].trim();
     if (!value || value === original[key].trim()) return;
     if (key === 'distance' || key === 'climb') {
@@ -130,21 +159,39 @@ export default function RaceInfoEditDialog({
   });
   const bodyChanged = body.trim() !== contents.trim();
   const hasChanges = Object.keys(changedFrontmatter).length > 0 || bodyChanged;
+  const idError = creating && !props.idsLoading && (effectiveRaceId || !props.existingIds)
+    ? raceIdError(effectiveRaceId, props.existingIds)
+    : null;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!UPDATES_EMAIL || !hasChanges) return;
 
+    if (creating) {
+      if (props.idsLoading) return;
+      const error = raceIdError(effectiveRaceId, props.existingIds)
+        ?? (!fields.title.trim() ? 'Enter a race title.' : null)
+        ?? (/^\s*!--/m.test(body) ? 'The description cannot contain a line beginning with !--.' : null);
+      if (error || !props.existingIds) {
+        setSubmitError(error);
+        return;
+      }
+      const email = createRaceInfoEmail(effectiveRaceId, changedFrontmatter, body, props.existingIds);
+      sendMailto({ to: UPDATES_EMAIL, ...email });
+      onClose();
+      return;
+    }
+
     const frontmatterBlock = Object.keys(changedFrontmatter).length
       ? YAML.stringify(changedFrontmatter).trimEnd()
       : '';
 
-    const subject = `Race details update for ${raceTitle} (${raceId})`;
+    const subject = `Race details update for ${props.raceTitle} (${props.raceId})`;
     const emailBody =
       `To ${toWhomItMayConcern()}:\n\n` +
       `I would like to update the details for the race below.\n\n` +
       `!-- IF YOU EDIT THE TEXT BELOW, PLEASE DO SO WITH CARE\n` +
-      `File: races/${raceId}/index.md\n` +
+      `File: races/${props.raceId}/index.md\n` +
       `---\n${frontmatterBlock}\n---\n` +
       (bodyChanged ? `${body.trim()}\n` : '') +
       `!-- END OF SENSITIVE SECTION\n`;
@@ -158,37 +205,58 @@ export default function RaceInfoEditDialog({
   return (
     <dialog
       ref={dialogRef}
+      aria-labelledby={`${formId}-dialog-title`}
       onClick={handleBackdropClick}
       className="m-auto w-full max-w-2xl rounded-xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-black/40 dark:border-slate-700 dark:bg-slate-900"
     >
       <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Edit race details
+        <h2 id={`${formId}-dialog-title`} className="text-lg font-semibold text-gray-900 dark:text-white">
+          {creating ? 'Add a race' : 'Edit race details'}
         </h2>
         <p className="text-sm text-gray-600 dark:text-slate-300">
-          Update any of the fields below, then send us the changes by email for review.
+          {creating ? 'Enter the race details, then send them by email for review.' : 'Update any of the fields below, then send us the changes by email for review.'}
         </p>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <label className={labelClass} htmlFor="ri-title">
+            <label className={labelClass} htmlFor={`${formId}-title`}>
               Race title
             </label>
             <input
-              id="ri-title"
+              id={`${formId}-title`}
               type="text"
               value={fields.title}
               onChange={(e) => updateField('title', e.target.value)}
               className={inputClass}
+              required={creating}
             />
           </div>
 
+          {creating && (
+            <>
+              <div className="col-span-2">
+                <label className={labelClass} htmlFor="race-create-id">Race ID</label>
+                <input id="race-create-id" type="text" value={effectiveRaceId} required
+                  onChange={(e) => { setNewRaceId(e.target.value); setIdEdited(true); setSubmitError(null); }}
+                  className={inputClass} aria-describedby="race-create-id-help" aria-invalid={Boolean(idError)} />
+                <p id="race-create-id-help" className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                  Letters, numbers, hyphens and underscores only. This becomes part of the race URL.
+                </p>
+              </div>
+              <div className="col-span-2">
+                <label className={labelClass} htmlFor="race-create-venue">Venue</label>
+                <input id="race-create-venue" type="text" value={fields.venue}
+                  onChange={(e) => updateField('venue', e.target.value)} className={inputClass} />
+              </div>
+            </>
+          )}
+
           <div>
-            <label className={labelClass} htmlFor="ri-distance">
+            <label className={labelClass} htmlFor={`${formId}-distance`}>
               Distance (km)
             </label>
             <input
-              id="ri-distance"
+              id={`${formId}-distance`}
               type="number"
               step="0.1"
               min={0}
@@ -199,11 +267,11 @@ export default function RaceInfoEditDialog({
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="ri-climb">
+            <label className={labelClass} htmlFor={`${formId}-climb`}>
               Climb (m)
             </label>
             <input
-              id="ri-climb"
+              id={`${formId}-climb`}
               type="number"
               step="1"
               min={0}
@@ -213,7 +281,7 @@ export default function RaceInfoEditDialog({
             />
           </div>
 
-          <div>
+          {!creating && <div>
             <label className={labelClass} htmlFor="ri-male-record">
               Male record
             </label>
@@ -225,9 +293,9 @@ export default function RaceInfoEditDialog({
               className={inputClass}
               placeholder="Name, time (year)"
             />
-          </div>
+          </div>}
 
-          <div>
+          {!creating && <div>
             <label className={labelClass} htmlFor="ri-female-record">
               Female record
             </label>
@@ -239,33 +307,37 @@ export default function RaceInfoEditDialog({
               className={inputClass}
               placeholder="Name, time (year)"
             />
-          </div>
+          </div>}
 
           <div className="col-span-2">
-            <label className={labelClass} htmlFor="ri-race-date">
+            <label className={labelClass} htmlFor={`${formId}-race-date`}>
               Race date rule
             </label>
             <input
-              id="ri-race-date"
+              id={`${formId}-race-date`}
               type="text"
               value={fields.raceDate}
               onChange={(e) => updateField('raceDate', e.target.value)}
               className={inputClass}
-              placeholder="e.g. Last Saturday in June"
+              placeholder="e.g. 5th June 2027"
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-              Used to work out future dates automatically. Supported formats: &quot;2nd
-              Sunday in May&quot;, &quot;Last Saturday in June&quot;, &quot;25th December&quot;,
-              or &quot;Day after some-other-race-id&quot;.
+              Omit the year to get a perpetual date.
+              Perpetual dates can be used to work out future dates automatically.
+              Supported formats:
+                &quot;2nd Sunday in May&quot;,
+                &quot;Last Saturday in June&quot;,
+                &quot;25th December&quot;, or
+                &quot;Day after some-other-race-id&quot;.
             </p>
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="ri-web">
+            <label className={labelClass} htmlFor={`${formId}-web`}>
               Website
             </label>
             <input
-              id="ri-web"
+              id={`${formId}-web`}
               type="text"
               value={fields.web}
               onChange={(e) => updateField('web', e.target.value)}
@@ -275,11 +347,11 @@ export default function RaceInfoEditDialog({
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="ri-organiser">
+            <label className={labelClass} htmlFor={`${formId}-organiser`}>
               Organiser
             </label>
             <input
-              id="ri-organiser"
+              id={`${formId}-organiser`}
               type="text"
               value={fields.organiser}
               onChange={(e) => updateField('organiser', e.target.value)}
@@ -289,15 +361,21 @@ export default function RaceInfoEditDialog({
           </div>
         </div>
 
-        <div>
-          <label className={labelClass}>Race description</label>
+        <div role="group" aria-labelledby={`${formId}-description-label`}>
+          <span id={`${formId}-description-label`} className={labelClass}>Race description</span>
           <MdxEditorClient
             markdown={body}
-            onChange={setBody}
-            placeholder="Describe the race..."
+            onChange={(value) => { setBody(value); setSubmitError(null); }}
+            placeholder={creating ? 'Describe the new race...' : 'Describe the race...'}
           />
         </div>
 
+        {creating && props.idsLoading && <p className="text-sm text-gray-600 dark:text-slate-300">Checking existing race IDs...</p>}
+        {creating && !props.idsLoading && (submitError || idError) && (
+          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+            {submitError || idError}
+          </p>
+        )}
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -308,10 +386,10 @@ export default function RaceInfoEditDialog({
           </button>
           <button
             type="submit"
-            disabled={!hasChanges}
+            disabled={!hasChanges || (creating && (props.idsLoading || !props.existingIds))}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:bg-gray-300 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
           >
-            Send update by email
+            {creating ? 'Send new race by email' : 'Send update by email'}
           </button>
         </div>
       </form>

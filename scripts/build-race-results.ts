@@ -797,6 +797,10 @@ function writeRaceData(raceMap: Map<string, RaceEntry>) {
     );
   }
   writeGz(outputDir, 'races.json', JSON.stringify(raceInfo));
+  const raceIds = fs.readdirSync(racesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+  writeGz(prebuildDir, 'race-ids.json', JSON.stringify(raceIds));
 }
 
 function writeRunnerData(allResults: RaceResult[]) {
